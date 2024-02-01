@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: fffit
+Version: 0.0.0.dev0
+Home-page: https://github.com/rsdefever/fffit
+Author: Ryan S. DeFever
+Author-email: rdefever@nd.edu
+License: MIT
+Requires-Python: >=3.6, <4
+License-File: LICENSE
