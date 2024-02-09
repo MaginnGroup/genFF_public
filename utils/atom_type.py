@@ -10,31 +10,68 @@ import numpy as np
 class Atom_Types:
     """
     Base class for atom typing schemes
+
+    Methods
+    -------
+    __init__(at_bounds, at_names, molec_map_dicts)
+    get_transformation_matrix(self, molec_key)
+    check_for_duplicates(self)
     """
 
     def __init__(self, at_bounds, at_names, molec_map_dicts):
+        """
+        Initialization Method:
+
+        Parameters
+        ----------
+        at_bounds: array, The bounds of the new atom type scheme
+        at_names: list, The names of the new atom types. Should correspond to each element in at_bounds.shape[1]
+        molec_map_dicts: dict, The dictionary of molecule property class for the old atom types
+        """
+        assert isinstance(at_bounds, np.ndarray), "at_bounds must be an np.ndarray"
+        assert isinstance(at_names, list), "at_names must be a list"
+        assert isinstance(molec_map_dicts, dict), "molec_map_dicts must be a dictionary"
+        assert all(isinstance(name, str) for name in at_names) == True, "all at_names must be string"
+        assert len(at_names) == at_bounds.shape[1], "at_bounds must have one column for each name in at_names"
+
         self.at_bounds = at_bounds
         self.at_names = at_names
         self.molec_map_dicts = molec_map_dicts
         self.at_matrices = {}
 
     def get_transformation_matrix(self, molec_key):
+        """
+        Creates transformation matrix between new and old atom types
+
+        Parameters:
+        -----------
+        molec_key: str, a key from the molec_map_dicts dictionary
+        
+        Returns:
+        --------
+        at_matrix: array, The transformation matrix from new to old atom types
+        """
+        assert molec_key in self.molec_map_dicts
+        #If you already have this matrix, use it. Otherwise generate it
         if not molec_key in self.at_matrices:
+            #Get mapping for specific molecule
             map_dict = self.molec_map_dicts[molec_key]
             #Create a matrix based on the keys and map dict length
             at_matrix = np.zeros((len(self.at_names), len(map_dict)))
-
             # Fill at_matrix with ones or zeros based on the presence of keys
             for i, value in enumerate(self.at_names):
                 if value in map_dict.values():
                     at_matrix[i, list(map_dict.values()).index(value)] = 1
-
+            #Add matrix to self dictionary
             self.at_matrices[molec_key] = at_matrix
         else:
             at_matrix = self.at_matrices[molec_key]
         return at_matrix
     
     def check_for_duplicates(self):
+        """
+        Checks for duplicates in at_matrix
+        """
         arr_list = list(self.at_matrices.values())
         tuple_list = [tuple(map(tuple, arr)) for arr in arr_list]
         len(tuple_list) != len(set(tuple_list))
@@ -43,6 +80,13 @@ class Atom_Types:
     
 
 class AT_Scheme_7(Atom_Types):
+    """
+    Class for Atom Type Scheme 7
+
+    Methods
+    -------
+    __init__(self)
+    """
     def __init__(self):
         #Get Bounds
         at_param_bounds_l = [2, 2, 1.5, 2, 2, 2, 10, 10,  2, 15, 15, 15] 

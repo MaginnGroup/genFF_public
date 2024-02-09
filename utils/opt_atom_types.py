@@ -4,10 +4,26 @@ import os
 import time
 import pandas as pd
 import pickle
+import gpflow
 from utils import r14, r32, r50, r125, r134a, r143a, r170, atom_type
 
 #Create a function for getting gp data from files
 def get_gp_data_from_pkl(key_list):
+    """
+    Get gp data from .pkl files
+
+    Parameters
+    ----------
+    key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
+
+    Returns:
+    --------
+    all_gp_dict: dict, dictionary of dictionary of gps for each property
+    """
+    valid_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
+    assert isinstance(key_list, list), "at_names must be a list"
+    assert all(isinstance(name, str) for name in key_list) == True, "all key in key_list must be string"
+    assert all(key in valid_keys for key in key_list) == True, "all key in key_list must be valid keys"
     #Make a dict of the gp dictionaries for each molecule
     all_gp_dict = {}
     #loop over molecules
@@ -15,13 +31,33 @@ def get_gp_data_from_pkl(key_list):
         #Get dict of vle gps
         #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
         file = os.path.join(key +"-vlegp/vle-gps.pkl")
+        assert os.path.isfile(file), "key-vlegp/vle-gps.pkl does not exist. Check key list carefully"
         with open(file, 'rb') as pickle_file:
             all_gp_dict[key] = pickle.load(pickle_file)
+
     return all_gp_dict
 
 
 #define the scipy function for minimizing
 def scipy_min_fxn(theta_guess, molec_data_dict, all_gp_dict, at_class):
+    """
+    The scipy function for minimizing the data
+
+    Parameters
+    ----------
+    theta_guess: np.ndarray, the initial parameter set to start optimization at
+    molec_data_dict: dict, dictionary of Refrigerant constants
+    all_gp_dict: dict, dictionary of refrigerant GP models
+    at_class: Atom_Types() instance, The class for atomy types 
+
+    Returns
+    --------
+    obj: float, the objective function from the formula defined in the paper
+    """
+    assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+    assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+    assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
+    assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
     #Initialize weight and squared error arrays
     sqerr_array  = []
     weight_array = []
@@ -71,6 +107,27 @@ def scipy_min_fxn(theta_guess, molec_data_dict, all_gp_dict, at_class):
 
 #Create fxn for analyzing a single gp w/ gpflow
 def eval_gp_new_theta(theta_guess, t_matrix, gp_object, Xexp):
+    """
+    Evaluates the gpflow model
+
+    Parameters
+    ----------
+    theta_guess: np.ndarray, the initial parameter set to start optimization at
+    t_matrix: np.ndarray, The transformation matrix from new to old atom types
+    gp_object: gpflow.models.GPR, GP Model
+    Xexp: np.ndarray, Experimental state point (Temperature) data
+
+    Returns
+    -------
+    gp_mean: tf.tensor, The (flattened) mean of the gp prediction
+    gp_var: tf.tensor, The (flattened) standard deviation of the gp prediction
+    """
+    assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+    assert isinstance(t_matrix, np.ndarray), "t_matrix must be an np.ndarray"
+    assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
+    assert isinstance(gp_object, gpflow.models.GPR)
+    assert len(theta_guess.flatten()) == len(t_matrix), "t_matrix and theta_guess must have same length"
+    assert gp_object.input_shape -1 == len(t_matrix), "gp_object.input_shape must be len(theta_guess) + 1"
     #Get theta into correct form using t_matrix
     theta_guess = theta_guess.reshape(1,-1)
     gp_theta = theta_guess@t_matrix
@@ -83,9 +140,28 @@ def eval_gp_new_theta(theta_guess, t_matrix, gp_object, Xexp):
     return np.squeeze(gp_mean), gp_std
 
 #Define fxn to optimize w/ restarts
-def optimize_ats(repeats, at_class, molec_data_dict, all_gp_dict, save_res):
-    #Add a seed here
+def optimize_ats(repeats, at_class, molec_data_dict, all_gp_dict, save_res, seed = None):
+    """
+    Optimizes New atom typing parameters
+
+    Parameters
+    ----------
+    at_class: Atom_Types() instance, The class for atomy types 
+    molec_data_dict: dict, dictionary of Refrigerant constants
+    all_gp_dict: dict, dictionary of refrigerant GP models
+    save_res: bool, Determines whether to save results
+    seed: int, seed for rng. Default None
+    """
+    assert isinstance(save_res, bool), "save_res must be bool"
+    assert isinstance(seed, int) or seed is None, "seed must be int or None"
+    assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+    assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
+    assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
     
+    #set seed here
+    if seed is not None:
+        np.random.seed(seed)
+
     #Get initial guesses
     lb = at_class.at_bounds[:,0].T
     ub = at_class.at_bounds[:,1].T
