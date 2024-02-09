@@ -131,8 +131,9 @@ def optimize_ats(repeats, at_class, molec_data_dict, all_gp_dict, save_res):
         ls_results = pd.concat([ls_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
 
         if save_res:
-            os.makedirs("Results", exist_ok=True) 
-            save_path = os.path.join("Results, opt_at_results.csv")
-            ls_results.to_csv(save_path, index = False)
+            dir_name = "Results/"
+            os.makedirs(dir_name, exist_ok=True) 
+            save_path = os.path.join(dir_name, "opt_at_results.csv")
+            ls_results.to_csv(save_path)
 
     return ls_results
