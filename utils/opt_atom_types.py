@@ -37,6 +37,26 @@ def get_gp_data_from_pkl(key_list):
 
     return all_gp_dict
 
+def get_exp_data(molec_data_dict, prop_key, molec_key):
+    """
+    Helper function for getting experimental data
+    """
+    valid_molec_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
+    assert molec_key in valid_molec_keys, "molec_key must be one of the valid_molec_keys"
+    valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
+    assert prop_key in valid_prop_keys, "prop_key must be one of the valid_prop_keys"
+
+    if "vap_density" in prop_key:
+        exp_data = molec_data_dict[molec_key].expt_vap_density
+    elif "liq_density" in prop_key:
+        exp_data = molec_data_dict[molec_key].expt_liq_density
+    elif "Pvap" in prop_key: 
+        exp_data = molec_data_dict[molec_key].expt_Pvap
+    elif "Hvap" in prop_key:
+        exp_data = molec_data_dict[molec_key].expt_Hvap
+    else:
+        raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
+    return exp_data
 
 #define the scipy function for minimizing
 def scipy_min_fxn(theta_guess, molec_data_dict, all_gp_dict, at_class):
@@ -73,20 +93,10 @@ def scipy_min_fxn(theta_guess, molec_data_dict, all_gp_dict, at_class):
             #Get GP associated with property
             gp_model = molec_gps_dict[key]
             #Get X and Y data associated with the GP
-            if "vap_density" in key:
-                exp_data = molec_data_dict[molec].expt_vap_density
-            elif "liq_density" in key:
-                exp_data = molec_data_dict[molec].expt_liq_density
-            elif "Pvap" in key: 
-                exp_data = molec_data_dict[molec].expt_Pvap
-            elif "Hvap" in key:
-                exp_data = molec_data_dict[molec].expt_Hvap
-            else:
-                raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
+            exp_data = get_exp_data(molec_data_dict, key, molec)
             #Get x and y data
             x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
             y_exp = np.array(list(exp_data.values()))
-
             # #Evaluate GP
             gp_mean, gp_std = eval_gp_new_theta(theta_guess, param_matrix, gp_model, x_exp)
             #Calculate weight from uncertainty
@@ -127,13 +137,15 @@ def eval_gp_new_theta(theta_guess, t_matrix, gp_object, Xexp):
     assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
     assert isinstance(gp_object, gpflow.models.GPR)
     assert len(theta_guess.flatten()) == len(t_matrix), "t_matrix and theta_guess must have same length"
-    assert gp_object.input_shape -1 == len(t_matrix), "gp_object.input_shape must be len(theta_guess) + 1"
+    gp_inp_sh = gp_object.kernel.lengthscales.shape[0]-1
+    assert gp_inp_sh == t_matrix.shape[1], "Number of gp_object inputs must be one more than t_matrix.shape[1]"
     #Get theta into correct form using t_matrix
     theta_guess = theta_guess.reshape(1,-1)
     gp_theta = theta_guess@t_matrix
     #Append x data for consideration
     gp_theta = np.repeat(gp_theta, len(Xexp) , axis = 0)
     gp_input = np.concatenate((gp_theta, Xexp), axis=1)
+    print(gp_input)
     #Get mean and std from gp
     gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
     gp_std = np.sqrt(np.diag(np.squeeze(gp_covar)))

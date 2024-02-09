@@ -32,7 +32,7 @@ class Atom_Types:
         assert isinstance(at_names, list), "at_names must be a list"
         assert isinstance(molec_map_dicts, dict), "molec_map_dicts must be a dictionary"
         assert all(isinstance(name, str) for name in at_names) == True, "all at_names must be string"
-        assert len(at_names) == at_bounds.shape[1], "at_bounds must have one column for each name in at_names"
+        assert len(at_names) == at_bounds.shape[0], "at_bounds must have one column for each name in at_names"
 
         self.at_bounds = at_bounds
         self.at_names = at_names
