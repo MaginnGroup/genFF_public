@@ -6,6 +6,7 @@ from .r134a import R134aConstants
 from .r143a import R143aConstants
 from .r170 import R170Constants
 import numpy as np
+import unyt as u
 
 class Atom_Types:
     """
@@ -38,6 +39,27 @@ class Atom_Types:
         self.at_names = at_names
         self.molec_map_dicts = molec_map_dicts
         self.at_matrices = {}
+
+    def scale_bounds(self):
+        """
+        Scales bounds to units of nm and kj/mol
+        """
+        #Get upper and lower bounds seperately
+        bounds_list = [self.at_bounds[:,x] for x in range(self.at_bounds.shape[1])]
+        at_bounds_nm_kjmol = np.zeros(self.at_bounds.shape)
+        #Get Midpoint of bounds
+        midpoint = len(bounds_list[0]) // 2
+        #Loop over upper and lower bounds
+        for i in range(len(bounds_list)):
+            #Create scaled list of upper and lower bounds for sigmas and epsilons
+            sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in bounds_list[i][:midpoint]]
+            epsilons = [float((x * u.K * u.kb).in_units("kJ/mol").value) for x in bounds_list[i][midpoint:]]
+            # Combine the results and add to array
+            new_bound = np.array(sigmas + epsilons)
+            at_bounds_nm_kjmol[:,i] = new_bound
+
+        self.at_bounds_nm_kjmol = at_bounds_nm_kjmol
+
 
     def get_transformation_matrix(self, molec_key):
         """
@@ -89,7 +111,7 @@ class AT_Scheme_7(Atom_Types):
     """
     def __init__(self):
         #Get Bounds
-        at_param_bounds_l = [2, 2, 1.5, 2, 2, 2, 10, 10,  2, 15, 15, 15] 
+        at_param_bounds_l = [2, 2, 1.5, 2, 2, 2, 10, 10,  2, 15, 15, 15] #Units of Angstroms and Kelvin for Sigmas and Epsilons
         at_param_bounds_u = [4, 4,   3, 4, 4, 4, 75, 75, 10, 50, 50, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
 
@@ -163,3 +185,5 @@ class AT_Scheme_7(Atom_Types):
             "R170":r170_map_dict}
         
         super().__init__(at_bounds, at_names, molec_map_dicts)
+        #Get scaled bounds
+        self.scale_bounds()
