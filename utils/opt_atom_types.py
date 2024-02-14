@@ -38,222 +38,326 @@ def get_gp_data_from_pkl(key_list):
 
     return all_gp_dict
 
-def get_exp_data(molec_object, prop_key):
+class Opt_ATs:
     """
-    Helper function for getting experimental data and bounds
-
-    Parameters
-    ----------
-    molec_object: Instance of RXXXXConstant() class. Class for refrigerant molecule data
-    prop_key: str, The property key to get exp_data for. Valid Keys are "sim_vap_density", "sim_liq_density", 
-    "sim_Pvap", "sim_Hvap"
-
-    Returns:
-    --------
-    exp_data: dict, dictionary of Temperature and property data
-    property_bounds: array, array of bounds for the property data
+    The class for Least Squares regression analysis. Child class of General_Analysis
     """
-    #How to assert that we have a constants class?
-    valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
-
-    if prop_key not in valid_prop_keys:
-        raise ValueError(
-            "Invalid prop_key {}. Supported prop_key names are "
-            "{}".format(prop_key, valid_prop_keys))
-    
-    if "vap_density" in prop_key:
-        exp_data = molec_object.expt_vap_density
-        property_bounds = molec_object.vap_density_bounds
-    elif "liq_density" in prop_key:
-        exp_data = molec_object.expt_liq_density
-        property_bounds = molec_object.liq_density_bounds
-    elif "Pvap" in prop_key: 
-        exp_data = molec_object.expt_Pvap
-        property_bounds = molec_object.Pvap_bounds
-    elif "Hvap" in prop_key:
-        exp_data = molec_object.expt_Hvap
-        property_bounds = molec_object.Hvap_bounds
-    else:
-        raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
-    return exp_data, property_bounds
-
-#define the scipy function for minimizing
-def scipy_min_fxn(theta_guess, molec_data_dict, all_gp_dict, at_class):
-    """
-    The scipy function for minimizing the data
-
-    Parameters
-    ----------
-    theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
-    molec_data_dict: dict, dictionary of Refrigerant constants
-    all_gp_dict: dict, dictionary of refrigerant GP models
-    at_class: Atom_Types() instance, The class for atom types 
-
-    Returns
-    --------
-    obj: float, the objective function from the formula defined in the paper
-    """
-    assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-    assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
-    assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
-    assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
-    #Initialize weight and squared error arrays
-    sqerr_array  = []
-    weight_array = []
-    
-    #Loop over molecules
-    for molec in list(molec_data_dict.keys()):
-        #Get constants for molecule
-        molec_object = molec_data_dict[molec]
-        #Get theta associated with each gp
-        param_matrix = at_class.get_transformation_matrix(molec)
-        #Transform the guess, and scale to bounds
-        gp_theta = theta_guess.reshape(1,-1)@param_matrix
-        gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
-        #Get GPs associated with each molecule
-        molec_gps_dict = all_gp_dict[molec]
+    #Inherit objects from General_Analysis
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data):
+        #Asserts
         
-        #Loop over gps (1 per property)
-        for key in list(molec_gps_dict.keys()):
-            #Get GP associated with property
-            gp_model = molec_gps_dict[key]
-            #Get X and Y data and bounds associated with the GP
-            exp_data, y_bounds = get_exp_data(molec_object, key)
-            #Get x and y data
-            x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
-            y_exp = np.array(list(exp_data.values()))
-            # #Evaluate GP
-            gp_mean, gp_var = eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
-            #Scale gp output to real value
-            gp_mean = values_scaled_to_real(gp_mean, y_bounds)
-            #Scale gp_variances to real values
-            gp_var = variances_scaled_to_real(gp_var, y_bounds)
-            #Calculate weight from uncertainty
-            weight_mpi = (1/(gp_var)).tolist()
-            weight_array += weight_mpi
-            #Calculate sse
-            sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
-            sqerr_array += sq_err
+        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+        assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
+        assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
+        assert isinstance(save_data, bool), "save_res must be bool"
+        assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
+        assert isinstance(seed, int) or seed is None, "seed must be int or None"
+
+        self.col_names = ["Run", "Iter", 'Min Obj', 'Param Min', "Min Obj Cum.", "Param Cum.", "jac evals", "Termination", 
+                            "Run Time"]
+        self.col_names_iter = ["Run", "Iter", 'Min Obj', 'Param Min', "Min Obj Cum.", 
+                                 "Param Cum."]
+        self.iter_param_data = []
+        self.iter_obj_data = []
+        self.iter_count = 0
+        self.seed = seed
+        #Placeholder that will be overwritten if None
+        self.molec_data_dict = molec_data_dict
+        self.all_gp_dict = all_gp_dict
+        self.at_class = at_class
+        self.seed = seed
+        self.repeats = repeats
+        self.save_data = save_data
     
-    #List to array
-    sqerr_array = np.array(sqerr_array)
-    weight_array = np.array(weight_array)
-    #Normalize weights to add up to 1
-    scaled_weights = weight_array / np.sum(weight_array)
-    #Define objective function
-    obj = np.sum(scaled_weights*sqerr_array)
-    return obj
+    #define the scipy function for minimizing
+    def __scipy_min_fxn(self, theta_guess):
+        """
+        The scipy function for minimizing the data
 
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        molec_data_dict: dict, dictionary of Refrigerant constants
+        all_gp_dict: dict, dictionary of refrigerant GP models
+        at_class: Atom_Types() instance, The class for atom types 
 
-#Create fxn for analyzing a single gp w/ gpflow
-def eval_gp_new_theta(gp_theta_guess, molec_object, gp_object, Xexp):
-    """
-    Evaluates the gpflow model
+        Returns
+        --------
+        obj: float, the objective function from the formula defined in the paper
+        """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        #Initialize weight and squared error arrays
+        sqerr_array  = []
+        weight_array = []
+        
+        #Loop over molecules
+        for molec in list(self.molec_data_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get theta associated with each gp
+            param_matrix = self.at_class.get_transformation_matrix(molec)
+            #Transform the guess, and scale to bounds
+            gp_theta = theta_guess.reshape(1,-1)@param_matrix
+            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds = self.get_exp_data(molec_object, key)
+                #Get x and y data
+                x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
+                y_exp = np.array(list(exp_data.values()))
+                # #Evaluate GP
+                gp_mean, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                #Scale gp output to real value
+                gp_mean = values_scaled_to_real(gp_mean, y_bounds)
+                #Scale gp_variances to real values
+                gp_var = variances_scaled_to_real(gp_var, y_bounds)
+                #Calculate weight from uncertainty
+                weight_mpi = (1/(gp_var)).tolist()
+                weight_array += weight_mpi
+                #Calculate sse
+                sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
+                sqerr_array += sq_err
+        
+        #List to array
+        sqerr_array = np.array(sqerr_array)
+        weight_array = np.array(weight_array)
+        #Normalize weights to add up to 1
+        scaled_weights = weight_array / np.sum(weight_array)
+        #Define objective function
+        obj = np.sum(scaled_weights*sqerr_array)
 
-    Parameters
-    ----------
-    gp_theta_guess: np.ndarray, the initial gp parameter set to start optimization at (sigma in A, eps in kJ/mol)
-    molec_object: Instance of RXXConstants(), The data associated with a refrigerant molecule
-    gp_object: gpflow.models.GPR, GP Model for a specific property
-    Xexp: np.ndarray, Experimental state point (Temperature (K)) data for the property estimated by gp_object
+        #Scale theta_guess to real values 
+        midpoint = len(theta_guess) //2
+        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
+        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        theta_guess = np.array(sigmas + epsilons)
 
-    Returns
-    -------
-    gp_mean: tf.tensor, The (flattened) mean of the gp prediction
-    gp_var: tf.tensor, The (flattened) variance of the gp prediction
-    """
-    assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
-    assert isinstance(gp_object, gpflow.models.GPR)
+        #Append intermediate values to list
+        self.iter_param_data.append(theta_guess)
+        self.iter_obj_data.append(obj)
+        self.iter_count += 1
+
+        return obj
+
+    def get_exp_data(self, molec_object, prop_key):
+        """
+        Helper function for getting experimental data and bounds
+
+        Parameters
+        ----------
+        molec_object: Instance of RXXXXConstant() class. Class for refrigerant molecule data
+        prop_key: str, The property key to get exp_data for. Valid Keys are "sim_vap_density", "sim_liq_density", 
+        "sim_Pvap", "sim_Hvap"
+
+        Returns:
+        --------
+        exp_data: dict, dictionary of Temperature and property data
+        property_bounds: array, array of bounds for the property data
+        """
+        #How to assert that we have a constants class?
+        valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
+
+        if prop_key not in valid_prop_keys:
+            raise ValueError(
+                "Invalid prop_key {}. Supported prop_key names are "
+                "{}".format(prop_key, valid_prop_keys))
+        
+        if "vap_density" in prop_key:
+            exp_data = molec_object.expt_vap_density
+            property_bounds = molec_object.vap_density_bounds
+        elif "liq_density" in prop_key:
+            exp_data = molec_object.expt_liq_density
+            property_bounds = molec_object.liq_density_bounds
+        elif "Pvap" in prop_key: 
+            exp_data = molec_object.expt_Pvap
+            property_bounds = molec_object.Pvap_bounds
+        elif "Hvap" in prop_key:
+            exp_data = molec_object.expt_Hvap
+            property_bounds = molec_object.Hvap_bounds
+        else:
+            raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
+        return exp_data, property_bounds
     
-    #Scale X data
-    gp_Xexp = values_real_to_scaled(Xexp, molec_object.temperature_bounds)
-    #Repeat theta guess x number of times
-    gp_theta = np.repeat(gp_theta_guess, len(Xexp) , axis = 0)
-    #Concatenate theta and tem values to get a gp input
-    gp_input = np.concatenate((gp_theta, gp_Xexp), axis=1)
-    #Get mean and std from gp
-    gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
-    gp_var = np.diag(np.squeeze(gp_covar))
-    return np.squeeze(gp_mean), gp_var
+    #Create fxn for analyzing a single gp w/ gpflow
+    def eval_gp_new_theta(self, gp_theta_guess, molec_object, gp_object, Xexp):
+        """
+        Evaluates the gpflow model
 
-#Define fxn to optimize w/ restarts
-def optimize_ats(repeats, at_class, molec_data_dict, all_gp_dict, save_res, seed = None):
-    """
-    Optimizes New atom typing parameters
+        Parameters
+        ----------
+        gp_theta_guess: np.ndarray, the initial gp parameter set to start optimization at (sigma in A, eps in kJ/mol)
+        molec_object: Instance of RXXConstants(), The data associated with a refrigerant molecule
+        gp_object: gpflow.models.GPR, GP Model for a specific property
+        Xexp: np.ndarray, Experimental state point (Temperature (K)) data for the property estimated by gp_object
 
-    Parameters
-    ----------
-    at_class: Atom_Types() instance, The class for atomy types 
-    molec_data_dict: dict, dictionary of Refrigerant constants
-    all_gp_dict: dict, dictionary of refrigerant GP models
-    save_res: bool, Determines whether to save results
-    seed: int, seed for rng. Default None
-    """
-    assert isinstance(save_res, bool), "save_res must be bool"
-    assert isinstance(repeats, int), "repeats must be int"
-    assert isinstance(seed, int) or seed is None, "seed must be int or None"
-    assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
-    assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
-    assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
+        Returns
+        -------
+        gp_mean: tf.tensor, The (flattened) mean of the gp prediction
+        gp_var: tf.tensor, The (flattened) variance of the gp prediction
+        """
+        assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
+        assert isinstance(gp_object, gpflow.models.GPR)
+        
+        #Scale X data
+        gp_Xexp = values_real_to_scaled(Xexp, molec_object.temperature_bounds)
+        #Repeat theta guess x number of times
+        gp_theta = np.repeat(gp_theta_guess, len(Xexp) , axis = 0)
+        #Concatenate theta and tem values to get a gp input
+        gp_input = np.concatenate((gp_theta, gp_Xexp), axis=1)
+        #Get mean and std from gp
+        gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
+        gp_var = np.diag(np.squeeze(gp_covar))
+        return np.squeeze(gp_mean), gp_var
+
+
+    def __get_params_and_df(self):
+        """
+        Gets parameter guesses and sets up bounds for optimization
+        """
+        #set seed here
+        if self.seed is not None:
+            np.random.seed(self.seed)
+
+        #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
+        lb = self.at_class.at_bounds_nm_kjmol[:,0].T
+        ub = self.at_class.at_bounds_nm_kjmol[:,1].T
+        param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
+
+        #Initialize results dataframe
+        ls_results = pd.DataFrame(columns=self.col_names)
+
+        return param_inits, ls_results
     
-    #set seed here
-    if seed is not None:
-        np.random.seed(seed)
+    def __get_scipy_soln(self, run, param_inits):
 
-    #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
-    lb = at_class.at_bounds_nm_kjmol[:,0].T
-    ub = at_class.at_bounds_nm_kjmol[:,1].T
-    param_inits = np.random.uniform(low=lb, high=ub, size=(repeats, len(lb)) )
-
-    #Initialize results dataframe
-    column_names = ['Param Init', 'Min Obj', 'Param at Min Obj', 'Min Obj Cum.', 'Param at Min Obj Cum.',
-                    "func evals", "jac evals", "Termination", "Total Run Time"]
-    ls_results = pd.DataFrame(columns=column_names)
-
-    #Optimize w/ retstarts
-    for i in range(repeats):
         #Start timer
         time_start = time.time()
         #Get guess and find scipy.optimize solution
-        Solution = optimize.minimize(scipy_min_fxn, param_inits[i] , bounds=at_class.at_bounds_nm_kjmol, method='L-BFGS-B', 
-                                    args=(molec_data_dict, all_gp_dict, at_class), options = {"disp":False})
+        solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run] , bounds=self.at_class.at_bounds_nm_kjmol, 
+                                        method='L-BFGS-B', options = {"disp":False})
         #End timer and calculate total run time
         time_end = time.time()
         time_per_run = time_end-time_start
 
-        #Back out results
-        param_min_obj = Solution.x
-        min_obj = Solution.fun
+        return solution, time_per_run
 
-        #Scaled to real parameter values
-        midpoint = len(param_min_obj) //2
-        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in param_min_obj[:midpoint]]
-        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in param_min_obj[midpoint:]]
-        param_min_obj = np.array(sigmas + epsilons)
-        
+    def __get_opt_iter_info(self, run, solution, time_per_run):
+        """
+        Runs Optimization, times progress, and makes iter_df
+        """
+        #Get list of iteration, sse, and parameter data
+        iter_list = np.array(range(self.iter_count)) + 1
+        obj_list = np.array(self.iter_obj_data)
+        param_list = self.iter_param_data
+
         #Create df for each least squares run
-        iter_df = pd.DataFrame(columns=column_names)
+        #Create a pd dataframe of all iteration information. Initialize cumulative columns as zero
+        ls_iter_res = [run + 1, iter_list, obj_list, param_list, None , None]
+        iter_df = pd.DataFrame([ls_iter_res], columns = self.col_names_iter)
+        iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
 
-        #On 1st iteration, min obj cum and theta min obj cum are the same as sse and sse min obj
-        if i==0 or min_obj < ls_results["Min Obj Cum."].iloc[i-1]:
-            obj_cum = min_obj  
-            theta_obj_cum = param_min_obj
-        else:
-            obj_cum = ls_results["Min Obj Cum."].iloc[i-1]
-            theta_obj_cum = ls_results['Param at Min Obj Cum.'].iloc[i-1]
+        #Add Theta min obj and theta_sse obj
+        #Loop over each iteration to create the min obj columns
+        for j in range(len(iter_df)):
+            min_sse = iter_df.loc[j, "Min Obj"].copy()
+            if j == 0 or min_sse < iter_df["Min Obj"].iloc[j-1]:
+                min_param = iter_df["Param Min"].iloc[j].copy()
+            else:
+                min_sse = iter_df["Min Obj Cum."].iloc[j-1].copy()
+                min_param = iter_df["Param Cum."].iloc[j-1].copy()
 
-        #get list of data for this iteration
-        ls_iter_res = [param_inits[i], min_obj, Solution.x, obj_cum, theta_obj_cum,  Solution.nfev, 
-                            Solution.njev, Solution.status, time_per_run]
+            iter_df.loc[j, "Min Obj Cum."] = min_sse
+            iter_df.at[j, "Param Cum."] = min_param
 
-        # Add the new row to the DataFrame
-        iter_df.loc[0] = ls_iter_res
-        ls_results = pd.concat([ls_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
+        iter_df["Run Time"] = time_per_run
+        iter_df["jac evals"] = solution.njev
+        iter_df["Termination"] = solution.status
 
-        if save_res:
+        return iter_df
+    
+    #Define fxn to optimize w/ restarts
+    def optimize_ats(self):
+        """
+        Optimizes New atom typing parameters
+
+        Parameters
+        ----------
+        at_class: Atom_Types() instance, The class for atomy types 
+        molec_data_dict: dict, dictionary of Refrigerant constants
+        all_gp_dict: dict, dictionary of refrigerant GP models
+        save_res: bool, Determines whether to save results
+        seed: int, seed for rng. Default None
+        """
+        param_inits, ls_results = self.__get_params_and_df()
+
+        #Optimize w/ retstarts
+        for i in range(self.repeats):
+            #Get Iteration results
+            solution, time_per_run = self.__get_scipy_soln(i, param_inits)
+            iter_df  = self.__get_opt_iter_info(i, solution, time_per_run)
+
+            #Append to results_df
+            ls_results = pd.concat([ls_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
+
+            #Reset iter lists and change seed
+            self.seed += 1
+            self.iter_param_data = []
+            self.iter_sse_data = []
+            self.iter_l2_norm = []
+            self.iter_count = 0
+
+        #Reset the index of the pandas df
+        ls_results = ls_results.reset_index(drop=True)
+
+        if self.save_data:
             dir_name = "Results/"
             os.makedirs(dir_name, exist_ok=True) 
             save_path = os.path.join(dir_name, "opt_at_results.csv")
             ls_results.to_csv(save_path)
 
-    return ls_results
+        return ls_results
+    
+
+#Define function to check GP Accuracy
+def check_GPs(molec_keys, molec_classes, at_class, repeats, seed, save_data):
+    assert len(molec_keys) == len(molec_classes), "molec_data_dict and all_gp_dict must have same keys"
+    assert isinstance(save_data, bool), "save_res must be bool"
+    assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
+    assert isinstance(seed, int) or seed is None, "seed must be int or None"
+    
+    #Create pd dataframe for GP Accuracy Check
+    col_names = ["Molecule", "Property", 'Min Obj', 'Param Min', "jac evals", "Termination",  "Run Time"]
+    
+    #Initialize results dataframe
+    gp_results = pd.DataFrame(columns=col_names)
+
+    #Loop over molecules
+    for key, data in zip(molec_keys, molec_classes):
+        #Get molec_data in dict form
+        molec_data_dict = {key:data} #Ex "R14": r14_class
+        #Get GPs associated with each molecule
+        all_gp_dict = get_gp_data_from_pkl(list(molec_data_dict.keys()))
+        molec_gps_dict = all_gp_dict[key]
+        #Loop over gps (1 per property)
+        for prop in list(molec_gps_dict.keys()):
+            #Create instance of optimization class
+            opt_ats_class = Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data)
+            #Optimize for each molecule and property
+            ls_results = opt_ats_class.optimize_ats()
+            #Get only the best results from ls_reults
+            best = ls_results.sort_values(by=['Min Obj Cum.', 'Iter'], ascending=True).copy()
+            columns_of_interest = ['Min Obj', 'Param Min', "jac evals", "Termination",  "Run Time"]
+            best_data = best.iloc[0][columns_of_interest].to_list()
+            result_list = [key, prop] + best_data
+            iter_df = pd.DataFrame([result_list], columns = col_names)
+            gp_results = pd.concat([gp_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
+    
+    #Reset the index of the pandas df
+    gp_results = gp_results.reset_index(drop=True)
+    return gp_results
