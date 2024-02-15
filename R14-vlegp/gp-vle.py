@@ -63,6 +63,15 @@ for property_name in property_names:
     x_train, y_train, x_test, y_test = shuffle_and_split(
         df_vle, param_names, property_name, shuffle_seed=gp_shuffle_seed
     )
+    # save train/test data
+    #df_xtrain = pd.DataFrame(x_train,columns=param_names)
+    df_ytrain = pd.DataFrame(y_train,columns=[property_name])
+    #df_xtest = pd.DataFrame(x_test,columns=param_names)
+    df_ytest = pd.DataFrame(y_test,columns=[property_name])
+    #df_xtrain.to_csv('%s_x_train.csv' %property_name, index=False)
+    df_ytrain.to_csv('%s_y_train.csv' %property_name, index=False)
+    #df_xtest.to_csv('%s_x_test.csv' %property_name, index=False)
+    df_ytest.to_csv('%s_y_test.csv' %property_name, index=False)
 
     # Fit model
     vle_models[property_name] = run_gpflow_scipy(
@@ -77,6 +86,15 @@ property_name = "sim_vap_density"
 x_train, y_train, x_test, y_test = shuffle_and_split(
     df_vle, param_names, property_name, shuffle_seed=gp_shuffle_seed
 )
+# save train/test data
+df_xtrain = pd.DataFrame(x_train,columns=param_names)
+df_ytrain = pd.DataFrame(y_train,columns=[property_name])
+df_xtest = pd.DataFrame(x_test,columns=param_names)
+df_ytest = pd.DataFrame(y_test,columns=[property_name])
+df_xtrain.to_csv('x_train.csv' , index=False)
+df_ytrain.to_csv('%s_y_train.csv' %property_name, index=False)
+df_xtest.to_csv('x_test.csv' , index=False)
+df_ytest.to_csv('%s_y_test.csv' %property_name, index=False)
 # Fit model
 vle_models[property_name] = run_gpflow_scipy(
     x_train,
