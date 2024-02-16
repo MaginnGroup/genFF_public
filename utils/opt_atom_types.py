@@ -6,7 +6,12 @@ import pandas as pd
 import pickle
 import gpflow
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
+from fffit.fffit.plot import plot_model_performance
 import unyt as u
+import matplotlib
+import matplotlib.pyplot as plt
+
+mpl_is_inline = 'inline' in matplotlib.get_backend()
 
 #Create a function for getting gp data from files
 def get_gp_data_from_pkl(key_list):
@@ -37,6 +42,32 @@ def get_gp_data_from_pkl(key_list):
             all_gp_dict[key] = pickle.load(pickle_file)
 
     return all_gp_dict
+
+def get_test_data(molec_key, prop_keys):
+    """
+    Get gp data from .pkl files
+
+    Parameters
+    ----------
+    key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
+
+    Returns:
+    --------
+    all_gp_dict: dict, dictionary of dictionary of gps for each property
+    """
+    #Get dict of testing data
+    test_data = {}
+    #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
+    file = os.path.join(molec_key +"-vlegp/x_test.csv")
+    assert os.path.isfile(file), "key-vlegp/x_test.csv does not exist. Check key list carefully"
+    x_data = np.loadtxt(file, delimiter=",",skiprows=1)
+    test_data["x"]=x_data
+    for prop_key in prop_keys:
+        file = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_test.csv")
+        prop_data = np.loadtxt(file, delimiter=",",skiprows=1)
+        test_data[prop_key]=prop_data
+
+    return test_data
 
 class Opt_ATs:
     """
@@ -215,6 +246,35 @@ class Opt_ATs:
         gp_var = np.diag(np.squeeze(gp_covar))
         return np.squeeze(gp_mean), gp_var
 
+    #Define function to check GP Accuracy
+    def check_GPs(self):
+        """
+        Makes GPs 
+        """
+        #Loop over molecules
+        for molec in list(self.all_gp_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            #Get testing data for that molecule
+            test_data = get_test_data(molec, molec_gps_dict.keys())
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Set label
+                label = molec + "_" + key
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds = self.get_exp_data(molec_object, key)
+                #Plot
+                fig = plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds)
+                if mpl_is_inline:
+                    plt.show()
+                    plt.close()
+
+        return
+
 
     def __get_params_and_df(self):
         """
@@ -322,42 +382,4 @@ class Opt_ATs:
             ls_results.to_csv(save_path)
 
         return ls_results
-    
 
-#Define function to check GP Accuracy
-def check_GPs(molec_keys, molec_classes, at_class, repeats, seed, save_data):
-    assert len(molec_keys) == len(molec_classes), "molec_data_dict and all_gp_dict must have same keys"
-    assert isinstance(save_data, bool), "save_res must be bool"
-    assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
-    assert isinstance(seed, int) or seed is None, "seed must be int or None"
-    
-    #Create pd dataframe for GP Accuracy Check
-    col_names = ["Molecule", "Property", 'Min Obj', 'Param Min', "jac evals", "Termination",  "Run Time"]
-    
-    #Initialize results dataframe
-    gp_results = pd.DataFrame(columns=col_names)
-
-    #Loop over molecules
-    for key, data in zip(molec_keys, molec_classes):
-        #Get molec_data in dict form
-        molec_data_dict = {key:data} #Ex "R14": r14_class
-        #Get GPs associated with each molecule
-        all_gp_dict = get_gp_data_from_pkl(list(molec_data_dict.keys()))
-        molec_gps_dict = all_gp_dict[key]
-        #Loop over gps (1 per property)
-        for prop in list(molec_gps_dict.keys()):
-            #Create instance of optimization class
-            opt_ats_class = Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data)
-            #Optimize for each molecule and property
-            ls_results = opt_ats_class.optimize_ats()
-            #Get only the best results from ls_reults
-            best = ls_results.sort_values(by=['Min Obj Cum.', 'Iter'], ascending=True).copy()
-            columns_of_interest = ['Min Obj', 'Param Min', "jac evals", "Termination",  "Run Time"]
-            best_data = best.iloc[0][columns_of_interest].to_list()
-            result_list = [key, prop] + best_data
-            iter_df = pd.DataFrame([result_list], columns = col_names)
-            gp_results = pd.concat([gp_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
-    
-    #Reset the index of the pandas df
-    gp_results = gp_results.reset_index(drop=True)
-    return gp_results

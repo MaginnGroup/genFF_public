@@ -4,7 +4,7 @@ import numpy as np
 import unyt as u
 
 #Set params for saving results, # of repeats, and the seed
-save_res = True
+save_data = True
 repeats = 50
 seed = 1
 
@@ -25,8 +25,12 @@ molec_data_dict = {"R14":r14_class,
                    "R125":r125_class, 
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
+
+at_class = atom_type.AT_Scheme_7()
+molec_data_dict = {"R14":r14_class}#, "R32":r32_class, "R50":r50_class, "R170":r170_class, "R125":r125_class, "R134a":r134a_class, "R143a":r143a_class}
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 at_class = atom_type.AT_Scheme_7()
+driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data)
 
 #Optimize AT scheme parameters
-ls_results = opt_atom_types.optimize_ats(repeats, at_class, molec_data_dict, all_gp_dict, save_res, seed)
+ls_results = ls_results = driver.optimize_ats()
