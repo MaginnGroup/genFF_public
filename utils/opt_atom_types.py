@@ -379,7 +379,7 @@ class Opt_ATs:
             dir_name = "Results/"
             os.makedirs(dir_name, exist_ok=True) 
             save_path = os.path.join(dir_name, "opt_at_results.csv")
-            ls_results.to_csv(save_path)
+            ls_results.to_csv(save_path, index = False)
 
         return ls_results
 

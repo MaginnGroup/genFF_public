@@ -33,4 +33,4 @@ at_class = atom_type.AT_Scheme_7()
 driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data)
 
 #Optimize AT scheme parameters
-ls_results = ls_results = driver.optimize_ats()
+ls_results = driver.optimize_ats()
