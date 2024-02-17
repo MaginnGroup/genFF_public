@@ -5,7 +5,7 @@ import unyt as u
 
 #Set params for saving results, # of repeats, and the seed
 save_data = True
-repeats = 50
+repeats = 200
 seed = 1
 
 #Load class properies for each molecule

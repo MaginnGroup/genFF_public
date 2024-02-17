@@ -374,11 +374,25 @@ class Opt_ATs:
         #Reset the index of the pandas df
         ls_results = ls_results.reset_index(drop=True)
 
+        #Sort by lowest obj first
+        sort_ls_res = ls_results.sort_values(['Min Obj Cum.'], ascending= True)
+
+        #Back out best job for each run
+        run_best = sort_ls_res.groupby('Run').first().reset_index()
+        best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
+
         if self.save_data:
             dir_name = "Results/"
             os.makedirs(dir_name, exist_ok=True) 
-            save_path = os.path.join(dir_name, "opt_at_results.csv")
-            ls_results.to_csv(save_path, index = False)
+            #Save original results
+            save_path1 = os.path.join(dir_name, "opt_at_results.csv")
+            ls_results.to_csv(save_path1, index = False)
+            #Save sorted results
+            save_path2 = os.path.join(dir_name, "sorted_at_res.csv")
+            sort_ls_res.to_csv(save_path2, index = False)
+            #Save sorted results for each run
+            save_path3 = os.path.join(dir_name, "best_per_run.csv")
+            best_runs.to_csv(save_path3, index = False)
 
         return ls_results
 
