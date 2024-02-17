@@ -360,7 +360,7 @@ class Opt_ATs:
         for i in range(self.repeats):
             #Get Iteration results
             solution, time_per_run = self.__get_scipy_soln(i, param_inits)
-            iter_df  = self.__get_opt_iter_info(i, solution, time_per_run)
+            iter_df = self.__get_opt_iter_info(i, solution, time_per_run)
 
             #Append to results_df
             ls_results = pd.concat([ls_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
@@ -368,8 +368,7 @@ class Opt_ATs:
             #Reset iter lists and change seed
             self.seed += 1
             self.iter_param_data = []
-            self.iter_sse_data = []
-            self.iter_l2_norm = []
+            self.iter_obj_data = []
             self.iter_count = 0
 
         #Reset the index of the pandas df
