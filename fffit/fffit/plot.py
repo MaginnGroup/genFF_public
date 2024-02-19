@@ -42,7 +42,10 @@ def plot_model_performance(
     for (label, model) in models.items():
         gp_mu, gp_var = model.predict_f(x_data)
         gp_mu_physical = values_scaled_to_real(gp_mu, property_bounds)
+        gp_var_physical = variances_scaled_to_real(gp_var, property_bounds)
+        gp_std_physical = np.sqrt(abs(gp_var_physical))
         ax.scatter(y_data_physical, gp_mu_physical, label=label, zorder=2.5, alpha=0.4)
+        ax.errorbar(y_data_physical.flatten(), gp_mu_physical.flatten(), yerr = 1.96*gp_std_physical.flatten(), fmt = 'o', alpha=0.4)
         meansqerr = np.mean(
             (gp_mu_physical - y_data_physical.reshape(-1, 1)) ** 2
         )
