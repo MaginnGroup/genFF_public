@@ -6,12 +6,14 @@ import pandas as pd
 import pickle
 import gpflow
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
-from fffit.fffit.plot import plot_model_performance
+from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params
 import unyt as u
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
+# print(mpl_is_inline)
 
 #Create a function for getting gp data from files
 def get_gp_data_from_pkl(key_list):
@@ -43,7 +45,7 @@ def get_gp_data_from_pkl(key_list):
 
     return all_gp_dict
 
-def get_test_data(molec_key, prop_keys):
+def get_train_test_data(molec_key, prop_keys):
     """
     Get gp data from .pkl files
 
@@ -57,17 +59,21 @@ def get_test_data(molec_key, prop_keys):
     """
     #Get dict of testing data
     test_data = {}
-    #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-    file = os.path.join(molec_key +"-vlegp/x_test.csv")
-    assert os.path.isfile(file), "key-vlegp/x_test.csv does not exist. Check key list carefully"
-    x_data = np.loadtxt(file, delimiter=",",skiprows=1)
-    test_data["x"]=x_data
-    for prop_key in prop_keys:
-        file = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_test.csv")
-        prop_data = np.loadtxt(file, delimiter=",",skiprows=1)
-        test_data[prop_key]=prop_data
+    train_data = {}
+    for str in ["train", "test"]:
+        #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
+        file_x = os.path.join(molec_key +"-vlegp/x_" + str +".csv")
+        assert os.path.isfile(file_x), "key-vlegp/x_****.csv does not exist. Check key list carefully"
+        x = np.loadtxt(file_x, delimiter=",",skiprows=1)
+        dict = train_data if str == "train" else test_data
+        dict["x"]=x
 
-    return test_data
+        for prop_key in prop_keys:
+            file_y = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
+            prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
+            dict[prop_key]=prop_data
+
+    return train_data, test_data
 
 class Opt_ATs:
     """
@@ -138,7 +144,7 @@ class Opt_ATs:
                 #Get GP associated with property
                 gp_model = molec_gps_dict[key]
                 #Get X and Y data and bounds associated with the GP
-                exp_data, y_bounds = self.get_exp_data(molec_object, key)
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
                 #Get x and y data
                 x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
                 y_exp = np.array(list(exp_data.values()))
@@ -202,18 +208,22 @@ class Opt_ATs:
         if "vap_density" in prop_key:
             exp_data = molec_object.expt_vap_density
             property_bounds = molec_object.vap_density_bounds
+            property_name = "Vapor Density [kg/m^3]"
         elif "liq_density" in prop_key:
             exp_data = molec_object.expt_liq_density
             property_bounds = molec_object.liq_density_bounds
+            property_name = "Liquid Density [kg/m^3]"
         elif "Pvap" in prop_key: 
             exp_data = molec_object.expt_Pvap
             property_bounds = molec_object.Pvap_bounds
+            property_name = "Vapor pressure [bar]"
         elif "Hvap" in prop_key:
             exp_data = molec_object.expt_Hvap
             property_bounds = molec_object.Hvap_bounds
+            property_name = "Enthalpy of Vaporization [kJ/kg]"
         else:
             raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
-        return exp_data, property_bounds
+        return exp_data, property_bounds, property_name
     
     #Create fxn for analyzing a single gp w/ gpflow
     def eval_gp_new_theta(self, gp_theta_guess, molec_object, gp_object, Xexp):
@@ -258,7 +268,10 @@ class Opt_ATs:
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
             #Get testing data for that molecule
-            test_data = get_test_data(molec, molec_gps_dict.keys())
+            train_data, test_data = get_train_test_data(molec, molec_gps_dict.keys())
+            #Make pdf
+            pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
+            pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
@@ -266,12 +279,64 @@ class Opt_ATs:
                 #Get GP associated with property
                 gp_model = molec_gps_dict[key]
                 #Get X and Y data and bounds associated with the GP
-                exp_data, y_bounds = self.get_exp_data(molec_object, key)
-                #Plot
-                fig = plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds)
-                if mpl_is_inline:
-                    plt.show()
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                #Plot model performance
+                pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
+                plt.close()
+
+                #Plot temperature slices
+                figs = plot_slices_temperature(
+                    {label:gp_model},
+                    molec_object.n_params,
+                    molec_object.temperature_bounds,
+                    y_bounds,
+                    plot_bounds = molec_object.temperature_bounds,
+                    property_name= y_names
+                )
+
+                for fig in figs:
+                    pdf.savefig(fig)
+                del figs
+
+                #Plot Parameter slices
+                for param_name in molec_object.param_names:
+                    figs = plot_slices_params(
+                        {label:gp_model},
+                        param_name,
+                        molec_object.param_names,
+                        list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
+                        molec_object.temperature_bounds,
+                        y_bounds,
+                        property_name=y_names
+                    )
                     plt.close()
+                    
+                    for fig in figs:
+                        pdf.savefig(fig)
+                    del figs
+
+                #Plot test vs train for each parameter set
+                for test_params in test_data["x"][:,:molec_object.n_params]:
+                    #Find points in test set with correct param value
+                    # Locate rows where parameter set == test parameter set
+                    match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                    test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
+                                                  test_data[key][match_test].reshape(-1,1)), axis = 1)
+                    #Find points in train set with correct param value
+                    match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                    train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
+                                                  train_data[key][match_trn].reshape(-1,1)), axis = 1)
+
+                    pdf.savefig(plot_model_vs_test({label:gp_model}, 
+                                                test_params, 
+                                                train_points, 
+                                                test_points, 
+                                                molec_object.temperature_bounds,
+                                                y_bounds,
+                                                plot_bounds = molec_object.temperature_bounds,
+                                                property_name =  y_names ))
+                    plt.close()
+            pdf.close()
 
         return
 
