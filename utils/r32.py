@@ -147,6 +147,20 @@ class R32Constants:
         return expt_Hvap
 
     @property
+    def uncertainties(self):
+        """
+        Dictionary with uncertainty for each calculation
+        from: https://doi.org/10.1063/1.556002
+        """
+        uncertainty = {
+            "expt_liq_density": 0.0005,
+            "expt_vap_density": 0.0005,
+            "expt_Pvap": 0.0002,
+            "expt_Hvap": 0.01
+        }
+        return uncertainty
+    
+    @property
     def temperature_bounds(self):
         """Bounds on temperature in units of K"""
 

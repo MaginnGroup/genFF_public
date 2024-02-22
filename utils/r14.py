@@ -152,6 +152,21 @@ class R14Constants:
         }
 
         return expt_Hvap
+    
+    @property
+    def uncertainties(self):
+        """
+        Dictionary with uncertainty for each calculation
+        from: Platzer, B.; Polt, A.; Maurer, G. Thermophysical Properties of Refrigerants; Springer-Verlag: Berlin, 1990.
+        Note: Need this reference. These numbers are wrong
+        """
+        uncertainty = {
+            "expt_liq_density": 0.0003,
+            "expt_vap_density": 0.0003,
+            "expt_Pvap": 0.003,
+            "expt_Hvap": 0.01
+        }
+        return uncertainty
 
     @property
     def temperature_bounds(self):

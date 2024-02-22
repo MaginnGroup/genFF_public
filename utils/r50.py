@@ -98,7 +98,7 @@ class R50Constants:
         }
 
         return expt_liq_density
-
+    
     @property
     def expt_vap_density(self):
         """Dictionary with experimental vapor density
@@ -153,6 +153,20 @@ class R50Constants:
 
         return expt_Hvap
 
+    @property
+    def uncertainties(self):
+        """
+        Dictionary with uncertainty for each calculation
+        from: https://doi.org/10.1063/1.555898
+        """
+        uncertainty = {
+            "expt_liq_density": 0.0003,
+            "expt_vap_density": 0.0003,
+            "expt_Pvap": 0.003,
+            "expt_Hvap": 0.01
+        }
+        return uncertainty
+    
     @property
     def temperature_bounds(self):
         """Bounds on temperature in units of K"""

@@ -162,6 +162,24 @@ class R143aConstants:
         return expt_Hvap
 
     @property
+    def uncertainties(self):
+        """
+        Dictionary with uncertainty for each calculation
+        from: 
+        Lemmon, E. and Jacobsen, R. (2000), An International Standard Formulation for 
+        the Thermodynamic Properties of 1,1,1-Trifluoroethane (HFC-143a) for Temperatures from 161 to 450 K 
+        and Pressures to 50 Mpa, J. Phys. & Chem. Ref. Data (JPCRD), National Institute of Standards and Technology, 
+        Gaithersburg, MD (Accessed February 22, 2024)
+        """
+        uncertainty = {
+            "expt_liq_density": 0.001,
+            "expt_vap_density": 0.001,
+            "expt_Pvap": 0.001,
+            "expt_Hvap": 0.005
+        }
+        return uncertainty
+    
+    @property
     def temperature_bounds(self):
         """Bounds on temperature in units of K"""
 
