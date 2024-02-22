@@ -11,6 +11,7 @@ import unyt as u
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import tensorflow as tf
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -460,4 +461,14 @@ class Opt_ATs:
             best_runs.to_csv(save_path3, index = False)
 
         return ls_results
+    
+    def approx_jac_hess(self, theta_guess):
+        """
+        Builds Jacobian Approximation
+        """
+        jac = optimize.approx_fprime(theta_guess, self.__scipy_min_fxn)
+        if len(jac.shape) == 1:
+            jac = jac.reshape(1,-1)
+        hess = jac.T@jac
+        return jac, hess
 
