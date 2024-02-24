@@ -91,12 +91,10 @@ class Opt_ATs:
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
 
-        self.col_names = ["Run", "Iter", 'Min Obj', 'Param Min', "Min Obj Cum.", "Param Cum.", "jac evals", "Termination", 
-                            "Run Time"]
-        self.col_names_iter = ["Run", "Iter", 'Min Obj', 'Param Min', "Min Obj Cum.", 
-                                 "Param Cum."]
         self.iter_param_data = []
         self.iter_obj_data = []
+        self.iter_sse_pieces = []
+        self.iter_mean_wt_pieces = []
         self.iter_count = 0
         self.seed = seed
         #Placeholder that will be overwritten if None
@@ -127,7 +125,8 @@ class Opt_ATs:
         #Initialize weight and squared error arrays
         sqerr_array  = []
         weight_array = []
-        
+        key_list = []
+
         #Loop over molecules
         for molec in list(self.molec_data_dict.keys()):
             #Get constants for molecule
@@ -160,13 +159,18 @@ class Opt_ATs:
                 weight_array += weight_mpi
                 #Calculate sse
                 sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
+                key_list.append(molec + "-" + key)
                 sqerr_array += sq_err
         
-        #List to array
+        #List to array or dict
         sqerr_array = np.array(sqerr_array)
+        sse_names = [name + "-sse" for name in key_list]
+        wt_names = [name + "-wt" for name in key_list]
+        sse_pieces = dict(zip(sse_names, np.sum(sqerr_array)))
         weight_array = np.array(weight_array)
+        mean_wt_pieces = dict(zip(wt_names, np.mean(weight_array)))
         #Normalize weights to add up to 1
-        scaled_weights = weight_array / np.sum(weight_array)
+        scaled_weights = weight_array #/ np.sum(weight_array)
         #Define objective function
         obj = np.sum(scaled_weights*sqerr_array)
 
@@ -178,6 +182,8 @@ class Opt_ATs:
 
         #Append intermediate values to list
         self.iter_param_data.append(theta_guess)
+        self.iter_sse_pieces.append(sse_pieces)
+        self.iter_mean_wt_pieces.append(mean_wt_pieces)
         self.iter_obj_data.append(obj)
         self.iter_count += 1
 
@@ -356,8 +362,14 @@ class Opt_ATs:
         param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
 
         #Initialize results dataframe
+        #Make list of column names
+        org_names = ["Run", "Iter", 'Min Obj', "Min Obj Cum.", "jac evals", "Termination", "Run Time"]
+        at_names_min = [name + "_min" for name in self.at_class.at_names]
+        at_names_cum = [name + "_cum" for name in self.at_class.at_names]
+        self.col_names_iter = org_names[0:3] + at_names_min + org_names[3] +  at_names_cum
+        self.col_names = self.col_names_iter + org_names[4:]
         ls_results = pd.DataFrame(columns=self.col_names)
-
+        
         return param_inits, ls_results
     
     def __get_scipy_soln(self, run, param_inits):
@@ -381,26 +393,33 @@ class Opt_ATs:
         iter_list = np.array(range(self.iter_count)) + 1
         obj_list = np.array(self.iter_obj_data)
         param_list = self.iter_param_data
-
+        num_params = len(self.at_class.at_names)
+        sse_names = list(self.iter_sse_pieces[0].keys())
+        wt_names = list(self.iter_mean_wt_pieces[0].keys())
+        
         #Create df for each least squares run
         #Create a pd dataframe of all iteration information. Initialize cumulative columns as zero
-        ls_iter_res = [run + 1, iter_list, obj_list, param_list, None , None]
+        ls_iter_res = [run + 1, iter_list, obj_list] + [param_list] + [None]*(num_params + 1)
         iter_df = pd.DataFrame([ls_iter_res], columns = self.col_names_iter)
         iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
-
+        
         #Add Theta min obj and theta_sse obj
         #Loop over each iteration to create the min obj columns
         for j in range(len(iter_df)):
             min_sse = iter_df.loc[j, "Min Obj"].copy()
             if j == 0 or min_sse < iter_df["Min Obj"].iloc[j-1]:
-                min_param = iter_df["Param Min"].iloc[j].copy()
+                min_param = iter_df.iloc[j-1, 3:num_params+1].copy()
             else:
                 min_sse = iter_df["Min Obj Cum."].iloc[j-1].copy()
-                min_param = iter_df["Param Cum."].iloc[j-1].copy()
+                min_param = iter_df.iloc[j-1, 5+num_params:5+2*num_params+1].copy()
 
             iter_df.loc[j, "Min Obj Cum."] = min_sse
-            iter_df.at[j, "Param Cum."] = min_param
+            iter_df.iloc[j, 5+num_params:5+2*num_params+1] = min_param
 
+            #Add iteration info from sse and mean weight
+            iter_df.iloc[j, sse_names] = self.iter_sse_pieces[j].values
+            iter_df.iloc[j, wt_names] = self.iter_mean_wt_pieces[j].values
+            
         iter_df["Run Time"] = time_per_run
         iter_df["jac evals"] = solution.njev
         iter_df["Termination"] = solution.status
@@ -435,6 +454,8 @@ class Opt_ATs:
             self.seed += 1
             self.iter_param_data = []
             self.iter_obj_data = []
+            self.iter_sse_pieces = []
+            self.iter_mean_wt_pieces = []
             self.iter_count = 0
 
         #Reset the index of the pandas df
