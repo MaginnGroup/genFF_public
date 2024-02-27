@@ -12,6 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import tensorflow as tf
+from itertools import combinations
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -46,153 +47,22 @@ def get_gp_data_from_pkl(key_list):
 
     return all_gp_dict
 
-def get_train_test_data(molec_key, prop_keys):
+class Problem_Setup:
     """
-    Get gp data from .pkl files
-
-    Parameters
-    ----------
-    key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
-
-    Returns:
-    --------
-    all_gp_dict: dict, dictionary of dictionary of gps for each property
-    """
-    #Get dict of testing data
-    test_data = {}
-    train_data = {}
-    for str in ["train", "test"]:
-        #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-        file_x = os.path.join(molec_key +"-vlegp/x_" + str +".csv")
-        assert os.path.isfile(file_x), "key-vlegp/x_****.csv does not exist. Check key list carefully"
-        x = np.loadtxt(file_x, delimiter=",",skiprows=1)
-        dict = train_data if str == "train" else test_data
-        dict["x"]=x
-
-        for prop_key in prop_keys:
-            file_y = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
-            prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
-            dict[prop_key]=prop_data
-
-    return train_data, test_data
-
-class Opt_ATs:
-    """
-    The class for Least Squares regression analysis. Child class of General_Analysis
+    Gets GP/ Experimental Data For experiments
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data):
-        #Asserts
-        
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, save_data):
         assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(save_data, bool), "save_res must be bool"
-        assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
-        assert isinstance(seed, int) or seed is None, "seed must be int or None"
-
-        self.iter_param_data = []
-        self.iter_obj_data = []
-        self.iter_sse_pieces = []
-        self.iter_mean_wt_pieces = []
-        self.iter_count = 0
-        self.seed = seed
         #Placeholder that will be overwritten if None
         self.molec_data_dict = molec_data_dict
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
-        self.seed = seed
-        self.repeats = repeats
         self.save_data = save_data
         self.scl_w = True
-    
-    #define the scipy function for minimizing
-    def __scipy_min_fxn(self, theta_guess):
-        """
-        The scipy function for minimizing the data
-
-        Parameters
-        ----------
-        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
-        molec_data_dict: dict, dictionary of Refrigerant constants
-        all_gp_dict: dict, dictionary of refrigerant GP models
-        at_class: Atom_Types() instance, The class for atom types 
-
-        Returns
-        --------
-        obj: float, the objective function from the formula defined in the paper
-        """
-        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        #Initialize weight and squared error arrays
-        sqerr_array  = []
-        weight_array = []
-        key_list = []
-        sse_pieces = {}
-        mean_wt_pieces = {}
-        
-        #Loop over molecules
-        for molec in list(self.molec_data_dict.keys()):
-            #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
-            #Get theta associated with each gp
-            param_matrix = self.at_class.get_transformation_matrix(molec)
-            #Transform the guess, and scale to bounds
-            gp_theta = theta_guess.reshape(1,-1)@param_matrix
-            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
-            #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
-            
-            #Loop over gps (1 per property)
-            for key in list(molec_gps_dict.keys()):
-                #Get GP associated with property
-                gp_model = molec_gps_dict[key]
-                #Get X and Y data and bounds associated with the GP
-                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
-                #Get x and y data
-                x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
-                y_exp = np.array(list(exp_data.values()))
-                # #Evaluate GP
-                gp_mean, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
-                #Scale gp output to real value
-                gp_mean = values_scaled_to_real(gp_mean, y_bounds)
-                #Scale gp_variances to real values
-                gp_var = variances_scaled_to_real(gp_var, y_bounds)
-                #Calculate weight from uncertainty
-                weight_mpi = (1/(gp_var)).tolist()
-                weight_array += weight_mpi
-                #Calculate sse
-                sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
-                # key_list.append(molec + "-" + key)
-                sse_pieces[molec + "-" + key + "-sse"] = np.sum(sq_err)
-                mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
-                sqerr_array += sq_err
-        
-        #List to array or dict
-        sqerr_array = np.array(sqerr_array).flatten()
-        weight_array = np.array(weight_array).flatten()
-        #CAN Normalize weights to add up to 1
-        sum_weights = np.sum(weight_array) if self.scl_w == True else 1
-        
-        scaled_weights = weight_array / sum_weights
-        # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
-        mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
-        #Define objective function
-        obj = np.sum(scaled_weights*sqerr_array)
-
-        #Scale theta_guess to real values 
-        midpoint = len(theta_guess) //2
-        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
-        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
-        theta_guess = np.array(sigmas + epsilons)
-
-        #Append intermediate values to list
-        self.iter_param_data.append(theta_guess)
-        self.iter_sse_pieces.append(sse_pieces)
-        self.iter_mean_wt_pieces.append(mean_wt_pieces)
-        self.iter_obj_data.append(obj)
-        self.iter_count += 1
-
-        return obj
 
     def get_exp_data(self, molec_object, prop_key):
         """
@@ -236,7 +106,37 @@ class Opt_ATs:
         else:
             raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
         return exp_data, property_bounds, property_name
-    
+
+    def get_train_test_data(self, molec_key, prop_keys):
+        """
+        Get gp data from .pkl files
+
+        Parameters
+        ----------
+        key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
+
+        Returns:
+        --------
+        all_gp_dict: dict, dictionary of dictionary of gps for each property
+        """
+        #Get dict of testing data
+        test_data = {}
+        train_data = {}
+        for str in ["train", "test"]:
+            #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
+            file_x = os.path.join(molec_key +"-vlegp/x_" + str +".csv")
+            assert os.path.isfile(file_x), "key-vlegp/x_****.csv does not exist. Check key list carefully"
+            x = np.loadtxt(file_x, delimiter=",",skiprows=1)
+            dict = train_data if str == "train" else test_data
+            dict["x"]=x
+
+            for prop_key in prop_keys:
+                file_y = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
+                prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
+                dict[prop_key]=prop_data
+
+        return train_data, test_data
+
     #Create fxn for analyzing a single gp w/ gpflow
     def eval_gp_new_theta(self, gp_theta_guess, molec_object, gp_object, Xexp):
         """
@@ -268,6 +168,333 @@ class Opt_ATs:
         gp_var = np.diag(np.squeeze(gp_covar))
         return np.squeeze(gp_mean), gp_var
 
+class Opt_ATs(Problem_Setup):
+    """
+    The class for Least Squares regression analysis. Child class of General_Analysis
+    """
+    #Inherit objects from General_Analysis
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data):
+        #Asserts
+        super().__init__(molec_data_dict, all_gp_dict, at_class, save_data)
+        assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
+        assert isinstance(seed, int) or seed is None, "seed must be int or None"
+        self.repeats = repeats
+        self.seed = seed
+        self.iter_param_data = []
+        self.iter_obj_data = []
+        self.iter_sse_pieces = []
+        self.iter_mean_wt_pieces = []
+        self.iter_count = 0
+        self.scl_w = True
+    
+    def calc_obj(self, theta_guess):
+        """
+        Calculates the sse objective function
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        """
+        #Initialize weight and squared error arrays
+        sqerr_array  = []
+        weight_array = []
+        sse_pieces = {}
+        mean_wt_pieces = {}
+        
+        #Loop over molecules
+        for molec in list(self.molec_data_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get theta associated with each gp
+            param_matrix = self.at_class.get_transformation_matrix(molec)
+            #Transform the guess, and scale to bounds
+            gp_theta = theta_guess.reshape(1,-1)@param_matrix
+            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                #Get x and y data
+                x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
+                y_exp = np.array(list(exp_data.values()))
+                # #Evaluate GP
+                gp_mean, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                #Scale gp output to real value
+                gp_mean = values_scaled_to_real(gp_mean, y_bounds)
+                #Scale gp_variances to real values
+                gp_var = variances_scaled_to_real(gp_var, y_bounds)
+                #Calculate weight from uncertainty
+                weight_mpi = (1/(gp_var)).tolist()
+                weight_array += weight_mpi
+                #Calculate sse
+                sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
+                # key_list.append(molec + "-" + key)
+                sse_pieces[molec + "-" + key + "-sse"] = np.sum(sq_err)
+                mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
+                sqerr_array += sq_err
+        
+        #List to flattened array
+        sqerr_array = np.array(sqerr_array).flatten()
+        weight_array = np.array(weight_array).flatten()
+
+        return sqerr_array, weight_array, sse_pieces, mean_wt_pieces
+
+    #define the scipy function for minimizing
+    def __scipy_min_fxn(self, theta_guess):
+        """
+        The scipy function for minimizing the data
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        molec_data_dict: dict, dictionary of Refrigerant constants
+        all_gp_dict: dict, dictionary of refrigerant GP models
+        at_class: Atom_Types() instance, The class for atom types 
+
+        Returns
+        --------
+        obj: float, the objective function from the formula defined in the paper
+        """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        sqerr_array, weight_array, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
+
+        #Normalize weights to add up to 1 if scl_w is True
+        sum_weights = np.sum(weight_array) if self.scl_w == True else 1
+        scaled_weights = weight_array / sum_weights
+        # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
+        mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
+
+        #Define objective function
+        obj = np.sum(scaled_weights*sqerr_array)
+
+        #Scale theta_guess to real values 
+        midpoint = len(theta_guess) //2
+        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
+        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        theta_guess = np.array(sigmas + epsilons)
+
+        #Append intermediate values to list
+        self.iter_param_data.append(theta_guess)
+        self.iter_sse_pieces.append(sse_pieces)
+        self.iter_mean_wt_pieces.append(mean_wt_pieces)
+        self.iter_obj_data.append(obj)
+        self.iter_count += 1
+
+        return obj
+
+    def __get_params_and_df(self):
+        """
+        Gets parameter guesses and sets up bounds for optimization
+        """
+        #set seed here
+        if self.seed is not None:
+            np.random.seed(self.seed)
+
+        #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
+        lb = self.at_class.at_bounds_nm_kjmol[:,0].T
+        ub = self.at_class.at_bounds_nm_kjmol[:,1].T
+        param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
+        
+        return param_inits
+    
+    def __get_scipy_soln(self, run, param_inits):
+
+        #Start timer
+        time_start = time.time()
+        #Get guess and find scipy.optimize solution
+        solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run] , bounds=self.at_class.at_bounds_nm_kjmol, 
+                                        method='L-BFGS-B', options = {"disp":False})
+        #End timer and calculate total run time
+        time_end = time.time()
+        time_per_run = time_end-time_start
+
+        return solution, time_per_run
+
+    def __get_opt_iter_info(self, run, solution, time_per_run):
+        """
+        Runs Optimization, times progress, and makes iter_df
+        """
+        #Get list of iteration, sse, and parameter data
+        iter_list = np.array(range(self.iter_count)) + 1
+        obj_list = np.array(self.iter_obj_data)
+        param_list = self.iter_param_data
+        num_params = len(self.at_class.at_names)
+        # print(self.iter_sse_pieces[0])
+
+        #Create df for each least squares run
+        #Initialize results dataframe
+        #Make list of column names
+        org_names = ["Run", "Iter", 'Min Obj', "Min Obj Cum."]
+        at_names_min = [name + "_min" for name in self.at_class.at_names]
+        at_names_cum = [name + "_cum" for name in self.at_class.at_names]
+        self.col_names_iter = org_names[0:3] + at_names_min + [org_names[3]] +  at_names_cum
+
+        #Create a pd dataframe of all iteration information. Initialize cumulative columns as zero
+        iter_df = pd.DataFrame(columns = self.col_names_iter)
+        iter_df["Iter"] = iter_list
+        iter_df["Min Obj"] = obj_list
+        iter_df[at_names_min] = param_list
+        iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
+        iter_df["Run"] = run + 1
+        
+        #Add Theta min obj and theta_sse obj
+        #Loop over each iteration to create the min obj columns
+        for j in range(len(iter_df)):
+            min_sse = iter_df.loc[j, "Min Obj"].copy()
+            if j == 0 or min_sse < iter_df["Min Obj Cum."].iloc[j-1]:
+                min_param = iter_df.loc[j, at_names_min].copy().to_numpy()
+            else:
+                min_sse = iter_df["Min Obj Cum."].iloc[j-1].copy()
+                min_param = iter_df.loc[j-1, at_names_cum].copy().to_numpy()
+
+            iter_df.loc[j, "Min Obj Cum."] = min_sse
+            iter_df.loc[j, at_names_cum] = min_param
+
+            #Add iteration info from sse and mean weight
+            sse_names = list(self.iter_sse_pieces[j].keys())
+            wt_names = list(self.iter_mean_wt_pieces[j].keys())
+            iter_df.loc[j, sse_names] = np.array(list(self.iter_sse_pieces[j].values()))
+            iter_df.loc[j, wt_names] = np.array(list(self.iter_mean_wt_pieces[j].values()))
+            
+        iter_df["Run Time"] = time_per_run
+        iter_df["jac evals"] = solution.njev
+        iter_df["Termination"] = solution.status
+
+        return iter_df
+    
+    #Define fxn to optimize w/ restarts
+    def optimize_ats(self):
+        """
+        Optimizes New atom typing parameters
+
+        Parameters
+        ----------
+        at_class: Atom_Types() instance, The class for atomy types 
+        molec_data_dict: dict, dictionary of Refrigerant constants
+        all_gp_dict: dict, dictionary of refrigerant GP models
+        save_res: bool, Determines whether to save results
+        seed: int, seed for rng. Default None
+        """
+        param_inits = self.__get_params_and_df()
+        ls_results = pd.DataFrame()
+
+        #Optimize w/ retstarts
+        for i in range(self.repeats):
+            #Get Iteration results
+            solution, time_per_run = self.__get_scipy_soln(i, param_inits)
+            iter_df = self.__get_opt_iter_info(i, solution, time_per_run)
+
+            #Append to results_df
+            ls_results = pd.concat([ls_results, iter_df], ignore_index=True)
+
+            #Reset iter lists and change seed
+            self.seed += 1
+            self.iter_param_data = []
+            self.iter_obj_data = []
+            self.iter_sse_pieces = []
+            self.iter_mean_wt_pieces = []
+            self.iter_count = 0
+
+        #Reset the index of the pandas df
+        ls_results = ls_results.reset_index(drop=True)
+
+        #Sort by lowest obj first
+        sort_ls_res = ls_results.sort_values(['Min Obj Cum.'], ascending= True)
+
+        #Back out best job for each run
+        run_best = sort_ls_res.groupby('Run').first().reset_index()
+        best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
+
+        if self.save_data:
+            scl_w_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
+            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()) , scl_w_str)
+            os.makedirs(dir_name, exist_ok=True) 
+            #Save original results
+            save_path1 = os.path.join(dir_name, "opt_at_results.csv")
+            ls_results.to_csv(save_path1, index = False)
+            #Save sorted results
+            save_path2 = os.path.join(dir_name, "sorted_at_res.csv")
+            sort_ls_res.to_csv(save_path2, index = False)
+            #Save sorted results for each run
+            save_path3 = os.path.join(dir_name, "best_per_run.csv")
+            best_runs.to_csv(save_path3, index = False)
+
+        return ls_results
+    
+    def approx_jac_hess(self, theta_guess):
+        """
+        Builds Jacobian Approximation
+        """
+        jac = optimize.approx_fprime(theta_guess, self.__scipy_min_fxn)
+        if len(jac.shape) == 1:
+            jac = jac.reshape(1,-1)
+        hess = jac.T@jac
+        return jac, hess
+    
+    def make_sse_sens_data(self, theta_guess):
+        """
+        Makes heat map data for obj predictions given a parameter set
+        """
+        n_points = 20 
+
+        #Create dict of heat map theta data
+        param_dict = {}
+        
+        #Create a linspace for the number of dimensions and define number of points
+        dim_list = np.linspace(0,len(theta_guess),len(theta_guess))
+        #Create a list of all combinations (without repeats e.g no (1,1), (2,2)) of dimensions of theta
+        mesh_combos = np.array(list(combinations(dim_list, 2)), dtype = int)
+
+        #Meshgrid set always defined by n_points**2
+        theta_set = np.tile(np.array(theta_guess), (n_points**2, 1))
+
+        #Loop over all possible theta combinations of 2
+        for i in range(len(mesh_combos)):
+            #Create a copy of the true values to change the mehsgrid valus on
+            theta_set_copy = np.copy(theta_set)
+            #Set the indeces of theta_set for evaluation as each row of mesh_combos
+            idcs = mesh_combos[i]
+            #define name of parameter set as tuple ("param_1,param_2")
+            data_set_name = (self.at_class.at_names[idcs[0]], self.at_class.at_names[idcs[1]])
+
+            #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
+            #Assume that theta1 and theta2 have equal number of points on the meshgrid
+            theta1 = np.linspace(self.at_bounds[0][idcs[0]], self.at_bounds[1][idcs[0]], n_points)
+            theta2 = np.linspace(self.at_bounds[0][idcs[1]], self.at_bounds[1][idcs[1]], n_points)
+            theta12_mesh = np.array(np.meshgrid(theta1, theta2))
+            theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
+            
+            #Set initial values for evaluation (true values) to meshgrid values
+            theta_set_copy[:,idcs] = theta12_vals
+            
+            #Append data set to dictionary with name
+            param_dict[data_set_name] = theta_set_copy
+
+        #Initialize obj dictionary
+        obj_dict = {}
+        #Loop over each heat map
+        for key, value in param_dict.items():
+            #Evaluate obj over data
+            obj_dict[key] = np.array([self.calc_obj(value[i]) for i in range(len(value))])
+
+        return param_dict, obj_dict
+class Vis_Results(Problem_Setup):
+    """
+    Class For vizualizing GP and Optimization Results
+    """
+
+    #Inherit objects from General_Analysis
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, scl_w, save_data):
+        #Asserts
+        super().__init__(molec_data_dict, all_gp_dict, at_class, save_data)
+        assert isinstance(scl_w, bool), "scl_w must be bool"
+        self.scl_w = scl_w
+
     #Define function to check GP Accuracy
     def check_GPs(self):
         """
@@ -280,7 +507,7 @@ class Opt_ATs:
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
             #Get testing data for that molecule
-            train_data, test_data = get_train_test_data(molec, molec_gps_dict.keys())
+            train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
             #Make pdf
             pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
             pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
@@ -351,158 +578,40 @@ class Opt_ATs:
             pdf.close()
 
         return
-
-
-    def __get_params_and_df(self):
+    
+    def compare_T_prop_best(self):
         """
-        Gets parameter guesses and sets up bounds for optimization
+        Compares T vs Property for the best set 
         """
-        #set seed here
-        if self.seed is not None:
-            np.random.seed(self.seed)
 
-        #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
-        lb = self.at_class.at_bounds_nm_kjmol[:,0].T
-        ub = self.at_class.at_bounds_nm_kjmol[:,1].T
-        param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
+        #Get best set from Results folder csv
+
+        #Loop over molecules
+            #Loop over gps (properties)
+                #Get model and Exp Data
+                #Plot T slices
+                #Plot Exp Data vs Model Prediction
         
-        return param_inits
-    
-    def __get_scipy_soln(self, run, param_inits):
-
-        #Start timer
-        time_start = time.time()
-        #Get guess and find scipy.optimize solution
-        solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run] , bounds=self.at_class.at_bounds_nm_kjmol, 
-                                        method='L-BFGS-B', options = {"disp":False})
-        #End timer and calculate total run time
-        time_end = time.time()
-        time_per_run = time_end-time_start
-
-        return solution, time_per_run
-
-    def __get_opt_iter_info(self, run, solution, time_per_run):
+    def plot_obj_hms(self):
         """
-        Runs Optimization, times progress, and makes iter_df
+        Plots objective contours given a set of data
         """
-        #Get list of iteration, sse, and parameter data
-        iter_list = np.array(range(self.iter_count)) + 1
-        obj_list = np.array(self.iter_obj_data)
-        param_list = self.iter_param_data
-        num_params = len(self.at_class.at_names)
-        # print(self.iter_sse_pieces[0])
 
-        #Create df for each least squares run
-        #Initialize results dataframe
-        #Make list of column names
-        org_names = ["Run", "Iter", 'Min Obj', "Min Obj Cum."]
-        at_names_min = [name + "_min" for name in self.at_class.at_names]
-        at_names_cum = [name + "_cum" for name in self.at_class.at_names]
-        self.col_names_iter = org_names[0:3] + at_names_min + [org_names[3]] +  at_names_cum
+        #Get best set from Results folder csv
+        theta_guess = np.array([1]) #Placeholder
 
-        #Create a pd dataframe of all iteration information. Initialize cumulative columns as zero
-        iter_df = pd.DataFrame(columns = self.col_names_iter)
-        iter_df["Iter"] = iter_list
-        iter_df["Min Obj"] = obj_list
-        iter_df[at_names_min] = param_list
-        # ls_iter_res = [run + 1, iter_list, obj_list] + [param_list] + [None]*(num_params + 1)  
-        # iter_df = pd.DataFrame(columns = self.col_names_iter)
-        iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
-        iter_df["Run"] = run + 1
+        #Make Opt_ATs class
+        at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
+                               1, 1, self.save_data)
+        #Get HM Data
+        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
+        #Loop over keys
+        for key in list(param_dict.keys()):
+            #Get parameter and sse data
+            theta_vals = param_dict[key]
+            obj_vals = obj_dict[key]
+            n_points = int(np.sqrt(len(theta_vals)))
+            theta_mesh = theta_vals.reshape((n_points,n_points))
+            #TO DO: Make a plotter in plot.py that actually plots this data 
+
         
-        #Add Theta min obj and theta_sse obj
-        #Loop over each iteration to create the min obj columns
-        for j in range(len(iter_df)):
-            min_sse = iter_df.loc[j, "Min Obj"].copy()
-            if j == 0 or min_sse < iter_df["Min Obj Cum."].iloc[j-1]:
-                min_param = iter_df.loc[j, at_names_min].copy().to_numpy()
-                # min_param = iter_df.iloc[j-1, 3:num_params+1].copy()
-            else:
-                min_sse = iter_df["Min Obj Cum."].iloc[j-1].copy()
-                min_param = iter_df.loc[j-1, at_names_cum].copy().to_numpy()
-                # min_param = iter_df.iloc[j-1, 4+num_params:4+2*num_params+1].copy()
-
-            iter_df.loc[j, "Min Obj Cum."] = min_sse
-            iter_df.loc[j, at_names_cum] = min_param
-
-            #Add iteration info from sse and mean weight
-            sse_names = list(self.iter_sse_pieces[j].keys())
-            wt_names = list(self.iter_mean_wt_pieces[j].keys())
-            iter_df.loc[j, sse_names] = np.array(list(self.iter_sse_pieces[j].values()))
-            iter_df.loc[j, wt_names] = np.array(list(self.iter_mean_wt_pieces[j].values()))
-            
-        iter_df["Run Time"] = time_per_run
-        iter_df["jac evals"] = solution.njev
-        iter_df["Termination"] = solution.status
-
-        return iter_df
-    
-    #Define fxn to optimize w/ restarts
-    def optimize_ats(self):
-        """
-        Optimizes New atom typing parameters
-
-        Parameters
-        ----------
-        at_class: Atom_Types() instance, The class for atomy types 
-        molec_data_dict: dict, dictionary of Refrigerant constants
-        all_gp_dict: dict, dictionary of refrigerant GP models
-        save_res: bool, Determines whether to save results
-        seed: int, seed for rng. Default None
-        """
-        param_inits = self.__get_params_and_df()
-        ls_results = pd.DataFrame()
-
-        #Optimize w/ retstarts
-        for i in range(self.repeats):
-            #Get Iteration results
-            solution, time_per_run = self.__get_scipy_soln(i, param_inits)
-            iter_df = self.__get_opt_iter_info(i, solution, time_per_run)
-
-            #Append to results_df
-            ls_results = pd.concat([ls_results, iter_df], ignore_index=True)
-
-            #Reset iter lists and change seed
-            self.seed += 1
-            self.iter_param_data = []
-            self.iter_obj_data = []
-            self.iter_sse_pieces = []
-            self.iter_mean_wt_pieces = []
-            self.iter_count = 0
-
-        #Reset the index of the pandas df
-        ls_results = ls_results.reset_index(drop=True)
-
-        #Sort by lowest obj first
-        sort_ls_res = ls_results.sort_values(['Min Obj Cum.'], ascending= True)
-
-        #Back out best job for each run
-        run_best = sort_ls_res.groupby('Run').first().reset_index()
-        best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
-
-        if self.save_data:
-            scl_w_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
-            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()), scl_w_str)
-            os.makedirs(dir_name, exist_ok=True) 
-            #Save original results
-            save_path1 = os.path.join(dir_name, "opt_at_results.csv")
-            ls_results.to_csv(save_path1, index = False)
-            #Save sorted results
-            save_path2 = os.path.join(dir_name, "sorted_at_res.csv")
-            sort_ls_res.to_csv(save_path2, index = False)
-            #Save sorted results for each run
-            save_path3 = os.path.join(dir_name, "best_per_run.csv")
-            best_runs.to_csv(save_path3, index = False)
-
-        return ls_results
-    
-    def approx_jac_hess(self, theta_guess):
-        """
-        Builds Jacobian Approximation
-        """
-        jac = optimize.approx_fprime(theta_guess, self.__scipy_min_fxn)
-        if len(jac.shape) == 1:
-            jac = jac.reshape(1,-1)
-        hess = jac.T@jac
-        return jac, hess
-

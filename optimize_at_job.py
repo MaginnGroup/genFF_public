@@ -5,6 +5,7 @@ import unyt as u
 
 #Set params for saving results, # of repeats, and the seed
 save_data = True
+scl_w = False
 repeats = 200
 seed = 1
 
@@ -29,6 +30,7 @@ molec_data_dict = {"R14":r14_class,
 at_class = atom_type.AT_Scheme_7()
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data)
+driver.scl_w = scl_w
 
 #Check GP Params
 # driver.check_GPs()
