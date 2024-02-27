@@ -12,12 +12,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import tensorflow as tf
+from itertools import combinations
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
 
 #Create a function for getting gp data from files
-def get_gp_data_from_pkl(self, key_list):
+def get_gp_data_from_pkl(key_list):
     """
     Get gp data from .pkl files
 
@@ -166,91 +167,7 @@ class Problem_Setup:
         gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
         gp_var = np.diag(np.squeeze(gp_covar))
         return np.squeeze(gp_mean), gp_var
-    
-    #Define function to check GP Accuracy
-    def check_GPs(self):
-        """
-        Makes GPs 
-        """
-        #Loop over molecules
-        for molec in list(self.all_gp_dict.keys()):
-            #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
-            #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
-            #Get testing data for that molecule
-            train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
-            #Make pdf
-            pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
-            pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
-            #Loop over gps (1 per property)
-            for key in list(molec_gps_dict.keys()):
-                #Set label
-                label = molec + "_" + key
-                #Get GP associated with property
-                gp_model = molec_gps_dict[key]
-                #Get X and Y data and bounds associated with the GP
-                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
-                #Plot model performance
-                pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
-                plt.close()
 
-                #Plot temperature slices
-                figs = plot_slices_temperature(
-                    {label:gp_model},
-                    molec_object.n_params,
-                    molec_object.temperature_bounds,
-                    y_bounds,
-                    plot_bounds = molec_object.temperature_bounds,
-                    property_name= y_names
-                )
-
-                for fig in figs:
-                    pdf.savefig(fig)
-                del figs
-
-                #Plot Parameter slices
-                for param_name in molec_object.param_names:
-                    figs = plot_slices_params(
-                        {label:gp_model},
-                        param_name,
-                        molec_object.param_names,
-                        list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
-                        molec_object.temperature_bounds,
-                        y_bounds,
-                        property_name=y_names
-                    )
-                    plt.close()
-                    
-                    for fig in figs:
-                        pdf.savefig(fig)
-                    del figs
-
-                #Plot test vs train for each parameter set
-                for test_params in test_data["x"][:,:molec_object.n_params]:
-                    #Find points in test set with correct param value
-                    # Locate rows where parameter set == test parameter set
-                    match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
-                    test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
-                                                  test_data[key][match_test].reshape(-1,1)), axis = 1)
-                    #Find points in train set with correct param value
-                    match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
-                    train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
-                                                  train_data[key][match_trn].reshape(-1,1)), axis = 1)
-
-                    pdf.savefig(plot_model_vs_test({label:gp_model}, 
-                                                test_params, 
-                                                train_points, 
-                                                test_points, 
-                                                molec_object.temperature_bounds,
-                                                y_bounds,
-                                                plot_bounds = molec_object.temperature_bounds,
-                                                property_name =  y_names ))
-                    plt.close()
-            pdf.close()
-
-        return
-    
 class Opt_ATs(Problem_Setup):
     """
     The class for Least Squares regression analysis. Child class of General_Analysis
@@ -270,27 +187,17 @@ class Opt_ATs(Problem_Setup):
         self.iter_count = 0
         self.scl_w = True
     
-    #define the scipy function for minimizing
-    def __scipy_min_fxn(self, theta_guess):
+    def calc_obj(self, theta_guess):
         """
-        The scipy function for minimizing the data
+        Calculates the sse objective function
 
         Parameters
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
-        molec_data_dict: dict, dictionary of Refrigerant constants
-        all_gp_dict: dict, dictionary of refrigerant GP models
-        at_class: Atom_Types() instance, The class for atom types 
-
-        Returns
-        --------
-        obj: float, the objective function from the formula defined in the paper
         """
-        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         #Initialize weight and squared error arrays
         sqerr_array  = []
         weight_array = []
-        key_list = []
         sse_pieces = {}
         mean_wt_pieces = {}
         
@@ -331,15 +238,37 @@ class Opt_ATs(Problem_Setup):
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
                 sqerr_array += sq_err
         
-        #List to array or dict
+        #List to flattened array
         sqerr_array = np.array(sqerr_array).flatten()
         weight_array = np.array(weight_array).flatten()
-        #CAN Normalize weights to add up to 1
+
+        return sqerr_array, weight_array, sse_pieces, mean_wt_pieces
+
+    #define the scipy function for minimizing
+    def __scipy_min_fxn(self, theta_guess):
+        """
+        The scipy function for minimizing the data
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        molec_data_dict: dict, dictionary of Refrigerant constants
+        all_gp_dict: dict, dictionary of refrigerant GP models
+        at_class: Atom_Types() instance, The class for atom types 
+
+        Returns
+        --------
+        obj: float, the objective function from the formula defined in the paper
+        """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        sqerr_array, weight_array, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
+
+        #Normalize weights to add up to 1 if scl_w is True
         sum_weights = np.sum(weight_array) if self.scl_w == True else 1
-        
         scaled_weights = weight_array / sum_weights
         # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
         mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
+
         #Define objective function
         obj = np.sum(scaled_weights*sqerr_array)
 
@@ -410,8 +339,6 @@ class Opt_ATs(Problem_Setup):
         iter_df["Iter"] = iter_list
         iter_df["Min Obj"] = obj_list
         iter_df[at_names_min] = param_list
-        # ls_iter_res = [run + 1, iter_list, obj_list] + [param_list] + [None]*(num_params + 1)  
-        # iter_df = pd.DataFrame(columns = self.col_names_iter)
         iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
         iter_df["Run"] = run + 1
         
@@ -421,11 +348,9 @@ class Opt_ATs(Problem_Setup):
             min_sse = iter_df.loc[j, "Min Obj"].copy()
             if j == 0 or min_sse < iter_df["Min Obj Cum."].iloc[j-1]:
                 min_param = iter_df.loc[j, at_names_min].copy().to_numpy()
-                # min_param = iter_df.iloc[j-1, 3:num_params+1].copy()
             else:
                 min_sse = iter_df["Min Obj Cum."].iloc[j-1].copy()
                 min_param = iter_df.loc[j-1, at_names_cum].copy().to_numpy()
-                # min_param = iter_df.iloc[j-1, 4+num_params:4+2*num_params+1].copy()
 
             iter_df.loc[j, "Min Obj Cum."] = min_sse
             iter_df.loc[j, at_names_cum] = min_param
@@ -511,3 +436,182 @@ class Opt_ATs(Problem_Setup):
         hess = jac.T@jac
         return jac, hess
     
+    def make_sse_sens_data(self, theta_guess):
+        """
+        Makes heat map data for obj predictions given a parameter set
+        """
+        n_points = 20 
+
+        #Create dict of heat map theta data
+        param_dict = {}
+        
+        #Create a linspace for the number of dimensions and define number of points
+        dim_list = np.linspace(0,len(theta_guess),len(theta_guess))
+        #Create a list of all combinations (without repeats e.g no (1,1), (2,2)) of dimensions of theta
+        mesh_combos = np.array(list(combinations(dim_list, 2)), dtype = int)
+
+        #Meshgrid set always defined by n_points**2
+        theta_set = np.tile(np.array(theta_guess), (n_points**2, 1))
+
+        #Loop over all possible theta combinations of 2
+        for i in range(len(mesh_combos)):
+            #Create a copy of the true values to change the mehsgrid valus on
+            theta_set_copy = np.copy(theta_set)
+            #Set the indeces of theta_set for evaluation as each row of mesh_combos
+            idcs = mesh_combos[i]
+            #define name of parameter set as tuple ("param_1,param_2")
+            data_set_name = (self.at_class.at_names[idcs[0]], self.at_class.at_names[idcs[1]])
+
+            #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
+            #Assume that theta1 and theta2 have equal number of points on the meshgrid
+            theta1 = np.linspace(self.at_bounds[0][idcs[0]], self.at_bounds[1][idcs[0]], n_points)
+            theta2 = np.linspace(self.at_bounds[0][idcs[1]], self.at_bounds[1][idcs[1]], n_points)
+            theta12_mesh = np.array(np.meshgrid(theta1, theta2))
+            theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
+            
+            #Set initial values for evaluation (true values) to meshgrid values
+            theta_set_copy[:,idcs] = theta12_vals
+            
+            #Append data set to dictionary with name
+            param_dict[data_set_name] = theta_set_copy
+
+        #Initialize obj dictionary
+        obj_dict = {}
+        #Loop over each heat map
+        for key, value in param_dict.items():
+            #Evaluate obj over data
+            obj_dict[key] = np.array([self.calc_obj(value[i]) for i in range(len(value))])
+
+        return param_dict, obj_dict
+class Vis_Results(Problem_Setup):
+    """
+    Class For vizualizing GP and Optimization Results
+    """
+
+    #Inherit objects from General_Analysis
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, scl_w, save_data):
+        #Asserts
+        super().__init__(molec_data_dict, all_gp_dict, at_class, save_data)
+        assert isinstance(scl_w, bool), "scl_w must be bool"
+        self.scl_w = scl_w
+
+    #Define function to check GP Accuracy
+    def check_GPs(self):
+        """
+        Makes GPs 
+        """
+        #Loop over molecules
+        for molec in list(self.all_gp_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            #Get testing data for that molecule
+            train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
+            #Make pdf
+            pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
+            pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Set label
+                label = molec + "_" + key
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                #Plot model performance
+                pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
+                plt.close()
+
+                #Plot temperature slices
+                figs = plot_slices_temperature(
+                    {label:gp_model},
+                    molec_object.n_params,
+                    molec_object.temperature_bounds,
+                    y_bounds,
+                    plot_bounds = molec_object.temperature_bounds,
+                    property_name= y_names
+                )
+
+                for fig in figs:
+                    pdf.savefig(fig)
+                del figs
+
+                #Plot Parameter slices
+                for param_name in molec_object.param_names:
+                    figs = plot_slices_params(
+                        {label:gp_model},
+                        param_name,
+                        molec_object.param_names,
+                        list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
+                        molec_object.temperature_bounds,
+                        y_bounds,
+                        property_name=y_names
+                    )
+                    plt.close()
+                    
+                    for fig in figs:
+                        pdf.savefig(fig)
+                    del figs
+
+                #Plot test vs train for each parameter set
+                for test_params in test_data["x"][:,:molec_object.n_params]:
+                    #Find points in test set with correct param value
+                    # Locate rows where parameter set == test parameter set
+                    match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                    test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
+                                                  test_data[key][match_test].reshape(-1,1)), axis = 1)
+                    #Find points in train set with correct param value
+                    match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                    train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
+                                                  train_data[key][match_trn].reshape(-1,1)), axis = 1)
+
+                    pdf.savefig(plot_model_vs_test({label:gp_model}, 
+                                                test_params, 
+                                                train_points, 
+                                                test_points, 
+                                                molec_object.temperature_bounds,
+                                                y_bounds,
+                                                plot_bounds = molec_object.temperature_bounds,
+                                                property_name =  y_names ))
+                    plt.close()
+            pdf.close()
+
+        return
+    
+    def compare_T_prop_best(self):
+        """
+        Compares T vs Property for the best set 
+        """
+
+        #Get best set from Results folder csv
+
+        #Loop over molecules
+            #Loop over gps (properties)
+                #Get model and Exp Data
+                #Plot T slices
+                #Plot Exp Data vs Model Prediction
+        
+    def plot_obj_hms(self):
+        """
+        Plots objective contours given a set of data
+        """
+
+        #Get best set from Results folder csv
+        theta_guess = np.array([1]) #Placeholder
+
+        #Make Opt_ATs class
+        at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
+                               1, 1, self.save_data)
+        #Get HM Data
+        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
+        #Loop over keys
+        for key in list(param_dict.keys()):
+            #Get parameter and sse data
+            theta_vals = param_dict[key]
+            obj_vals = obj_dict[key]
+            n_points = int(np.sqrt(len(theta_vals)))
+            theta_mesh = theta_vals.reshape((n_points,n_points))
+            #TO DO: Make a plotter in plot.py that actually plots this data 
+
+        

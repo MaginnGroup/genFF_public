@@ -321,3 +321,77 @@ def plot_model_vs_test(
 
     if not mpl_is_inline:
         return fig
+    
+def plot_model_vs_exp(
+    models,
+    param_values,
+    exp_data,
+    temperature_bounds,
+    property_bounds,
+    plot_bounds=[220.0, 340.0],
+    property_name="property",
+):
+    """Plots the GP model(s) as a function of temperature with all other parameters
+    taken as param_values. Overlays training and testing points with the same
+    param_values.
+
+    Parameters
+    ----------
+    models : dict {"label" : gpflow.model }
+        GPFlow models to plot
+    param_values : np.ndarray, shape=(n_params)
+        The parameters at which to evaluate the GP model
+    exp_data : dict
+        The experimental temperature (unscaled) and property (unscaled) data
+    temperature_bounds: array-like
+        bounds for scaling temperature between physical
+        and dimensionless values
+    property_bounds: array-like
+        bounds for scaling property between physical
+        and dimensionless values
+    plot_bounds : array-like, optional
+        temperature bounds for the plot
+    property_name : str, optional, default="property"
+        property name with units for axis label
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+
+    n_samples = 100
+    vals = np.linspace(plot_bounds[0], plot_bounds[1], n_samples).reshape(
+        -1, 1
+    )
+    vals_scaled = values_real_to_scaled(vals, temperature_bounds)
+
+    other = np.tile(param_values, (n_samples, 1))
+    xx = np.hstack((other, vals_scaled))
+
+    fig, ax = plt.subplots()
+    for (label, model) in models.items():
+        mean_scaled, var_scaled = model.predict_f(xx)
+
+        mean = values_scaled_to_real(mean_scaled, property_bounds)
+        var = variances_scaled_to_real(var_scaled, property_bounds)
+        ax.plot(vals, mean, lw=2, label="GP model" + label)
+        ax.fill_between(
+            vals[:, 0],
+            mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
+            mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
+            alpha=0.25,
+        )
+
+    exp_temp = np.array(list(exp_data.keys()))
+    exp_property = np.array(list(exp_data.values()))
+    ax.plot(
+        exp_temp, exp_property, "s", color="black", label="Exp"
+    )
+
+    ax.set_xlabel("Temperature")
+    ax.set_ylabel(property_name)
+    fig.legend()
+
+    if not mpl_is_inline:
+        return fig
+
