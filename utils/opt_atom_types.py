@@ -104,6 +104,7 @@ class Opt_ATs:
         self.seed = seed
         self.repeats = repeats
         self.save_data = save_data
+        self.scl_w = True
     
     #define the scipy function for minimizing
     def __scipy_min_fxn(self, theta_guess):
@@ -126,7 +127,9 @@ class Opt_ATs:
         sqerr_array  = []
         weight_array = []
         key_list = []
-
+        sse_pieces = {}
+        mean_wt_pieces = {}
+        
         #Loop over molecules
         for molec in list(self.molec_data_dict.keys()):
             #Get constants for molecule
@@ -159,18 +162,20 @@ class Opt_ATs:
                 weight_array += weight_mpi
                 #Calculate sse
                 sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
-                key_list.append(molec + "-" + key)
+                # key_list.append(molec + "-" + key)
+                sse_pieces[molec + "-" + key + "-sse"] = np.sum(sq_err)
+                mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
                 sqerr_array += sq_err
         
         #List to array or dict
-        sqerr_array = np.array(sqerr_array)
-        sse_names = [name + "-sse" for name in key_list]
-        wt_names = [name + "-wt" for name in key_list]
-        sse_pieces = dict(zip(sse_names, np.sum(sqerr_array)))
-        weight_array = np.array(weight_array)
-        mean_wt_pieces = dict(zip(wt_names, np.mean(weight_array)))
-        #Normalize weights to add up to 1
-        scaled_weights = weight_array #/ np.sum(weight_array)
+        sqerr_array = np.array(sqerr_array).flatten()
+        weight_array = np.array(weight_array).flatten()
+        #CAN Normalize weights to add up to 1
+        sum_weights = np.sum(weight_array) if self.scl_w == True else 1
+        
+        scaled_weights = weight_array / sum_weights
+        # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
+        mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
         #Define objective function
         obj = np.sum(scaled_weights*sqerr_array)
 
@@ -360,17 +365,8 @@ class Opt_ATs:
         lb = self.at_class.at_bounds_nm_kjmol[:,0].T
         ub = self.at_class.at_bounds_nm_kjmol[:,1].T
         param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
-
-        #Initialize results dataframe
-        #Make list of column names
-        org_names = ["Run", "Iter", 'Min Obj', "Min Obj Cum.", "jac evals", "Termination", "Run Time"]
-        at_names_min = [name + "_min" for name in self.at_class.at_names]
-        at_names_cum = [name + "_cum" for name in self.at_class.at_names]
-        self.col_names_iter = org_names[0:3] + at_names_min + org_names[3] +  at_names_cum
-        self.col_names = self.col_names_iter + org_names[4:]
-        ls_results = pd.DataFrame(columns=self.col_names)
         
-        return param_inits, ls_results
+        return param_inits
     
     def __get_scipy_soln(self, run, param_inits):
 
@@ -394,31 +390,46 @@ class Opt_ATs:
         obj_list = np.array(self.iter_obj_data)
         param_list = self.iter_param_data
         num_params = len(self.at_class.at_names)
-        sse_names = list(self.iter_sse_pieces[0].keys())
-        wt_names = list(self.iter_mean_wt_pieces[0].keys())
-        
+        # print(self.iter_sse_pieces[0])
+
         #Create df for each least squares run
+        #Initialize results dataframe
+        #Make list of column names
+        org_names = ["Run", "Iter", 'Min Obj', "Min Obj Cum."]
+        at_names_min = [name + "_min" for name in self.at_class.at_names]
+        at_names_cum = [name + "_cum" for name in self.at_class.at_names]
+        self.col_names_iter = org_names[0:3] + at_names_min + [org_names[3]] +  at_names_cum
+
         #Create a pd dataframe of all iteration information. Initialize cumulative columns as zero
-        ls_iter_res = [run + 1, iter_list, obj_list] + [param_list] + [None]*(num_params + 1)
-        iter_df = pd.DataFrame([ls_iter_res], columns = self.col_names_iter)
+        iter_df = pd.DataFrame(columns = self.col_names_iter)
+        iter_df["Iter"] = iter_list
+        iter_df["Min Obj"] = obj_list
+        iter_df[at_names_min] = param_list
+        # ls_iter_res = [run + 1, iter_list, obj_list] + [param_list] + [None]*(num_params + 1)  
+        # iter_df = pd.DataFrame(columns = self.col_names_iter)
         iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
+        iter_df["Run"] = run + 1
         
         #Add Theta min obj and theta_sse obj
         #Loop over each iteration to create the min obj columns
         for j in range(len(iter_df)):
             min_sse = iter_df.loc[j, "Min Obj"].copy()
-            if j == 0 or min_sse < iter_df["Min Obj"].iloc[j-1]:
-                min_param = iter_df.iloc[j-1, 3:num_params+1].copy()
+            if j == 0 or min_sse < iter_df["Min Obj Cum."].iloc[j-1]:
+                min_param = iter_df.loc[j, at_names_min].copy().to_numpy()
+                # min_param = iter_df.iloc[j-1, 3:num_params+1].copy()
             else:
                 min_sse = iter_df["Min Obj Cum."].iloc[j-1].copy()
-                min_param = iter_df.iloc[j-1, 5+num_params:5+2*num_params+1].copy()
+                min_param = iter_df.loc[j-1, at_names_cum].copy().to_numpy()
+                # min_param = iter_df.iloc[j-1, 4+num_params:4+2*num_params+1].copy()
 
             iter_df.loc[j, "Min Obj Cum."] = min_sse
-            iter_df.iloc[j, 5+num_params:5+2*num_params+1] = min_param
+            iter_df.loc[j, at_names_cum] = min_param
 
             #Add iteration info from sse and mean weight
-            iter_df.iloc[j, sse_names] = self.iter_sse_pieces[j].values
-            iter_df.iloc[j, wt_names] = self.iter_mean_wt_pieces[j].values
+            sse_names = list(self.iter_sse_pieces[j].keys())
+            wt_names = list(self.iter_mean_wt_pieces[j].keys())
+            iter_df.loc[j, sse_names] = np.array(list(self.iter_sse_pieces[j].values()))
+            iter_df.loc[j, wt_names] = np.array(list(self.iter_mean_wt_pieces[j].values()))
             
         iter_df["Run Time"] = time_per_run
         iter_df["jac evals"] = solution.njev
@@ -439,7 +450,8 @@ class Opt_ATs:
         save_res: bool, Determines whether to save results
         seed: int, seed for rng. Default None
         """
-        param_inits, ls_results = self.__get_params_and_df()
+        param_inits = self.__get_params_and_df()
+        ls_results = pd.DataFrame()
 
         #Optimize w/ retstarts
         for i in range(self.repeats):
@@ -448,7 +460,7 @@ class Opt_ATs:
             iter_df = self.__get_opt_iter_info(i, solution, time_per_run)
 
             #Append to results_df
-            ls_results = pd.concat([ls_results.astype(iter_df.dtypes), iter_df], ignore_index=True)
+            ls_results = pd.concat([ls_results, iter_df], ignore_index=True)
 
             #Reset iter lists and change seed
             self.seed += 1
@@ -469,7 +481,8 @@ class Opt_ATs:
         best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
 
         if self.save_data:
-            dir_name = "Results/"
+            scl_w_str = "_scl_w" if self.scl_w == True else ""
+            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()), scl_w_str)
             os.makedirs(dir_name, exist_ok=True) 
             #Save original results
             save_path1 = os.path.join(dir_name, "opt_at_results.csv")
