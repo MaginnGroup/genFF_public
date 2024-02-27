@@ -17,7 +17,7 @@ mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
 
 #Create a function for getting gp data from files
-def get_gp_data_from_pkl(key_list):
+def get_gp_data_from_pkl(self, key_list):
     """
     Get gp data from .pkl files
 
@@ -46,64 +46,228 @@ def get_gp_data_from_pkl(key_list):
 
     return all_gp_dict
 
-def get_train_test_data(molec_key, prop_keys):
+class Problem_Setup:
     """
-    Get gp data from .pkl files
-
-    Parameters
-    ----------
-    key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
-
-    Returns:
-    --------
-    all_gp_dict: dict, dictionary of dictionary of gps for each property
+    Gets GP/ Experimental Data For experiments
     """
-    #Get dict of testing data
-    test_data = {}
-    train_data = {}
-    for str in ["train", "test"]:
-        #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-        file_x = os.path.join(molec_key +"-vlegp/x_" + str +".csv")
-        assert os.path.isfile(file_x), "key-vlegp/x_****.csv does not exist. Check key list carefully"
-        x = np.loadtxt(file_x, delimiter=",",skiprows=1)
-        dict = train_data if str == "train" else test_data
-        dict["x"]=x
+    #Inherit objects from General_Analysis
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, save_data):
+        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+        assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
+        assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
+        assert isinstance(save_data, bool), "save_res must be bool"
+        #Placeholder that will be overwritten if None
+        self.molec_data_dict = molec_data_dict
+        self.all_gp_dict = all_gp_dict
+        self.at_class = at_class
+        self.save_data = save_data
+        self.scl_w = True
 
-        for prop_key in prop_keys:
-            file_y = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
-            prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
-            dict[prop_key]=prop_data
+    def get_exp_data(self, molec_object, prop_key):
+        """
+        Helper function for getting experimental data and bounds
 
-    return train_data, test_data
+        Parameters
+        ----------
+        molec_object: Instance of RXXXXConstant() class. Class for refrigerant molecule data
+        prop_key: str, The property key to get exp_data for. Valid Keys are "sim_vap_density", "sim_liq_density", 
+        "sim_Pvap", "sim_Hvap"
 
-class Opt_ATs:
+        Returns:
+        --------
+        exp_data: dict, dictionary of Temperature and property data
+        property_bounds: array, array of bounds for the property data
+        """
+        #How to assert that we have a constants class?
+        valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
+
+        if prop_key not in valid_prop_keys:
+            raise ValueError(
+                "Invalid prop_key {}. Supported prop_key names are "
+                "{}".format(prop_key, valid_prop_keys))
+        
+        if "vap_density" in prop_key:
+            exp_data = molec_object.expt_vap_density
+            property_bounds = molec_object.vap_density_bounds
+            property_name = "Vapor Density [kg/m^3]"
+        elif "liq_density" in prop_key:
+            exp_data = molec_object.expt_liq_density
+            property_bounds = molec_object.liq_density_bounds
+            property_name = "Liquid Density [kg/m^3]"
+        elif "Pvap" in prop_key: 
+            exp_data = molec_object.expt_Pvap
+            property_bounds = molec_object.Pvap_bounds
+            property_name = "Vapor pressure [bar]"
+        elif "Hvap" in prop_key:
+            exp_data = molec_object.expt_Hvap
+            property_bounds = molec_object.Hvap_bounds
+            property_name = "Enthalpy of Vaporization [kJ/kg]"
+        else:
+            raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
+        return exp_data, property_bounds, property_name
+
+    def get_train_test_data(self, molec_key, prop_keys):
+        """
+        Get gp data from .pkl files
+
+        Parameters
+        ----------
+        key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
+
+        Returns:
+        --------
+        all_gp_dict: dict, dictionary of dictionary of gps for each property
+        """
+        #Get dict of testing data
+        test_data = {}
+        train_data = {}
+        for str in ["train", "test"]:
+            #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
+            file_x = os.path.join(molec_key +"-vlegp/x_" + str +".csv")
+            assert os.path.isfile(file_x), "key-vlegp/x_****.csv does not exist. Check key list carefully"
+            x = np.loadtxt(file_x, delimiter=",",skiprows=1)
+            dict = train_data if str == "train" else test_data
+            dict["x"]=x
+
+            for prop_key in prop_keys:
+                file_y = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
+                prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
+                dict[prop_key]=prop_data
+
+        return train_data, test_data
+
+    #Create fxn for analyzing a single gp w/ gpflow
+    def eval_gp_new_theta(self, gp_theta_guess, molec_object, gp_object, Xexp):
+        """
+        Evaluates the gpflow model
+
+        Parameters
+        ----------
+        gp_theta_guess: np.ndarray, the initial gp parameter set to start optimization at (sigma in A, eps in kJ/mol)
+        molec_object: Instance of RXXConstants(), The data associated with a refrigerant molecule
+        gp_object: gpflow.models.GPR, GP Model for a specific property
+        Xexp: np.ndarray, Experimental state point (Temperature (K)) data for the property estimated by gp_object
+
+        Returns
+        -------
+        gp_mean: tf.tensor, The (flattened) mean of the gp prediction
+        gp_var: tf.tensor, The (flattened) variance of the gp prediction
+        """
+        assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
+        assert isinstance(gp_object, gpflow.models.GPR)
+        
+        #Scale X data
+        gp_Xexp = values_real_to_scaled(Xexp, molec_object.temperature_bounds)
+        #Repeat theta guess x number of times
+        gp_theta = np.repeat(gp_theta_guess, len(Xexp) , axis = 0)
+        #Concatenate theta and tem values to get a gp input
+        gp_input = np.concatenate((gp_theta, gp_Xexp), axis=1)
+        #Get mean and std from gp
+        gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
+        gp_var = np.diag(np.squeeze(gp_covar))
+        return np.squeeze(gp_mean), gp_var
+    
+    #Define function to check GP Accuracy
+    def check_GPs(self):
+        """
+        Makes GPs 
+        """
+        #Loop over molecules
+        for molec in list(self.all_gp_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            #Get testing data for that molecule
+            train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
+            #Make pdf
+            pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
+            pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Set label
+                label = molec + "_" + key
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                #Plot model performance
+                pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
+                plt.close()
+
+                #Plot temperature slices
+                figs = plot_slices_temperature(
+                    {label:gp_model},
+                    molec_object.n_params,
+                    molec_object.temperature_bounds,
+                    y_bounds,
+                    plot_bounds = molec_object.temperature_bounds,
+                    property_name= y_names
+                )
+
+                for fig in figs:
+                    pdf.savefig(fig)
+                del figs
+
+                #Plot Parameter slices
+                for param_name in molec_object.param_names:
+                    figs = plot_slices_params(
+                        {label:gp_model},
+                        param_name,
+                        molec_object.param_names,
+                        list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
+                        molec_object.temperature_bounds,
+                        y_bounds,
+                        property_name=y_names
+                    )
+                    plt.close()
+                    
+                    for fig in figs:
+                        pdf.savefig(fig)
+                    del figs
+
+                #Plot test vs train for each parameter set
+                for test_params in test_data["x"][:,:molec_object.n_params]:
+                    #Find points in test set with correct param value
+                    # Locate rows where parameter set == test parameter set
+                    match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                    test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
+                                                  test_data[key][match_test].reshape(-1,1)), axis = 1)
+                    #Find points in train set with correct param value
+                    match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                    train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
+                                                  train_data[key][match_trn].reshape(-1,1)), axis = 1)
+
+                    pdf.savefig(plot_model_vs_test({label:gp_model}, 
+                                                test_params, 
+                                                train_points, 
+                                                test_points, 
+                                                molec_object.temperature_bounds,
+                                                y_bounds,
+                                                plot_bounds = molec_object.temperature_bounds,
+                                                property_name =  y_names ))
+                    plt.close()
+            pdf.close()
+
+        return
+    
+class Opt_ATs(Problem_Setup):
     """
     The class for Least Squares regression analysis. Child class of General_Analysis
     """
     #Inherit objects from General_Analysis
     def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data):
         #Asserts
-        
-        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
-        assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
-        assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
-        assert isinstance(save_data, bool), "save_res must be bool"
+        super().__init__(molec_data_dict, all_gp_dict, at_class, save_data)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
-
+        self.repeats = repeats
+        self.seed = seed
         self.iter_param_data = []
         self.iter_obj_data = []
         self.iter_sse_pieces = []
         self.iter_mean_wt_pieces = []
         self.iter_count = 0
-        self.seed = seed
-        #Placeholder that will be overwritten if None
-        self.molec_data_dict = molec_data_dict
-        self.all_gp_dict = all_gp_dict
-        self.at_class = at_class
-        self.seed = seed
-        self.repeats = repeats
-        self.save_data = save_data
         self.scl_w = True
     
     #define the scipy function for minimizing
@@ -193,165 +357,6 @@ class Opt_ATs:
         self.iter_count += 1
 
         return obj
-
-    def get_exp_data(self, molec_object, prop_key):
-        """
-        Helper function for getting experimental data and bounds
-
-        Parameters
-        ----------
-        molec_object: Instance of RXXXXConstant() class. Class for refrigerant molecule data
-        prop_key: str, The property key to get exp_data for. Valid Keys are "sim_vap_density", "sim_liq_density", 
-        "sim_Pvap", "sim_Hvap"
-
-        Returns:
-        --------
-        exp_data: dict, dictionary of Temperature and property data
-        property_bounds: array, array of bounds for the property data
-        """
-        #How to assert that we have a constants class?
-        valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
-
-        if prop_key not in valid_prop_keys:
-            raise ValueError(
-                "Invalid prop_key {}. Supported prop_key names are "
-                "{}".format(prop_key, valid_prop_keys))
-        
-        if "vap_density" in prop_key:
-            exp_data = molec_object.expt_vap_density
-            property_bounds = molec_object.vap_density_bounds
-            property_name = "Vapor Density [kg/m^3]"
-        elif "liq_density" in prop_key:
-            exp_data = molec_object.expt_liq_density
-            property_bounds = molec_object.liq_density_bounds
-            property_name = "Liquid Density [kg/m^3]"
-        elif "Pvap" in prop_key: 
-            exp_data = molec_object.expt_Pvap
-            property_bounds = molec_object.Pvap_bounds
-            property_name = "Vapor pressure [bar]"
-        elif "Hvap" in prop_key:
-            exp_data = molec_object.expt_Hvap
-            property_bounds = molec_object.Hvap_bounds
-            property_name = "Enthalpy of Vaporization [kJ/kg]"
-        else:
-            raise(ValueError, "all_gp_dict must contain a dict with keys sim_vap_density, sim_liq_density, sim_Hvap, or, sim_Pvap")
-        return exp_data, property_bounds, property_name
-    
-    #Create fxn for analyzing a single gp w/ gpflow
-    def eval_gp_new_theta(self, gp_theta_guess, molec_object, gp_object, Xexp):
-        """
-        Evaluates the gpflow model
-
-        Parameters
-        ----------
-        gp_theta_guess: np.ndarray, the initial gp parameter set to start optimization at (sigma in A, eps in kJ/mol)
-        molec_object: Instance of RXXConstants(), The data associated with a refrigerant molecule
-        gp_object: gpflow.models.GPR, GP Model for a specific property
-        Xexp: np.ndarray, Experimental state point (Temperature (K)) data for the property estimated by gp_object
-
-        Returns
-        -------
-        gp_mean: tf.tensor, The (flattened) mean of the gp prediction
-        gp_var: tf.tensor, The (flattened) variance of the gp prediction
-        """
-        assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
-        assert isinstance(gp_object, gpflow.models.GPR)
-        
-        #Scale X data
-        gp_Xexp = values_real_to_scaled(Xexp, molec_object.temperature_bounds)
-        #Repeat theta guess x number of times
-        gp_theta = np.repeat(gp_theta_guess, len(Xexp) , axis = 0)
-        #Concatenate theta and tem values to get a gp input
-        gp_input = np.concatenate((gp_theta, gp_Xexp), axis=1)
-        #Get mean and std from gp
-        gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
-        gp_var = np.diag(np.squeeze(gp_covar))
-        return np.squeeze(gp_mean), gp_var
-
-    #Define function to check GP Accuracy
-    def check_GPs(self):
-        """
-        Makes GPs 
-        """
-        #Loop over molecules
-        for molec in list(self.all_gp_dict.keys()):
-            #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
-            #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
-            #Get testing data for that molecule
-            train_data, test_data = get_train_test_data(molec, molec_gps_dict.keys())
-            #Make pdf
-            pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
-            pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
-            #Loop over gps (1 per property)
-            for key in list(molec_gps_dict.keys()):
-                #Set label
-                label = molec + "_" + key
-                #Get GP associated with property
-                gp_model = molec_gps_dict[key]
-                #Get X and Y data and bounds associated with the GP
-                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
-                #Plot model performance
-                pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
-                plt.close()
-
-                #Plot temperature slices
-                figs = plot_slices_temperature(
-                    {label:gp_model},
-                    molec_object.n_params,
-                    molec_object.temperature_bounds,
-                    y_bounds,
-                    plot_bounds = molec_object.temperature_bounds,
-                    property_name= y_names
-                )
-
-                for fig in figs:
-                    pdf.savefig(fig)
-                del figs
-
-                #Plot Parameter slices
-                for param_name in molec_object.param_names:
-                    figs = plot_slices_params(
-                        {label:gp_model},
-                        param_name,
-                        molec_object.param_names,
-                        list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
-                        molec_object.temperature_bounds,
-                        y_bounds,
-                        property_name=y_names
-                    )
-                    plt.close()
-                    
-                    for fig in figs:
-                        pdf.savefig(fig)
-                    del figs
-
-                #Plot test vs train for each parameter set
-                for test_params in test_data["x"][:,:molec_object.n_params]:
-                    #Find points in test set with correct param value
-                    # Locate rows where parameter set == test parameter set
-                    match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
-                    test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
-                                                  test_data[key][match_test].reshape(-1,1)), axis = 1)
-                    #Find points in train set with correct param value
-                    match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
-                    train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
-                                                  train_data[key][match_trn].reshape(-1,1)), axis = 1)
-
-                    pdf.savefig(plot_model_vs_test({label:gp_model}, 
-                                                test_params, 
-                                                train_points, 
-                                                test_points, 
-                                                molec_object.temperature_bounds,
-                                                y_bounds,
-                                                plot_bounds = molec_object.temperature_bounds,
-                                                property_name =  y_names ))
-                    plt.close()
-            pdf.close()
-
-        return
-
 
     def __get_params_and_df(self):
         """
@@ -481,8 +486,8 @@ class Opt_ATs:
         best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
 
         if self.save_data:
-            scl_w_str = "_scl_w" if self.scl_w == True else ""
-            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()), scl_w_str)
+            scl_w_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
+            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()) , scl_w_str)
             os.makedirs(dir_name, exist_ok=True) 
             #Save original results
             save_path1 = os.path.join(dir_name, "opt_at_results.csv")
@@ -505,4 +510,4 @@ class Opt_ATs:
             jac = jac.reshape(1,-1)
         hess = jac.T@jac
         return jac, hess
-
+    
