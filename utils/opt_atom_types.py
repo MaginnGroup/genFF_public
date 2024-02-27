@@ -242,7 +242,16 @@ class Opt_ATs(Problem_Setup):
         sqerr_array = np.array(sqerr_array).flatten()
         weight_array = np.array(weight_array).flatten()
 
-        return sqerr_array, weight_array, sse_pieces, mean_wt_pieces
+        #Normalize weights to add up to 1 if scl_w is True
+        sum_weights = np.sum(weight_array) if self.scl_w == True else 1
+        scaled_weights = weight_array / sum_weights
+        # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
+        mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
+
+        #Define objective function
+        obj = np.sum(scaled_weights*sqerr_array)
+
+        return obj, sse_pieces, mean_wt_pieces
 
     #define the scipy function for minimizing
     def __scipy_min_fxn(self, theta_guess):
@@ -261,16 +270,7 @@ class Opt_ATs(Problem_Setup):
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        sqerr_array, weight_array, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
-
-        #Normalize weights to add up to 1 if scl_w is True
-        sum_weights = np.sum(weight_array) if self.scl_w == True else 1
-        scaled_weights = weight_array / sum_weights
-        # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
-        mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
-
-        #Define objective function
-        obj = np.sum(scaled_weights*sqerr_array)
+        obj, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
 
         #Scale theta_guess to real values 
         midpoint = len(theta_guess) //2
@@ -412,7 +412,7 @@ class Opt_ATs(Problem_Setup):
 
         if self.save_data:
             scl_w_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
-            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()) , scl_w_str)
+            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()), scl_w_str)
             os.makedirs(dir_name, exist_ok=True) 
             #Save original results
             save_path1 = os.path.join(dir_name, "opt_at_results.csv")
@@ -480,7 +480,7 @@ class Opt_ATs(Problem_Setup):
         #Loop over each heat map
         for key, value in param_dict.items():
             #Evaluate obj over data
-            obj_dict[key] = np.array([self.calc_obj(value[i]) for i in range(len(value))])
+            obj_dict[key] = np.array([self.calc_obj(value[i])[0] for i in range(len(value))])
 
         return param_dict, obj_dict
 class Vis_Results(Problem_Setup):
