@@ -510,8 +510,8 @@ class Vis_Results(Problem_Setup):
             #Get testing data for that molecule
             train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
             #Make pdf
-            pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
-            pdf = PdfPages('Results/pdfs/' + molec + '_gp_figs.pdf')
+            pdf_dir = os.makedirs("Results/pdfs/gp_val_figs", exist_ok=True)
+            pdf = PdfPages('Results/pdfs/gp_val_figs/' + molec + '.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
