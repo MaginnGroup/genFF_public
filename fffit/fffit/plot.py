@@ -420,14 +420,14 @@ def plot_obj_contour(
     fig, ax = plt.subplots()
 
     x, y = param_mesh
-    ax.contourf(x, y, obj_vals, cmap='viridis')
+    cmap = ax.contourf(x, y, obj_vals, 20, cmap='viridis')
 
     # Add colorbar
-    cbar = ax.colorbar()
+    cbar = fig.colorbar(cmap, ax = ax)
     cbar.set_label('Objective Value')
     
     # Add title and labels
-    ax.set_.xlabel(param_names[0])
+    ax.set_xlabel(param_names[0])
     ax.set_ylabel(param_names[1])
 
     if not mpl_is_inline:

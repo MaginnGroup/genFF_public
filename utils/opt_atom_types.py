@@ -440,7 +440,7 @@ class Opt_ATs(Problem_Setup):
         """
         Makes heat map data for obj predictions given a parameter set
         """
-        n_points = 20 
+        n_points = 5
 
         #Create dict of heat map theta data
         param_dict = {}
@@ -636,9 +636,13 @@ class Vis_Results(Problem_Setup):
         for key in list(param_dict.keys()):
             #Get parameter and sse data
             theta_vals = param_dict[key]
-            obj_vals = obj_dict[key].reshape((n_points,n_points)).T
+            #Get index associated with params in key
+            indcs = [self.at_class.at_names.index(key[0]), self.at_class.at_names.index(key[1])]
             n_points = int(np.sqrt(len(theta_vals)))
-            theta_mesh = theta_vals.reshape((n_points,n_points, -1)).T
+            obj_vals = obj_dict[key].reshape((n_points,n_points)).T
+            #Remove unchanging columns
+            theta_mesh = theta_vals[:, indcs].reshape((n_points,n_points, -1)).T
+            print(theta_mesh.shape, obj_vals.shape)
             pdf.savefig(plot_obj_contour(
                     theta_mesh,
                     obj_vals,
