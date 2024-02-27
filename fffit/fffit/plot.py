@@ -397,6 +397,7 @@ def plot_model_vs_exp(
 
 def plot_obj_contour(
     param_mesh,
+    true_vals,
     obj_vals,
     param_names,
 ):
@@ -418,9 +419,13 @@ def plot_obj_contour(
     """
     # Create the heatmap using contourf
     fig, ax = plt.subplots()
-
+    
     x, y = param_mesh
-    cmap = ax.contourf(x, y, obj_vals, 20, cmap='viridis')
+    cmap = ax.contourf(x, y, obj_vals, 50, cmap='viridis')
+
+    ax.scatter(
+        true_vals[0], true_vals[1], marker="*", color="red", label="Best Set"
+    )
 
     # Add colorbar
     cbar = fig.colorbar(cmap, ax = ax)
@@ -429,6 +434,7 @@ def plot_obj_contour(
     # Add title and labels
     ax.set_xlabel(param_names[0])
     ax.set_ylabel(param_names[1])
+    fig.legend()
 
     if not mpl_is_inline:
         return fig

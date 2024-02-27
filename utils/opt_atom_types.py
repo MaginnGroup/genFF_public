@@ -440,7 +440,7 @@ class Opt_ATs(Problem_Setup):
         """
         Makes heat map data for obj predictions given a parameter set
         """
-        n_points = 5
+        n_points = 3
 
         #Create dict of heat map theta data
         param_dict = {}
@@ -624,11 +624,18 @@ class Vis_Results(Problem_Setup):
         Plots objective contours given a set of data
         """
         w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
+
+        #Scale true value to scaled values
+        midpoint = len(theta_guess) //2
+        sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
+        epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        theta_guess_scl = np.array(sigmas + epsilons)
+
         #Make Opt_ATs class
         at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
                                1, 1, self.save_data)
         #Get HM Data
-        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
+        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess_scl)
         #Make pdf
         pdf_dir = os.makedirs("Results/pdfs/obj_contours", exist_ok=True)
         pdf = PdfPages('Results/pdfs/obj_contours/'+w_scl_str+'.pdf')
@@ -642,9 +649,9 @@ class Vis_Results(Problem_Setup):
             obj_vals = obj_dict[key].reshape((n_points,n_points)).T
             #Remove unchanging columns
             theta_mesh = theta_vals[:, indcs].reshape((n_points,n_points, -1)).T
-            print(theta_mesh.shape, obj_vals.shape)
             pdf.savefig(plot_obj_contour(
                     theta_mesh,
+                    theta_guess[indcs],
                     obj_vals,
                     key
                 ))
