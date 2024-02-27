@@ -446,7 +446,7 @@ class Opt_ATs(Problem_Setup):
         param_dict = {}
         
         #Create a linspace for the number of dimensions and define number of points
-        dim_list = np.linspace(0,len(theta_guess),len(theta_guess))
+        dim_list = np.linspace(0,len(theta_guess)-1,len(theta_guess)-1)
         #Create a list of all combinations (without repeats e.g no (1,1), (2,2)) of dimensions of theta
         mesh_combos = np.array(list(combinations(dim_list, 2)), dtype = int)
 
@@ -464,8 +464,9 @@ class Opt_ATs(Problem_Setup):
 
             #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
             #Assume that theta1 and theta2 have equal number of points on the meshgrid
-            theta1 = np.linspace(self.at_bounds[0][idcs[0]], self.at_bounds[1][idcs[0]], n_points)
-            theta2 = np.linspace(self.at_bounds[0][idcs[1]], self.at_bounds[1][idcs[1]], n_points)
+            # print(self.at_class.at_bounds, self.at_class.at_bounds.shape, idcs)
+            theta1 = np.linspace(self.at_class.at_bounds[idcs[0]][0], self.at_class.at_bounds[idcs[0]][1], n_points)
+            theta2 = np.linspace(self.at_class.at_bounds[idcs[1]][0], self.at_class.at_bounds[idcs[1]][1], n_points)
             theta12_mesh = np.array(np.meshgrid(theta1, theta2))
             theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
             
@@ -622,14 +623,15 @@ class Vis_Results(Problem_Setup):
         """
         Plots objective contours given a set of data
         """
+        w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
         #Make Opt_ATs class
         at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
                                1, 1, self.save_data)
         #Get HM Data
         param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
         #Make pdf
-        pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
-        pdf = PdfPages('Results/pdfs/obj_contours.pdf')
+        pdf_dir = os.makedirs("Results/pdfs/obj_contours", exist_ok=True)
+        pdf = PdfPages('Results/pdfs/obj_contours/'+w_scl_str+'.pdf')
         #Loop over keys
         for key in list(param_dict.keys()):
             #Get parameter and sse data
@@ -637,7 +639,6 @@ class Vis_Results(Problem_Setup):
             obj_vals = obj_dict[key].reshape((n_points,n_points)).T
             n_points = int(np.sqrt(len(theta_vals)))
             theta_mesh = theta_vals.reshape((n_points,n_points, -1)).T
-            #TO DO: Make a plotter in plot.py that actually plots this data 
             pdf.savefig(plot_obj_contour(
                     theta_mesh,
                     obj_vals,
