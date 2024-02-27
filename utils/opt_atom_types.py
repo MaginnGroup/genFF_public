@@ -481,7 +481,7 @@ class Opt_ATs:
         best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
 
         if self.save_data:
-            scl_w_str = "_scl_w" if self.scl_w == True else ""
+            scl_w_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
             dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()), scl_w_str)
             os.makedirs(dir_name, exist_ok=True) 
             #Save original results
