@@ -374,7 +374,7 @@ def plot_model_vs_exp(
 
         mean = values_scaled_to_real(mean_scaled, property_bounds)
         var = variances_scaled_to_real(var_scaled, property_bounds)
-        ax.plot(vals, mean, lw=2, label="GP model" + label)
+        ax.plot(vals, mean, lw=2, label="GP " + label)
         ax.fill_between(
             vals[:, 0],
             mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
@@ -395,3 +395,40 @@ def plot_model_vs_exp(
     if not mpl_is_inline:
         return fig
 
+def plot_obj_contour(
+    param_mesh,
+    obj_vals,
+    param_names,
+):
+    """Plots the objective as a function of 2 parameter values with all other parameters
+    taken as param_values.values. 
+
+    Parameters
+    ----------
+    models : dict {"label" : gpflow.model }
+        GPFlow models to plot
+    param_values : dict,
+        The parameters at which to evaluate the GP model
+    obj_values : dict
+        The objective data values
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    # Create the heatmap using contourf
+    fig, ax = plt.subplots()
+
+    x, y = param_mesh
+    ax.contourf(x, y, obj_vals, cmap='viridis')
+
+    # Add colorbar
+    cbar = ax.colorbar()
+    cbar.set_label('Objective Value')
+    
+    # Add title and labels
+    ax.set_.xlabel(param_names[0])
+    ax.set_ylabel(param_names[1])
+
+    if not mpl_is_inline:
+        return fig

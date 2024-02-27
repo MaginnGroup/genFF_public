@@ -6,7 +6,7 @@ import pandas as pd
 import pickle
 import gpflow
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
-from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params
+from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params, plot_model_vs_exp, plot_obj_contour
 import unyt as u
 import matplotlib
 import matplotlib.pyplot as plt
@@ -579,39 +579,70 @@ class Vis_Results(Problem_Setup):
 
         return
     
-    def compare_T_prop_best(self):
+    def compare_T_prop_best(self, theta_guess):
         """
-        Compares T vs Property for the best set 
+        Compares T vs Property for a given set
         """
-
-        #Get best set from Results folder csv
-
+        w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
+        #Make pdf
+        pdf_dir = os.makedirs("Results/pdfs/prop_vs_T", exist_ok=True)
+        pdf = PdfPages('Results/pdfs/prop_vs_T/'+w_scl_str+'.pdf')
         #Loop over molecules
-            #Loop over gps (properties)
-                #Get model and Exp Data
-                #Plot T slices
+        for molec in list(self.molec_data_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get theta associated with each gp
+            param_matrix = self.at_class.get_transformation_matrix(molec)
+            #Transform the guess, and scale to bounds
+            gp_theta = theta_guess.reshape(1,-1)@param_matrix
+            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Set label
+                label = molec + "_" + key
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
                 #Plot Exp Data vs Model Prediction
+                pdf.savefig(plot_model_vs_exp(
+                {label:gp_model},
+                gp_theta_guess,
+                exp_data,
+                molec_object.temperature_bounds,
+                y_bounds,
+                plot_bounds=molec_object.temperature_bounds,
+                property_name=y_names))
+                plt.close()
+        pdf.close()
         
-    def plot_obj_hms(self):
+    def plot_obj_hms(self, theta_guess):
         """
         Plots objective contours given a set of data
         """
-
-        #Get best set from Results folder csv
-        theta_guess = np.array([1]) #Placeholder
-
         #Make Opt_ATs class
         at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
                                1, 1, self.save_data)
         #Get HM Data
         param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
+        #Make pdf
+        pdf_dir = os.makedirs("Results/pdfs/", exist_ok=True)
+        pdf = PdfPages('Results/pdfs/obj_contours.pdf')
         #Loop over keys
         for key in list(param_dict.keys()):
             #Get parameter and sse data
             theta_vals = param_dict[key]
-            obj_vals = obj_dict[key]
+            obj_vals = obj_dict[key].reshape((n_points,n_points)).T
             n_points = int(np.sqrt(len(theta_vals)))
-            theta_mesh = theta_vals.reshape((n_points,n_points))
+            theta_mesh = theta_vals.reshape((n_points,n_points, -1)).T
             #TO DO: Make a plotter in plot.py that actually plots this data 
-
+            pdf.savefig(plot_obj_contour(
+                    theta_mesh,
+                    obj_vals,
+                    key
+                ))
+            plt.close()
+        pdf.close()
         
