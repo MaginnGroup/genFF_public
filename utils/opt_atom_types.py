@@ -64,6 +64,17 @@ class Problem_Setup:
         self.save_data = save_data
         self.scl_w = True
 
+    def values_pref_to_real(self, theta_guess):
+        """
+        Scales preferred units (Angstrom and eps/kb) to real units (nm, kJ/mol)
+        """
+        midpoint = len(theta_guess) //2
+        sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
+        epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        theta_guess = np.array(sigmas + epsilons)
+        
+        return theta_guess
+
     def get_exp_data(self, molec_object, prop_key):
         """
         Helper function for getting experimental data and bounds
@@ -187,7 +198,7 @@ class Opt_ATs(Problem_Setup):
         self.iter_count = 0
         self.scl_w = True
     
-    def calc_obj(self, theta_guess):
+    def calc_obj(self, theta_guess, scl_w = None):
         """
         Calculates the sse objective function
 
@@ -200,6 +211,9 @@ class Opt_ATs(Problem_Setup):
         weight_array = []
         sse_pieces = {}
         mean_wt_pieces = {}
+
+        scl_wt = self.scl_w if scl_w == None else scl_w
+        assert isinstance(scl_wt, bool), "scl_w must be None, True, or False"
         
         #Loop over molecules
         for molec in list(self.molec_data_dict.keys()):
@@ -243,7 +257,7 @@ class Opt_ATs(Problem_Setup):
         weight_array = np.array(weight_array).flatten()
 
         #Normalize weights to add up to 1 if scl_w is True
-        sum_weights = np.sum(weight_array) if self.scl_w == True else 1
+        sum_weights = np.sum(weight_array) if scl_wt == True else 1
         scaled_weights = weight_array / sum_weights
         # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
         mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
@@ -439,12 +453,12 @@ class Opt_ATs(Problem_Setup):
     def make_sse_sens_data(self, theta_guess):
         """
         Makes heat map data for obj predictions given a parameter set
+        theta_guess (eps/kb and nm)
         """
-        n_points = 3
-
+        n_points = 15
         #Create dict of heat map theta data
         param_dict = {}
-        
+
         #Create a linspace for the number of dimensions and define number of points
         dim_list = np.linspace(0,len(theta_guess)-1,len(theta_guess)-1)
         #Create a list of all combinations (without repeats e.g no (1,1), (2,2)) of dimensions of theta
@@ -481,7 +495,12 @@ class Opt_ATs(Problem_Setup):
         #Loop over each heat map
         for key, value in param_dict.items():
             #Evaluate obj over data
-            obj_dict[key] = np.array([self.calc_obj(value[i])[0] for i in range(len(value))])
+            obj_arr = np.zeros(len(value))
+            for i in range(len(value)):
+                #Values pref to real
+                val_real = self.values_pref_to_real(value[i])
+                obj_arr[i] = self.calc_obj(val_real, self.scl_w)[0]
+            obj_dict[key] = obj_arr
 
         return param_dict, obj_dict
 class Vis_Results(Problem_Setup):
@@ -625,17 +644,11 @@ class Vis_Results(Problem_Setup):
         """
         w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
 
-        #Scale true value to scaled values
-        midpoint = len(theta_guess) //2
-        sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
-        epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
-        theta_guess_scl = np.array(sigmas + epsilons)
-
         #Make Opt_ATs class
         at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
                                1, 1, self.save_data)
         #Get HM Data
-        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess_scl)
+        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
         #Make pdf
         pdf_dir = os.makedirs("Results/pdfs/obj_contours", exist_ok=True)
         pdf = PdfPages('Results/pdfs/obj_contours/'+w_scl_str+'.pdf')
