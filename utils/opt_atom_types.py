@@ -269,7 +269,7 @@ class Problem_Setup:
         """
         res, sse_pieces, mean_wt_pieces = self.calc_wt_res(self, theta_guess, scl_w = None)
         obj = np.sum(np.square(res))
-        
+
         return obj, sse_pieces, mean_wt_pieces
 
 class Opt_ATs(Problem_Setup):
@@ -482,59 +482,7 @@ class Opt_ATs(Problem_Setup):
         hess = jac.T@jac
         return jac, hess
     
-    def make_sse_sens_data(self, theta_guess):
-        """
-        Makes heat map data for obj predictions given a parameter set
-        theta_guess (eps/kb and nm)
-        """
-        n_points = 15
-        #Create dict of heat map theta data
-        param_dict = {}
-
-        #Create a linspace for the number of dimensions and define number of points
-        dim_list = np.linspace(0,len(theta_guess)-1,len(theta_guess)-1)
-        #Create a list of all combinations (without repeats e.g no (1,1), (2,2)) of dimensions of theta
-        mesh_combos = np.array(list(combinations(dim_list, 2)), dtype = int)
-
-        #Meshgrid set always defined by n_points**2
-        theta_set = np.tile(np.array(theta_guess), (n_points**2, 1))
-
-        #Loop over all possible theta combinations of 2
-        for i in range(len(mesh_combos)):
-            #Create a copy of the true values to change the mehsgrid valus on
-            theta_set_copy = np.copy(theta_set)
-            #Set the indeces of theta_set for evaluation as each row of mesh_combos
-            idcs = mesh_combos[i]
-            #define name of parameter set as tuple ("param_1,param_2")
-            data_set_name = (self.at_class.at_names[idcs[0]], self.at_class.at_names[idcs[1]])
-
-            #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
-            #Assume that theta1 and theta2 have equal number of points on the meshgrid
-            # print(self.at_class.at_bounds, self.at_class.at_bounds.shape, idcs)
-            theta1 = np.linspace(self.at_class.at_bounds[idcs[0]][0], self.at_class.at_bounds[idcs[0]][1], n_points)
-            theta2 = np.linspace(self.at_class.at_bounds[idcs[1]][0], self.at_class.at_bounds[idcs[1]][1], n_points)
-            theta12_mesh = np.array(np.meshgrid(theta1, theta2))
-            theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
-            
-            #Set initial values for evaluation (true values) to meshgrid values
-            theta_set_copy[:,idcs] = theta12_vals
-            
-            #Append data set to dictionary with name
-            param_dict[data_set_name] = theta_set_copy
-
-        #Initialize obj dictionary
-        obj_dict = {}
-        #Loop over each heat map
-        for key, value in param_dict.items():
-            #Evaluate obj over data
-            obj_arr = np.zeros(len(value))
-            for i in range(len(value)):
-                #Values pref to real
-                val_real = self.values_pref_to_real(value[i])
-                obj_arr[i] = self.calc_obj(val_real, self.scl_w)[0]
-            obj_dict[key] = obj_arr
-
-        return param_dict, obj_dict
+    
 class Vis_Results(Problem_Setup):
     """
     Class For vizualizing GP and Optimization Results
@@ -669,18 +617,69 @@ class Vis_Results(Problem_Setup):
                 property_name=y_names))
                 plt.close()
         pdf.close()
-        
+
+    def make_sse_sens_data(self, theta_guess):
+        """
+        Makes heat map data for obj predictions given a parameter set
+        theta_guess (eps/kb and nm)
+        """
+        n_points = 15
+        #Create dict of heat map theta data
+        param_dict = {}
+
+        #Create a linspace for the number of dimensions and define number of points
+        dim_list = np.linspace(0,len(theta_guess)-1,len(theta_guess)-1)
+        #Create a list of all combinations (without repeats e.g no (1,1), (2,2)) of dimensions of theta
+        mesh_combos = np.array(list(combinations(dim_list, 2)), dtype = int)
+
+        #Meshgrid set always defined by n_points**2
+        theta_set = np.tile(np.array(theta_guess), (n_points**2, 1))
+
+        #Loop over all possible theta combinations of 2
+        for i in range(len(mesh_combos)):
+            #Create a copy of the true values to change the mehsgrid valus on
+            theta_set_copy = np.copy(theta_set)
+            #Set the indeces of theta_set for evaluation as each row of mesh_combos
+            idcs = mesh_combos[i]
+            #define name of parameter set as tuple ("param_1,param_2")
+            data_set_name = (self.at_class.at_names[idcs[0]], self.at_class.at_names[idcs[1]])
+
+            #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
+            #Assume that theta1 and theta2 have equal number of points on the meshgrid
+            # print(self.at_class.at_bounds, self.at_class.at_bounds.shape, idcs)
+            theta1 = np.linspace(self.at_class.at_bounds[idcs[0]][0], self.at_class.at_bounds[idcs[0]][1], n_points)
+            theta2 = np.linspace(self.at_class.at_bounds[idcs[1]][0], self.at_class.at_bounds[idcs[1]][1], n_points)
+            theta12_mesh = np.array(np.meshgrid(theta1, theta2))
+            theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
+            
+            #Set initial values for evaluation (true values) to meshgrid values
+            theta_set_copy[:,idcs] = theta12_vals
+            
+            #Append data set to dictionary with name
+            param_dict[data_set_name] = theta_set_copy
+
+        #Initialize obj dictionary
+        obj_dict = {}
+        #Loop over each heat map
+        for key, value in param_dict.items():
+            #Evaluate obj over data
+            obj_arr = np.zeros(len(value))
+            for i in range(len(value)):
+                #Values pref to real
+                val_real = self.values_pref_to_real(value[i])
+                obj_arr[i] = self.calc_obj(val_real, self.scl_w)[0]
+            obj_dict[key] = obj_arr
+
+        return param_dict, obj_dict
+    
     def plot_obj_hms(self, theta_guess):
         """
         Plots objective contours given a set of data
         """
         w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
 
-        #Make Opt_ATs class
-        at_optimizer = Opt_ATs(self.molec_data_dict, self.all_gp_dict, self.at_class, 
-                               1, 1, self.save_data)
         #Get HM Data
-        param_dict, obj_dict = at_optimizer.make_sse_sens_data(theta_guess)
+        param_dict, obj_dict = self.make_sse_sens_data(theta_guess)
         #Make pdf
         pdf_dir = os.makedirs("Results/pdfs/obj_contours", exist_ok=True)
         pdf = PdfPages('Results/pdfs/obj_contours/'+w_scl_str+'.pdf')
