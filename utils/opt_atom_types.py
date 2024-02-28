@@ -52,7 +52,7 @@ class Problem_Setup:
     Gets GP/ Experimental Data For experiments
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, scl_w, save_data):
         assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
@@ -62,7 +62,7 @@ class Problem_Setup:
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
         self.save_data = save_data
-        self.scl_w = True
+        self.scl_w = scl_w
 
     def values_pref_to_real(self, theta_guess):
         """
@@ -267,7 +267,7 @@ class Problem_Setup:
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
         """
-        res, sse_pieces, mean_wt_pieces = self.calc_wt_res(self, theta_guess, scl_w = None)
+        res, sse_pieces, mean_wt_pieces = self.calc_wt_res(theta_guess, scl_w)
         obj = np.sum(np.square(res))
 
         return obj, sse_pieces, mean_wt_pieces
@@ -277,9 +277,9 @@ class Opt_ATs(Problem_Setup):
     The class for Least Squares regression analysis. Child class of General_Analysis
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, scl_w, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, scl_w, save_data)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.repeats = repeats
@@ -289,7 +289,6 @@ class Opt_ATs(Problem_Setup):
         self.iter_sse_pieces = []
         self.iter_mean_wt_pieces = []
         self.iter_count = 0
-        self.scl_w = True
     
     #define the scipy function for minimizing
     def __scipy_min_fxn(self, theta_guess):
@@ -491,9 +490,8 @@ class Vis_Results(Problem_Setup):
     #Inherit objects from General_Analysis
     def __init__(self, molec_data_dict, all_gp_dict, at_class, scl_w, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, scl_w, save_data)
         assert isinstance(scl_w, bool), "scl_w must be bool"
-        self.scl_w = scl_w
 
     #Define function to check GP Accuracy
     def check_GPs(self):
