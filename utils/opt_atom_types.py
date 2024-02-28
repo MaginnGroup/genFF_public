@@ -74,6 +74,17 @@ class Problem_Setup:
         theta_guess = np.array(sigmas + epsilons)
         
         return theta_guess
+    
+    def values_real_to_pref(self, theta_guess):
+        """
+        Scales real units (nm, Kj/mol) to preferred units (Angstrom and eps/kb)
+        """
+        midpoint = len(theta_guess) //2
+        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
+        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        theta_guess = np.array(sigmas + epsilons)
+
+        return theta_guess
 
     def get_exp_data(self, molec_object, prop_key):
         """
@@ -178,6 +189,88 @@ class Problem_Setup:
         gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
         gp_var = np.diag(np.squeeze(gp_covar))
         return np.squeeze(gp_mean), gp_var
+    
+    def calc_wt_res(self, theta_guess, scl_w = None):
+        """
+        Calculates the sse objective function
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        """
+        #Initialize weight and squared error arrays
+        res_array  = []
+        weight_array = []
+        mean_wt_pieces = {}
+        sse_pieces = {}
+        key_list = []
+
+        scl_wt = self.scl_w if scl_w == None else scl_w
+        assert isinstance(scl_wt, bool), "scl_w must be None, True, or False"
+        
+        #Loop over molecules
+        for molec in list(self.molec_data_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get theta associated with each gp
+            param_matrix = self.at_class.get_transformation_matrix(molec)
+            #Transform the guess, and scale to bounds
+            gp_theta = theta_guess.reshape(1,-1)@param_matrix
+            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                key_list.append(molec + "-" + key)
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                #Get x and y data
+                x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
+                y_exp = np.array(list(exp_data.values()))
+                # #Evaluate GP
+                gp_mean, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                #Scale gp output to real value
+                gp_mean = values_scaled_to_real(gp_mean, y_bounds)
+                #Scale gp_variances to real values
+                gp_var = variances_scaled_to_real(gp_var, y_bounds)
+                #Calculate weight from uncertainty
+                weight_mpi = (1/(gp_var)).tolist()
+                weight_array += weight_mpi
+                #Calculate residuals
+                residuals = (y_exp.flatten() - gp_mean.flatten()).tolist()
+                mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
+                sse_pieces[molec + "-" + key + "-sse"] = np.sum(np.square(np.array(residuals)))
+                res_array += residuals
+        
+        #List to flattened array
+        res_array = np.array(res_array).flatten()
+        weight_array = np.array(weight_array).flatten()
+
+        #Normalize weights to add up to 1 if scl_w is True
+        sum_weights = np.sum(weight_array) if scl_wt == True else 1
+        scaled_weights = weight_array / sum_weights
+
+        mean_wt_pieces = dict(zip(mean_wt_pieces.keys(), np.array(list(mean_wt_pieces.values()))/sum_weights))
+
+        #Residual is (y - gp_mean)*sqrt(weight) for each data point
+        res = res_array*np.sqrt(scaled_weights)
+        return res, sse_pieces, mean_wt_pieces
+    
+    def calc_obj(self, theta_guess, scl_w = None):
+        """
+        Calculates the sse objective function
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        """
+        res, sse_pieces, mean_wt_pieces = self.calc_wt_res(self, theta_guess, scl_w = None)
+        obj = np.sum(np.square(res))
+        
+        return obj, sse_pieces, mean_wt_pieces
 
 class Opt_ATs(Problem_Setup):
     """
@@ -198,75 +291,6 @@ class Opt_ATs(Problem_Setup):
         self.iter_count = 0
         self.scl_w = True
     
-    def calc_obj(self, theta_guess, scl_w = None):
-        """
-        Calculates the sse objective function
-
-        Parameters
-        ----------
-        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
-        """
-        #Initialize weight and squared error arrays
-        sqerr_array  = []
-        weight_array = []
-        sse_pieces = {}
-        mean_wt_pieces = {}
-
-        scl_wt = self.scl_w if scl_w == None else scl_w
-        assert isinstance(scl_wt, bool), "scl_w must be None, True, or False"
-        
-        #Loop over molecules
-        for molec in list(self.molec_data_dict.keys()):
-            #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
-            #Get theta associated with each gp
-            param_matrix = self.at_class.get_transformation_matrix(molec)
-            #Transform the guess, and scale to bounds
-            gp_theta = theta_guess.reshape(1,-1)@param_matrix
-            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
-            #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
-            
-            #Loop over gps (1 per property)
-            for key in list(molec_gps_dict.keys()):
-                #Get GP associated with property
-                gp_model = molec_gps_dict[key]
-                #Get X and Y data and bounds associated with the GP
-                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
-                #Get x and y data
-                x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
-                y_exp = np.array(list(exp_data.values()))
-                # #Evaluate GP
-                gp_mean, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
-                #Scale gp output to real value
-                gp_mean = values_scaled_to_real(gp_mean, y_bounds)
-                #Scale gp_variances to real values
-                gp_var = variances_scaled_to_real(gp_var, y_bounds)
-                #Calculate weight from uncertainty
-                weight_mpi = (1/(gp_var)).tolist()
-                weight_array += weight_mpi
-                #Calculate sse
-                sq_err = ((y_exp.flatten() - gp_mean.flatten())**2).tolist()
-                # key_list.append(molec + "-" + key)
-                sse_pieces[molec + "-" + key + "-sse"] = np.sum(sq_err)
-                mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
-                sqerr_array += sq_err
-        
-        #List to flattened array
-        sqerr_array = np.array(sqerr_array).flatten()
-        weight_array = np.array(weight_array).flatten()
-
-        #Normalize weights to add up to 1 if scl_w is True
-        sum_weights = np.sum(weight_array) if scl_wt == True else 1
-        scaled_weights = weight_array / sum_weights
-        # mean_wt_pieces = {k: 1 /v for k, v in mean_wt_pieces.items()} #Show gp variances
-        mean_wt_pieces = {k: v / sum_weights for k, v in mean_wt_pieces.items()}
-
-        #Define objective function
-        obj = np.sum(scaled_weights*sqerr_array)
-
-        return obj, sse_pieces, mean_wt_pieces
-
     #define the scipy function for minimizing
     def __scipy_min_fxn(self, theta_guess):
         """
@@ -284,22 +308,23 @@ class Opt_ATs(Problem_Setup):
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        obj, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
+        res, sse_pieces, mean_wt_pieces =self.calc_wt_res(theta_guess)
+        #  obj, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
+        
+        #Scale theta_guess to preferred units
+        theta_guess_pref = self.values_real_to_pref(theta_guess)
 
-        #Scale theta_guess to real values 
-        midpoint = len(theta_guess) //2
-        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
-        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
-        theta_guess = np.array(sigmas + epsilons)
+        # #Append intermediate values to list
+        if len(self.iter_param_data) == 0 or not np.allclose(self.iter_param_data[-1], theta_guess_pref):
+            self.iter_param_data.append(theta_guess_pref)
+            self.iter_sse_pieces.append(sse_pieces)
+            self.iter_mean_wt_pieces.append(mean_wt_pieces)
+            self.iter_obj_data.append(np.sum(np.square(res)))
+            # self.iter_obj_data.append(obj)
+            self.iter_count += 1
+            # print(self.iter_count, np.sum(np.square(res)))
 
-        #Append intermediate values to list
-        self.iter_param_data.append(theta_guess)
-        self.iter_sse_pieces.append(sse_pieces)
-        self.iter_mean_wt_pieces.append(mean_wt_pieces)
-        self.iter_obj_data.append(obj)
-        self.iter_count += 1
-
-        return obj
+        return res
 
     def __get_params_and_df(self):
         """
@@ -321,8 +346,11 @@ class Opt_ATs(Problem_Setup):
         #Start timer
         time_start = time.time()
         #Get guess and find scipy.optimize solution
-        solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run] , bounds=self.at_class.at_bounds_nm_kjmol, 
-                                        method='L-BFGS-B', options = {"disp":False})
+        bounds = (self.at_class.at_bounds_nm_kjmol[:,0], self.at_class.at_bounds_nm_kjmol[:,1])
+        solution = optimize.least_squares(self.__scipy_min_fxn, param_inits[run], bounds=bounds,
+                                         method='trf', verbose = 0)
+        # solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run], bounds=self.at_class.at_bounds_nm_kjmol,
+        #                                  method='L-BFGS-B', options = {'disp':False})
         #End timer and calculate total run time
         time_end = time.time()
         time_per_run = time_end-time_start
@@ -337,8 +365,6 @@ class Opt_ATs(Problem_Setup):
         iter_list = np.array(range(self.iter_count)) + 1
         obj_list = np.array(self.iter_obj_data)
         param_list = self.iter_param_data
-        num_params = len(self.at_class.at_names)
-        # print(self.iter_sse_pieces[0])
 
         #Create df for each least squares run
         #Initialize results dataframe
@@ -374,10 +400,16 @@ class Opt_ATs(Problem_Setup):
             wt_names = list(self.iter_mean_wt_pieces[j].keys())
             iter_df.loc[j, sse_names] = np.array(list(self.iter_sse_pieces[j].values()))
             iter_df.loc[j, wt_names] = np.array(list(self.iter_mean_wt_pieces[j].values()))
-            
-        iter_df["Run Time"] = time_per_run
-        iter_df["jac evals"] = solution.njev
-        iter_df["Termination"] = solution.status
+
+        #Find largest iter for each restart
+        idx = iter_df.groupby('Run')['Iter'].idxmax()
+        #Add following to only last iter runs    
+        iter_df.loc[idx, "Run Time"] = time_per_run
+        iter_df.loc[idx, "jac evals"] = solution.njev
+        iter_df.loc[idx, "func evals"] = solution.nfev
+        iter_df.loc[idx, "Term Status"] = solution.status
+        iter_df.loc[idx, "Message"] = solution.message
+        iter_df.loc[idx, "Optimality"] = solution.optimality
 
         return iter_df
     
