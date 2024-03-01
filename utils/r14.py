@@ -158,12 +158,12 @@ class R14Constants:
         """
         Dictionary with uncertainty for each calculation
         from: Platzer, B.; Polt, A.; Maurer, G. Thermophysical Properties of Refrigerants; Springer-Verlag: Berlin, 1990.
-        Note: Need this reference. These numbers are wrong
+        Note: Hvap is set at 1% because a value was not given in the reference provided
         """
         uncertainty = {
-            "expt_liq_density": 0.0003,
-            "expt_vap_density": 0.0003,
-            "expt_Pvap": 0.003,
+            "expt_liq_density": 0.0164125,
+            "expt_vap_density": 0.0034,
+            "expt_Pvap": 0.001038,
             "expt_Hvap": 0.01
         }
         return uncertainty
