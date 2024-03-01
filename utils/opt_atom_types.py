@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as optimize
+import scipy
 import os
 import time
 import pandas as pd
@@ -307,8 +308,8 @@ class Opt_ATs(Problem_Setup):
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        res, sse_pieces, mean_wt_pieces =self.calc_wt_res(theta_guess)
-        #  obj, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
+        # res, sse_pieces, mean_wt_pieces =self.calc_wt_res(theta_guess)
+        obj, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
         
         #Scale theta_guess to preferred units
         theta_guess_pref = self.values_real_to_pref(theta_guess)
@@ -318,12 +319,12 @@ class Opt_ATs(Problem_Setup):
             self.iter_param_data.append(theta_guess_pref)
             self.iter_sse_pieces.append(sse_pieces)
             self.iter_mean_wt_pieces.append(mean_wt_pieces)
-            self.iter_obj_data.append(np.sum(np.square(res)))
-            # self.iter_obj_data.append(obj)
+            # self.iter_obj_data.append(np.sum(np.square(res)))
+            self.iter_obj_data.append(obj)
             self.iter_count += 1
             # print(self.iter_count, np.sum(np.square(res)))
 
-        return res
+        return obj
 
     def __get_params_and_df(self):
         """
@@ -345,11 +346,11 @@ class Opt_ATs(Problem_Setup):
         #Start timer
         time_start = time.time()
         #Get guess and find scipy.optimize solution
-        bounds = (self.at_class.at_bounds_nm_kjmol[:,0], self.at_class.at_bounds_nm_kjmol[:,1])
-        solution = optimize.least_squares(self.__scipy_min_fxn, param_inits[run], bounds=bounds,
-                                         method='trf', verbose = 0)
-        # solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run], bounds=self.at_class.at_bounds_nm_kjmol,
-        #                                  method='L-BFGS-B', options = {'disp':False})
+        # bounds = (self.at_class.at_bounds_nm_kjmol[:,0], self.at_class.at_bounds_nm_kjmol[:,1])
+        # solution = optimize.least_squares(self.__scipy_min_fxn, param_inits[run], bounds=bounds,
+        #                                  method='trf', verbose = 0)
+        solution = optimize.minimize(self.__scipy_min_fxn, param_inits[run], bounds=self.at_class.at_bounds_nm_kjmol,
+                                         method='L-BFGS-B', options = {'disp':False, 'eps' : 1e-10, 'ftol':1e-10})
         #End timer and calculate total run time
         time_end = time.time()
         time_per_run = time_end-time_start
@@ -406,9 +407,10 @@ class Opt_ATs(Problem_Setup):
         iter_df.loc[idx, "Run Time"] = time_per_run
         iter_df.loc[idx, "jac evals"] = solution.njev
         iter_df.loc[idx, "func evals"] = solution.nfev
+        iter_df.loc[idx, "Optimality"] = scipy.linalg.norm(solution.jac, ord = np.inf) 
         iter_df.loc[idx, "Term Status"] = solution.status
         iter_df.loc[idx, "Message"] = solution.message
-        iter_df.loc[idx, "Optimality"] = solution.optimality
+        # iter_df.loc[idx, "Optimality"] = solution.optimality
 
         return iter_df
     
@@ -476,11 +478,8 @@ class Opt_ATs(Problem_Setup):
         Builds Jacobian Approximation
         """
         jac = optimize.approx_fprime(theta_guess, self.__scipy_min_fxn)
-        if len(jac.shape) == 1:
-            jac = jac.reshape(1,-1)
         hess = jac.T@jac
         return jac, hess
-    
     
 class Vis_Results(Problem_Setup):
     """
