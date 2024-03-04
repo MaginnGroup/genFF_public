@@ -26,7 +26,7 @@ molec_data_dict = {"R14":r14_class,
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
-at_class = atom_type.AT_Scheme_7()
+at_class = atom_type.AT_Scheme_9()
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 
 for w_scheme in [0,1,2]:
