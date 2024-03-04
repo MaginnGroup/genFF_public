@@ -51,20 +51,44 @@ def get_gp_data_from_pkl(key_list):
 class Problem_Setup:
     """
     Gets GP/ Experimental Data For experiments
+
+    Parameters:
+    molec_data_dict: dict, keys are refrigerant names w/ capital R, values are class objects from r***.py
+    all_gp_dict: dict of dict, keys are refrigerant names w/ capital R, values are dictionaries of properties and GP objects
+    at_class: Instance of Atom_Types, class for atom typing
+    w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
+    save_data: bool, whether to save data or not
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, scl_w, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, save_data):
         assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(save_data, bool), "save_res must be bool"
+        assert isinstance(w_calc, int) and w_calc in [0,1,2], "w_calc must be 0, 1 or 2"
         #Placeholder that will be overwritten if None
         self.molec_data_dict = molec_data_dict
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
         self.save_data = save_data
-        self.scl_w = scl_w
+        self.w_calc = w_calc
 
+    def make_results_dir(self, molecules):
+        scheme_name = self.at_class.scheme_name
+        molecule_str = '-'.join(molecules)
+        if self.w_calc == 0:
+            scl_w_str = "wt_sum1_gp_var"
+        elif self.w_calc == 1:
+            scl_w_str = "wt_gp_var"
+        else:
+            scl_w_str = "wt_y_var"
+
+        dir_name = os.path.join("Results" ,scheme_name, molecule_str, scl_w_str)
+        os.makedirs(dir_name, exist_ok=True) 
+
+        return dir_name
+
+    
     def values_pref_to_real(self, theta_guess):
         """
         Scales preferred units (Angstrom and eps/kb) to real units (nm, kJ/mol)
@@ -191,7 +215,7 @@ class Problem_Setup:
         gp_var = np.diag(np.squeeze(gp_covar))
         return np.squeeze(gp_mean), gp_var
     
-    def calc_wt_res(self, theta_guess, scl_w = None):
+    def calc_wt_res(self, theta_guess, w_calc = None):
         """
         Calculates the sse objective function
 
@@ -206,8 +230,8 @@ class Problem_Setup:
         sse_pieces = {}
         key_list = []
 
-        scl_wt = self.scl_w if scl_w == None else scl_w
-        assert isinstance(scl_wt, bool), "scl_w must be None, True, or False"
+        w_calc = self.w_calc if w_calc == None else w_calc
+        assert isinstance(w_calc, int) and w_calc in [0,1,2], "w_calc must be 0, 1 or 2"
         
         #Loop over molecules
         for molec in list(self.molec_data_dict.keys()):
@@ -238,7 +262,13 @@ class Problem_Setup:
                 #Scale gp_variances to real values
                 gp_var = variances_scaled_to_real(gp_var, y_bounds)
                 #Calculate weight from uncertainty
-                weight_mpi = (1/(gp_var)).tolist()
+                if w_calc == 2:
+                    #Get y data uncertainties
+                    unc = molec_object.uncertainties[key.replace("sim", "expt")]
+                    y_var = (y_exp*unc)**2
+                    weight_mpi = (1/y_var).tolist()
+                else:
+                    weight_mpi = (1/(gp_var)).tolist()
                 weight_array += weight_mpi
                 #Calculate residuals
                 residuals = (y_exp.flatten() - gp_mean.flatten()).tolist()
@@ -251,7 +281,7 @@ class Problem_Setup:
         weight_array = np.array(weight_array).flatten()
 
         #Normalize weights to add up to 1 if scl_w is True
-        sum_weights = np.sum(weight_array) if scl_wt == True else 1
+        sum_weights = np.sum(weight_array) if w_calc == 0 else 1
         scaled_weights = weight_array / sum_weights
 
         mean_wt_pieces = dict(zip(mean_wt_pieces.keys(), np.array(list(mean_wt_pieces.values()))/sum_weights))
@@ -260,7 +290,7 @@ class Problem_Setup:
         res = res_array*np.sqrt(scaled_weights)
         return res, sse_pieces, mean_wt_pieces
     
-    def calc_obj(self, theta_guess, scl_w = None):
+    def calc_obj(self, theta_guess, w_calc = None):
         """
         Calculates the sse objective function
 
@@ -268,7 +298,7 @@ class Problem_Setup:
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
         """
-        res, sse_pieces, mean_wt_pieces = self.calc_wt_res(theta_guess, scl_w)
+        res, sse_pieces, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
         obj = np.sum(np.square(res))
 
         return obj, sse_pieces, mean_wt_pieces
@@ -278,9 +308,9 @@ class Opt_ATs(Problem_Setup):
     The class for Least Squares regression analysis. Child class of General_Analysis
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, scl_w, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, w_calc, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, scl_w, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, save_data)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.repeats = repeats
@@ -458,9 +488,7 @@ class Opt_ATs(Problem_Setup):
         best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
 
         if self.save_data:
-            scl_w_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
-            dir_name = os.path.join("Results" , ' '.join(self.molec_data_dict.keys()), scl_w_str)
-            os.makedirs(dir_name, exist_ok=True) 
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
             #Save original results
             save_path1 = os.path.join(dir_name, "opt_at_results.csv")
             ls_results.to_csv(save_path1, index = False)
@@ -487,10 +515,10 @@ class Vis_Results(Problem_Setup):
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, scl_w, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, scl_w, save_data)
-        assert isinstance(scl_w, bool), "scl_w must be bool"
+        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, save_data)
+        
 
     #Define function to check GP Accuracy
     def check_GPs(self):
@@ -506,8 +534,8 @@ class Vis_Results(Problem_Setup):
             #Get testing data for that molecule
             train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
             #Make pdf
-            pdf_dir = os.makedirs("Results/pdfs/gp_val_figs", exist_ok=True)
-            pdf = PdfPages('Results/pdfs/gp_val_figs/' + molec + '.pdf')
+            dir_name = self.make_results_dir(list(molec))
+            pdf = PdfPages(dir_name + '/gp_val_figs.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
@@ -580,10 +608,9 @@ class Vis_Results(Problem_Setup):
         """
         Compares T vs Property for a given set
         """
-        w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
         #Make pdf
-        pdf_dir = os.makedirs("Results/pdfs/prop_vs_T", exist_ok=True)
-        pdf = PdfPages('Results/pdfs/prop_vs_T/'+w_scl_str+'.pdf')
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        pdf = PdfPages(dir_name + '/prop_vs_T.pdf')
         #Loop over molecules
         for molec in list(self.molec_data_dict.keys()):
             #Get constants for molecule
@@ -664,7 +691,7 @@ class Vis_Results(Problem_Setup):
             for i in range(len(value)):
                 #Values pref to real
                 val_real = self.values_pref_to_real(value[i])
-                obj_arr[i] = self.calc_obj(val_real, self.scl_w)[0]
+                obj_arr[i] = self.calc_obj(val_real, self.w_calc)[0]
             obj_dict[key] = obj_arr
 
         return param_dict, obj_dict
@@ -673,13 +700,11 @@ class Vis_Results(Problem_Setup):
         """
         Plots objective contours given a set of data
         """
-        w_scl_str = "scl_w_T" if self.scl_w == True else "scl_w_F"
-
         #Get HM Data
         param_dict, obj_dict = self.make_sse_sens_data(theta_guess)
         #Make pdf
-        pdf_dir = os.makedirs("Results/pdfs/obj_contours", exist_ok=True)
-        pdf = PdfPages('Results/pdfs/obj_contours/'+w_scl_str+'.pdf')
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        pdf = PdfPages(dir_name + '/obj_contours.pdf')
         #Loop over keys
         for key in list(param_dict.keys()):
             #Get parameter and sse data

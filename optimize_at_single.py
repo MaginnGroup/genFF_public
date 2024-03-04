@@ -28,14 +28,13 @@ molec_data_dict = {"R14":r14_class,
 
 at_class = atom_type.AT_Scheme_7()
 
+#Loop over all molecules seperately
 for k, v in molec_data_dict.items():
     molec_data_dict_1_mol = {k: v}
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict_1_mol.keys()))
-    driver = opt_atom_types.Opt_ATs(molec_data_dict_1_mol, all_gp_dict, at_class, repeats, seed, save_data)
-
-    #Optimize AT scheme parameters
-    ls_results = driver.optimize_ats()
-
-    #Optimize AT params with weights not scaled to 1
-    driver.scl_w = False
-    ls_results = driver.optimize_ats()
+    
+    #Loop over all 3 ways to calculate weight and optimize
+    for w_scheme in [0,1,2]:
+        #Optimize AT scheme parameters
+        driver = opt_atom_types.Opt_ATs(molec_data_dict_1_mol, all_gp_dict, at_class, repeats, seed, w_scheme, save_data)
+        ls_results = driver.optimize_ats()

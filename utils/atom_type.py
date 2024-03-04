@@ -114,12 +114,12 @@ class AT_Scheme_7(Atom_Types):
         at_param_bounds_l = [2, 2, 1.5, 2, 2, 2, 10, 10,  2, 15, 15, 15] #Units of Angstroms and Kelvin for Sigmas and Epsilons
         at_param_bounds_u = [4, 4,   3, 4, 4, 4, 75, 75, 10, 50, 50, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
-
+        self.scheme_name = "at_7"
         #Get Names
         at_keys = ["sigma_C1", "sigma_C2", "sigma_H1","sigma_F_H2","sigma_F_H1","sigma_F_Hx",
            "epsilon_C1", "epsilon_C2", "epsilon_H1","epsilon_F_H2","epsilon_F_H1","epsilon_F_Hx"]
 
-        #Create a file that maps param names to at_param names for atom type 7 for each molecule
+        #Create a file that maps param names (keys) to at_param names for atom type 7 (values) for each molecule
         r14_map_dict = {"sigma_C1": "sigma_C1",
                     "sigma_F1": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C1",
@@ -168,13 +168,101 @@ class AT_Scheme_7(Atom_Types):
                     "epsilon_F1": "epsilon_F_Hx",
                     "epsilon_H1": "epsilon_H1"}
 
-        r170_map_dict = {"sigma_C2": "sigma_C1",
+        r170_map_dict = {"sigma_C1": "sigma_C2",
                         "sigma_H1": "sigma_H1",
-                        "epsilon_C2": "epsilon_C1",
+                        "epsilon_C1": "epsilon_C2",
                         "epsilon_H1": "epsilon_H1"}
 
         at_names = ["sigma_C1", "sigma_C2", "sigma_H1","sigma_F_H2","sigma_F_H1","sigma_F_Hx",
                 "epsilon_C1", "epsilon_C2", "epsilon_H1","epsilon_F_H2","epsilon_F_H1","epsilon_F_Hx"]
+        
+        molec_map_dicts = {"R14":r14_map_dict,
+            "R32":r32_map_dict,
+            "R50":r50_map_dict,
+            "R125":r125_map_dict,
+            "R134a":r134a_map_dict,
+            "R143a":r143a_map_dict,
+            "R170":r170_map_dict}
+        
+        super().__init__(at_bounds, at_names, molec_map_dicts)
+        #Get scaled bounds
+        self.scale_bounds()
+
+
+class AT_Scheme_9(Atom_Types):
+    """
+    Class for Atom Type Scheme 9
+
+    Methods
+    -------
+    __init__(self)
+    """
+    def __init__(self):
+        #Get Bounds
+        at_param_bounds_l = [2, 2, 2, 1.5, 2, 2, 2, 10, 10, 10,  2, 15, 15, 15] #Units of Angstroms and Kelvin for Sigmas and Epsilons
+        at_param_bounds_u = [4, 4, 4,  3, 4, 4, 4, 75, 75, 75, 10, 50, 50, 50]
+        at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
+        self.scheme_name = "at_9"
+        #Get Names
+        at_keys = ["sigma_C1", "sigma_C2_F0", "sigma_C2_Fx", "sigma_H1","sigma_F_H2","sigma_F_H1","sigma_F_Hx",
+           "epsilon_C1", "epsilon_C2_F0", "epsilon_C2_Fx", "epsilon_H1","epsilon_F_H2","epsilon_F_H1","epsilon_F_Hx"]
+
+        #Create a file that maps param names (keys) to at_param names for atom type 7 (values) for each molecule
+        r14_map_dict = {"sigma_C1": "sigma_C1",
+                    "sigma_F1": "sigma_F_Hx",
+                    "epsilon_C1": "epsilon_C1",
+                    "epsilon_F1": "epsilon_F_Hx"}
+
+        r32_map_dict = {"sigma_C": "sigma_C1",
+                        "sigma_F": "sigma_F_H2",
+                        "sigma_H": "sigma_H1",
+                        "epsilon_C": "epsilon_C1",
+                        "epsilon_F": "epsilon_F_H2",
+                        "epsilon_H": "epsilon_H1"}
+
+        r50_map_dict = {"sigma_C1": "sigma_C1",
+                        "sigma_H1": "sigma_H1",
+                        "epsilon_C1": "epsilon_C1",
+                        "epsilon_H1": "epsilon_H1"}
+
+        r125_map_dict = {"sigma_C1":"sigma_C2_Fx",
+                    "sigma_C2": "sigma_C2_Fx",
+                    "sigma_F1": "sigma_F_Hx",
+                    "sigma_F2":"sigma_F_H1",
+                    "sigma_H1": "sigma_H1",
+                    "epsilon_C1": "epsilon_C2_Fx",
+                    "epsilon_C2": "epsilon_C2_Fx",
+                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_F2": "epsilon_F_H1",
+                    "epsilon_H1": "epsilon_H1"}
+
+        r134a_map_dict = {"sigma_C1": "sigma_C2_Fx",
+                    "sigma_C2": "sigma_C2_Fx",
+                    "sigma_F1": "sigma_F_Hx",
+                    "sigma_F2": "sigma_F_H2",
+                    "sigma_H1": "sigma_H1",
+                    "epsilon_C1": "epsilon_C2_Fx",
+                    "epsilon_C2": "epsilon_C2_Fx",
+                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_F2": "epsilon_F_H2",
+                    "epsilon_H1":"epsilon_H1"}
+
+        r143a_map_dict = {"sigma_C1": "sigma_C2_Fx",
+                    "sigma_C2": "sigma_C2_F0",
+                    "sigma_F1": "sigma_F_Hx",
+                    "sigma_H1": "sigma_H1",
+                    "epsilon_C1": "epsilon_C2_Fx",
+                    "epsilon_C2": "epsilon_C2_F0",
+                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_H1": "epsilon_H1"}
+
+        r170_map_dict = {"sigma_C1": "sigma_C2_F0",
+                        "sigma_H1": "sigma_H1",
+                        "epsilon_C1": "epsilon_C2_F0",
+                        "epsilon_H1": "epsilon_H1"}
+
+        at_names = ["sigma_C1", "sigma_C2_F0", "sigma_C2_Fx", "sigma_H1","sigma_F_H2","sigma_F_H1","sigma_F_Hx",
+                "epsilon_C1", "epsilon_C2_F0", "epsilon_C2_Fx", "epsilon_H1","epsilon_F_H2","epsilon_F_H1","epsilon_F_Hx"]
         
         molec_map_dicts = {"R14":r14_map_dict,
             "R32":r32_map_dict,
