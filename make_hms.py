@@ -5,7 +5,7 @@ import unyt as u
 
 #Set params for saving results and whether obj wts are scaled
 save_data = True
-scl_w = False
+scl_w = 2
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()
@@ -17,19 +17,11 @@ r143a_class = r143a.R143aConstants()
 r170_class = r170.R170Constants()
 
 #Get dict of refrigerant classes to consider, gps, and atom typing class
-molec_data_dict = {"R14":r14_class, 
-                   "R32":r32_class, 
-                   "R50":r50_class, 
-                   "R170":r170_class, 
-                   "R125":r125_class, 
-                   "R134a":r134a_class, 
-                   "R143a":r143a_class}
+molec_data_dict = {"R32":r32_class}
 
 at_class = atom_type.AT_Scheme_7()
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
-#Set best_set from scl_w experiment
-# best_set = np.array([2.89631543, 4.0, 1.5, 3.1945792, 2.23150945,  3.07915865, 75.0, 75.0, 9.9999988, 29.9003147, 50.0, 50.0])
-#Best set from not scl_wt exp
-best_set = np.array([3.0019590836418883,3.9999999999999996,1.5,3.2313895507940393,3.3941233247870666,2.927011182373593,38.33283581744562,75.00000000000001,9.999998797276383,50.00000000000001,50.00000000000001,36.59782932335614])
+#Best set from Experiment
+best_set = np.array([3.830327452839443,2.9719813341938197,2.156373165481484,2.6941766822509,3.8523628534129073,3.837466871267212,53.22755465997726,72.61206434864629,8.547339075792452,33.29151423562465,19.727770531635596,32.69817579869139])
 visual = opt_atom_types.Vis_Results(molec_data_dict, all_gp_dict, at_class, scl_w, save_data)
 visual.plot_obj_hms(best_set)
