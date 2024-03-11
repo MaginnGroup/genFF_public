@@ -275,6 +275,7 @@ class Problem_Setup:
                     unc = molec_object.uncertainties[key.replace("sim", "expt")]
                     y_var = (y_exp*unc)**2
                     weight_mpi = (1/y_var).tolist()
+                    var_ratios.append((gp_var/y_var).tolist())
                 else:
                     weight_mpi = (1/(gp_var)).tolist()
                 weight_array += weight_mpi
@@ -284,7 +285,6 @@ class Problem_Setup:
                 dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1)
                 # print(dL_dz.T.shape, gp_covar.shape, dL_dz.shape)
                 sse_var = dL_dz.T@gp_covar@dL_dz
-                # var_ratios.append((gp_var/y_var).tolist())
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
                 sse_pieces[molec + "-" + key + "-sse"] = np.sum(np.square(np.array(residuals)))
                 sse_var_pieces[molec + "-" + key + "-sse_var"] = sse_var
@@ -293,6 +293,7 @@ class Problem_Setup:
         #List to flattened array
         res_array = np.array(res_array).flatten()
         weight_array = np.array(weight_array).flatten()
+        var_ratios_arr = np.array(var_ratios).flatten()
 
         #Normalize weights to add up to 1 if scl_w is True
         sum_weights = np.sum(weight_array) if w_calc == 0 else 1
@@ -302,7 +303,7 @@ class Problem_Setup:
 
         #Residual is (y - gp_mean)*sqrt(weight) for each data point
         res = res_array*np.sqrt(scaled_weights)
-        return res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces
+        return res, sse_pieces, sse_var_pieces, var_ratios_arr, mean_wt_pieces
     
     def calc_obj(self, theta_guess, w_calc = None):
         """
@@ -314,12 +315,14 @@ class Problem_Setup:
         """
         res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
         sse = np.sum(np.square(res))
-        sum_var_ratios = np.sum(var_ratios)
-        expected_sse_val = sse + sum_var_ratios
-        sse_std = np.sqrt(abs(np.array(list(sse_var_pieces.values()))))
         if self.obj_choice == "SSE":
             obj = sse
-        elif self.obj_choice == "ExpVal":
+        else:
+            sum_var_ratios = np.sum(var_ratios)
+            expected_sse_val = sse + sum_var_ratios
+            sse_std = np.sqrt(abs(np.sum(np.array(list(sse_var_pieces.values())))))
+        
+        if self.obj_choice == "ExpVal":
             obj = expected_sse_val
         elif self.obj_choice == "UCB":
             obj = expected_sse_val + sse_std
