@@ -60,7 +60,7 @@ class Problem_Setup:
     save_data: bool, whether to save data or not
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data):
         assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
@@ -72,6 +72,7 @@ class Problem_Setup:
         self.at_class = at_class
         self.save_data = save_data
         self.w_calc = w_calc
+        self.obj_choice == obj_choice
 
     def make_results_dir(self, molecules):
         scheme_name = self.at_class.scheme_name
@@ -83,7 +84,7 @@ class Problem_Setup:
         else:
             scl_w_str = "wt_y_var"
 
-        dir_name = os.path.join("Results" ,scheme_name, molecule_str, scl_w_str)
+        dir_name = os.path.join("Results" ,scheme_name, molecule_str, self.obj_choice, scl_w_str)
         os.makedirs(dir_name, exist_ok=True) 
 
         return dir_name
@@ -213,7 +214,7 @@ class Problem_Setup:
         #Get mean and std from gp
         gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
         gp_var = np.diag(np.squeeze(gp_covar))
-        return np.squeeze(gp_mean), gp_var
+        return np.squeeze(gp_mean),  np.squeeze(gp_covar), gp_var
     
     def calc_wt_res(self, theta_guess, w_calc = None):
         """
@@ -226,6 +227,8 @@ class Problem_Setup:
         #Initialize weight and squared error arrays
         res_array  = []
         weight_array = []
+        var_ratios = []
+        sse_var = 0
         mean_wt_pieces = {}
         sse_pieces = {}
         key_list = []
@@ -256,10 +259,11 @@ class Problem_Setup:
                 x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
                 y_exp = np.array(list(exp_data.values()))
                 # #Evaluate GP
-                gp_mean, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                gp_mean, gp_covar, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
                 #Scale gp output to real value
                 gp_mean = values_scaled_to_real(gp_mean, y_bounds)
                 #Scale gp_variances to real values
+                gp_covar = variances_scaled_to_real(gp_covar, y_bounds)
                 gp_var = variances_scaled_to_real(gp_var, y_bounds)
                 #Calculate weight from uncertainty
                 if w_calc == 2:
@@ -271,9 +275,14 @@ class Problem_Setup:
                     weight_mpi = (1/(gp_var)).tolist()
                 weight_array += weight_mpi
                 #Calculate residuals
-                residuals = (y_exp.flatten() - gp_mean.flatten()).tolist()
+                res_vals = y_exp.flatten() - gp_mean.flatten()
+                residuals = (res_vals).tolist()
+                dL_dz = -2*(res_vals/np.array(weight_mpi)).reshape(-1,1)
+                sse_var += dL_dz.T@gp_covar@dL_dz
+                var_ratios.append((gp_var/y_var).tolist())
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
                 sse_pieces[molec + "-" + key + "-sse"] = np.sum(np.square(np.array(residuals)))
+                # sse_var_pieces[molec + "-" + key + "-sse_var"] = sse_var
                 res_array += residuals
         
         #List to flattened array
@@ -288,7 +297,7 @@ class Problem_Setup:
 
         #Residual is (y - gp_mean)*sqrt(weight) for each data point
         res = res_array*np.sqrt(scaled_weights)
-        return res, sse_pieces, mean_wt_pieces
+        return res, sse_pieces, sse_var, mean_wt_pieces
     
     def calc_obj(self, theta_guess, w_calc = None):
         """
@@ -298,8 +307,22 @@ class Problem_Setup:
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
         """
-        res, sse_pieces, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
-        obj = np.sum(np.square(res))
+        res, sse_pieces, sse_var, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
+        sse = np.sum(np.square(res))
+        exp_val_sse = sse + sum_var_ratios
+        sum_var_ratios = np.sum(var_ratios)
+        sse_std = np.sqrt(abs(sse_var))
+        if self.obj_choice == "SSE":
+            obj = sse
+        elif self.obj_choice == "ExpVal":
+            obj = exp_val_sse
+        elif self.obj_choice == "UCB":
+            obj = exp_val_sse - sse_std
+        elif self.obj_choice == "LCB":
+            obj = exp_val_sse - sse_std
+        else:
+            raise ValueError(
+                "Invalid obj_choice. Supported obj_choice names are 'SSE', 'UCB', 'ExpVal', and 'LCB'")
 
         return obj, sse_pieces, mean_wt_pieces
 
@@ -308,9 +331,9 @@ class Opt_ATs(Problem_Setup):
     The class for Least Squares regression analysis. Child class of General_Analysis
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, w_calc, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, w_calc, obj_choice, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.repeats = repeats
@@ -515,9 +538,9 @@ class Vis_Results(Problem_Setup):
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data)
         
 
     #Define function to check GP Accuracy
