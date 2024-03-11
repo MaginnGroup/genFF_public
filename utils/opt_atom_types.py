@@ -72,7 +72,10 @@ class Problem_Setup:
         self.at_class = at_class
         self.save_data = save_data
         self.w_calc = w_calc
-        self.obj_choice == obj_choice
+        self.obj_choice = obj_choice
+
+        if obj_choice is not "SSE":
+            assert w_calc == 2, "Only objective choice SSE is valid with w_calc methods != 2"
 
     def make_results_dir(self, molecules):
         scheme_name = self.at_class.scheme_name
@@ -259,12 +262,13 @@ class Problem_Setup:
                 x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
                 y_exp = np.array(list(exp_data.values()))
                 # #Evaluate GP
-                gp_mean, gp_covar, gp_var = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                gp_mean_scl, gp_covar_scl, gp_var_scl = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
                 #Scale gp output to real value
-                gp_mean = values_scaled_to_real(gp_mean, y_bounds)
+                gp_mean = values_scaled_to_real(gp_mean_scl, y_bounds)
                 #Scale gp_variances to real values
-                gp_covar = variances_scaled_to_real(gp_covar, y_bounds)
-                gp_var = variances_scaled_to_real(gp_var, y_bounds)
+                y_bounds_2D = np.asarray(y_bounds).reshape(-1,2)
+                gp_covar = gp_covar_scl * (y_bounds_2D[:, 1] - y_bounds_2D[:, 0]) ** 2
+                gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
                 #Calculate weight from uncertainty
                 if w_calc == 2:
                     #Get y data uncertainties
@@ -278,6 +282,7 @@ class Problem_Setup:
                 res_vals = y_exp.flatten() - gp_mean.flatten()
                 residuals = (res_vals).tolist()
                 dL_dz = -2*(res_vals/np.array(weight_mpi)).reshape(-1,1)
+                # print(dL_dz.T.shape, gp_covar.shape, dL_dz.shape)
                 sse_var += dL_dz.T@gp_covar@dL_dz
                 var_ratios.append((gp_var/y_var).tolist())
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
@@ -297,7 +302,7 @@ class Problem_Setup:
 
         #Residual is (y - gp_mean)*sqrt(weight) for each data point
         res = res_array*np.sqrt(scaled_weights)
-        return res, sse_pieces, sse_var, mean_wt_pieces
+        return res, sse_pieces, sse_var, var_ratios, mean_wt_pieces
     
     def calc_obj(self, theta_guess, w_calc = None):
         """
@@ -309,17 +314,18 @@ class Problem_Setup:
         """
         res, sse_pieces, sse_var, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
         sse = np.sum(np.square(res))
-        exp_val_sse = sse + sum_var_ratios
+        sum_var_ratios = np.sum(var_ratios)
+        expected_sse_val = sse + sum_var_ratios
         sum_var_ratios = np.sum(var_ratios)
         sse_std = np.sqrt(abs(sse_var))
         if self.obj_choice == "SSE":
             obj = sse
         elif self.obj_choice == "ExpVal":
-            obj = exp_val_sse
+            obj = expected_sse_val
         elif self.obj_choice == "UCB":
-            obj = exp_val_sse - sse_std
+            obj = expected_sse_val - sse_std
         elif self.obj_choice == "LCB":
-            obj = exp_val_sse - sse_std
+            obj = expected_sse_val - sse_std
         else:
             raise ValueError(
                 "Invalid obj_choice. Supported obj_choice names are 'SSE', 'UCB', 'ExpVal', and 'LCB'")
