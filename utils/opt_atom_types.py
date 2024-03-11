@@ -231,7 +231,7 @@ class Problem_Setup:
         res_array  = []
         weight_array = []
         var_ratios = []
-        sse_var = 0
+        sse_var_pieces = {}
         mean_wt_pieces = {}
         sse_pieces = {}
         key_list = []
@@ -281,13 +281,13 @@ class Problem_Setup:
                 #Calculate residuals
                 res_vals = y_exp.flatten() - gp_mean.flatten()
                 residuals = (res_vals).tolist()
-                dL_dz = -2*(res_vals/np.array(weight_mpi)).reshape(-1,1)
+                dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1)
                 # print(dL_dz.T.shape, gp_covar.shape, dL_dz.shape)
-                sse_var += dL_dz.T@gp_covar@dL_dz
-                var_ratios.append((gp_var/y_var).tolist())
+                sse_var = dL_dz.T@gp_covar@dL_dz
+                # var_ratios.append((gp_var/y_var).tolist())
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
                 sse_pieces[molec + "-" + key + "-sse"] = np.sum(np.square(np.array(residuals)))
-                # sse_var_pieces[molec + "-" + key + "-sse_var"] = sse_var
+                sse_var_pieces[molec + "-" + key + "-sse_var"] = sse_var
                 res_array += residuals
         
         #List to flattened array
@@ -302,7 +302,7 @@ class Problem_Setup:
 
         #Residual is (y - gp_mean)*sqrt(weight) for each data point
         res = res_array*np.sqrt(scaled_weights)
-        return res, sse_pieces, sse_var, var_ratios, mean_wt_pieces
+        return res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces
     
     def calc_obj(self, theta_guess, w_calc = None):
         """
@@ -312,18 +312,17 @@ class Problem_Setup:
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
         """
-        res, sse_pieces, sse_var, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
+        res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
         sse = np.sum(np.square(res))
         sum_var_ratios = np.sum(var_ratios)
         expected_sse_val = sse + sum_var_ratios
-        sum_var_ratios = np.sum(var_ratios)
-        sse_std = np.sqrt(abs(sse_var))
+        sse_std = np.sqrt(abs(np.array(list(sse_var_pieces.values()))))
         if self.obj_choice == "SSE":
             obj = sse
         elif self.obj_choice == "ExpVal":
             obj = expected_sse_val
         elif self.obj_choice == "UCB":
-            obj = expected_sse_val - sse_std
+            obj = expected_sse_val + sse_std
         elif self.obj_choice == "LCB":
             obj = expected_sse_val - sse_std
         else:
