@@ -66,6 +66,8 @@ class Problem_Setup:
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(save_data, bool), "save_res must be bool"
         assert isinstance(w_calc, int) and w_calc in [0,1,2], "w_calc must be 0, 1 or 2"
+        assert isinstance(obj_choice, str), "obj_choice must be string"
+        assert obj_choice in ["ExpVal", "UCB", "LCB", "SSE"], "obj_choice must be SSE, ExpVal, UCB, or LCB"
         #Placeholder that will be overwritten if None
         self.molec_data_dict = molec_data_dict
         self.all_gp_dict = all_gp_dict
