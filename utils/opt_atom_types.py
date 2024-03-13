@@ -216,10 +216,29 @@ class Problem_Setup:
         gp_theta = np.repeat(gp_theta_guess, len(Xexp) , axis = 0)
         #Concatenate theta and tem values to get a gp input
         gp_input = np.concatenate((gp_theta, gp_Xexp), axis=1)
-        #Get mean and std from gp
-        gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
+
+        #If we need partial derivatives for our objective
+        if self.obj_choice in ["UCB", "LCB"]:
+            #Convert input to tensor
+            gp_input_tf = tf.convert_to_tensor(gp_input) 
+            # this allows us to compute different gradients below
+            with tf.GradientTape(persistent=True) as tape: 
+                # By default, only Variables are watched. For gradients with respect to tensors,
+                # we need to explicitly watch them:
+                tape.watch(gp_input_tf)
+                #Get mean and std from gp
+                gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
+            #Calculate grad_mean and convert tensor to numpy
+            grad_mean = tape.gradient(gp_mean, gp_input_tf)
+            gp_mean = gp_mean.numpy()
+            gp_covar = gp_covar.numpy()
+        else:
+            #Get mean and std from gp
+            gp_mean, gp_covar = gp_object.predict_f(gp_input, full_cov=True)
+            grad_mean = None
+        #get variance from covar
         gp_var = np.diag(np.squeeze(gp_covar))
-        return np.squeeze(gp_mean),  np.squeeze(gp_covar), gp_var
+        return np.squeeze(gp_mean),  np.squeeze(gp_covar), gp_var, grad_mean
     
     def calc_wt_res(self, theta_guess, w_calc = None):
         """
@@ -264,7 +283,7 @@ class Problem_Setup:
                 x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
                 y_exp = np.array(list(exp_data.values()))
                 # #Evaluate GP
-                gp_mean_scl, gp_covar_scl, gp_var_scl = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                gp_mean_scl, gp_covar_scl, gp_var_scl, gp_grad_mean = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
                 #Scale gp output to real value
                 gp_mean = values_scaled_to_real(gp_mean_scl, y_bounds)
                 #Scale gp_variances to real values
@@ -280,11 +299,14 @@ class Problem_Setup:
                     var_ratios.append((gp_var/y_var).tolist())
                 else:
                     weight_mpi = (1/(gp_var)).tolist()
+
                 weight_array += weight_mpi
                 #Calculate residuals
                 res_vals = y_exp.flatten() - gp_mean.flatten()
                 residuals = (res_vals).tolist()
-                dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1)
+                dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1) 
+                if gp_grad_mean is not None:
+                    dL_dz += gp_grad_mean.reshape(-1,1)
                 # print(dL_dz.T.shape, gp_covar.shape, dL_dz.shape)
                 sse_var = dL_dz.T@gp_covar@dL_dz
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
