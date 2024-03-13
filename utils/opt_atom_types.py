@@ -331,8 +331,7 @@ class Problem_Setup:
         elif self.obj_choice == "LCB":
             obj = expected_sse_val - sse_std
         else:
-            raise ValueError(
-                "Invalid obj_choice. Supported obj_choice names are 'SSE', 'UCB', 'ExpVal', and 'LCB'")
+            pass
 
         return obj, sse_pieces, mean_wt_pieces
 
