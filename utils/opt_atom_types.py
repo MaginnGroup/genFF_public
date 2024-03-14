@@ -306,7 +306,7 @@ class Problem_Setup:
                 residuals = (res_vals).tolist()
                 dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1) 
                 if gp_grad_mean is not None:
-                    dL_dz += gp_grad_mean.reshape(-1,1)
+                    dL_dz = dL_dz*gp_grad_mean.reshape(-1,1)
                 # print(dL_dz.T.shape, gp_covar.shape, dL_dz.shape)
                 sse_var = dL_dz.T@gp_covar@dL_dz
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
