@@ -214,11 +214,12 @@ class AT_Scheme_9(Atom_Types):
                     "epsilon_F1": "epsilon_F_Hx"}
 
         r32_map_dict = {"sigma_C": "sigma_C1",
-                        "sigma_F": "sigma_F_H2",
                         "sigma_H": "sigma_H1",
+                        "sigma_F": "sigma_F_H2",
                         "epsilon_C": "epsilon_C1",
-                        "epsilon_F": "epsilon_F_H2",
-                        "epsilon_H": "epsilon_H1"}
+                        "epsilon_H": "epsilon_H1",
+                        "epsilon_F": "epsilon_F_H2"
+                        }
 
         r50_map_dict = {"sigma_C1": "sigma_C1",
                         "sigma_H1": "sigma_H1",

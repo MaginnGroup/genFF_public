@@ -86,7 +86,7 @@ def plot_slices_temperature(
     temperature_bounds,
     property_bounds,
     plot_bounds,#=[220.0, 340.0],
-    property_name="property",
+    property_name="property"
 ):
     """Plot the model predictions as a function of temperature
     Slices are plotted where the values of the other parameters
@@ -130,7 +130,6 @@ def plot_slices_temperature(
             mean_scaled, var_scaled = model.predict_f(xx)
             mean = values_scaled_to_real(mean_scaled, property_bounds)
             var = variances_scaled_to_real(var_scaled, property_bounds)
-
             ax.plot(vals, mean, lw=2, label=label)
             ax.fill_between(
                 vals[:, 0],
@@ -242,6 +241,8 @@ def plot_model_vs_test(
     property_bounds,
     plot_bounds=[220.0, 340.0],
     property_name="property",
+    exp_x_data = None,
+    exp_y_data = None,
 ):
     """Plots the GP model(s) as a function of temperature with all other parameters
     taken as param_values. Overlays training and testing points with the same
@@ -272,6 +273,14 @@ def plot_model_vs_test(
     -------
     matplotlib.figure.Figure
     """
+    molec_name = list(models.keys())[0]
+    label_vals = ["GP " + molec_name, "Paper", "GP All Molecules"]
+    linestyles = ["solid", "dashed", "dotted"]
+
+    if len(param_values.shape) == 1:
+        param_values = param_values.reshape(1,-1)
+
+    param_sets = param_values.shape[0]
 
     n_samples = 100
     vals = np.linspace(plot_bounds[0], plot_bounds[1], n_samples).reshape(
@@ -279,22 +288,26 @@ def plot_model_vs_test(
     )
     vals_scaled = values_real_to_scaled(vals, temperature_bounds)
 
-    other = np.tile(param_values, (n_samples, 1))
-    xx = np.hstack((other, vals_scaled))
-
     fig, ax = plt.subplots()
-    for (label, model) in models.items():
-        mean_scaled, var_scaled = model.predict_f(xx)
+    if exp_x_data is not None and exp_y_data is not None:
+        ax.scatter(exp_x_data, exp_y_data, label="Exp Data", zorder = 4, color = "purple")
 
-        mean = values_scaled_to_real(mean_scaled, property_bounds)
-        var = variances_scaled_to_real(var_scaled, property_bounds)
-        ax.plot(vals, mean, lw=2, label="GP model" + label)
-        ax.fill_between(
-            vals[:, 0],
-            mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
-            mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
-            alpha=0.25,
-        )
+    for i in range(len(param_values)):
+        other = np.tile(param_values[i], (n_samples, 1))
+        xx = np.hstack((other, vals_scaled))
+        
+        for (label, model) in models.items():
+            mean_scaled, var_scaled = model.predict_f(xx)
+            mean = values_scaled_to_real(mean_scaled, property_bounds)
+            var = variances_scaled_to_real(var_scaled, property_bounds)
+            
+            ax.plot(vals, mean, lw=2, linestyle = linestyles[i], label=label_vals[i])
+            ax.fill_between(
+                vals[:, 0],
+                mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
+                mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
+                alpha=0.25,
+            )
 
     if train_points.shape[0] > 0:
         md_train_temp = values_scaled_to_real(
