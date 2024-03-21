@@ -35,7 +35,7 @@ for k, v in molec_data_dict.items():
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict_1_mol.keys()))
     
     #Loop over all 3 ways to calculate weight and optimize
-    for obj_choice in ["ExpVal", "UCB", "LCB"]:
+    for obj_choice in ["ExpVal", "SSE"]:
         #Optimize AT scheme parameters
         driver = opt_atom_types.Opt_ATs(molec_data_dict_1_mol, all_gp_dict, at_class, repeats, seed, w_scheme, obj_choice, save_data)
         ls_results = driver.optimize_ats()
