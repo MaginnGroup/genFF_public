@@ -81,7 +81,9 @@ class Problem_Setup:
 
     def make_results_dir(self, molecules):
         scheme_name = self.at_class.scheme_name
-        if len(molecules) > 1 and isinstance(molecules, (list,np.ndarray)):
+        if isinstance(molecules, str):
+            molecule_str = molecules
+        elif len(molecules) > 1 and isinstance(molecules, (list,np.ndarray)):
             molecule_str = '-'.join(molecules)
         else:
             molecule_str = molecules[0]
@@ -269,7 +271,7 @@ class Problem_Setup:
             #Get theta associated with each gp
             param_matrix = self.at_class.get_transformation_matrix(molec)
             #Transform the guess, and scale to bounds
-            gp_theta = theta_guess.reshape(1,-1)@param_matrix
+            gp_theta = theta_guess.reshape(-1,1).T@param_matrix
             gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
@@ -306,6 +308,7 @@ class Problem_Setup:
                 #Calculate residuals
                 res_vals = y_exp.flatten() - gp_mean.flatten()
                 residuals = (res_vals).tolist()
+
                 dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1) 
                 if gp_grad_mean is not None:
                     dL_dz = dL_dz*gp_grad_mean.reshape(-1,1)
@@ -590,7 +593,7 @@ class Vis_Results(Problem_Setup):
             #Get testing data for that molecule
             train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
             #Make pdf
-            dir_name = self.make_results_dir(list(molec))
+            dir_name = self.make_results_dir(list(molec)) 
             pdf = PdfPages(dir_name + '/gp_val_figs.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
@@ -672,7 +675,6 @@ class Vis_Results(Problem_Setup):
 
         #Loop over molecules
         for molec in list(self.all_gp_dict.keys()):
-            print(molec)
             #Get constants for molecule
             molec_object = self.molec_data_dict[molec]
             #Get GPs associated with each molecule
@@ -688,12 +690,12 @@ class Vis_Results(Problem_Setup):
             for i in range(len(all_param_sets_org)):
                 #Change test_params to preferred values to real values
                 param_set = self.values_pref_to_real(all_param_sets_org[i])
-                new_set = param_matrix.T@param_set.reshape(-1,1)
+                new_set = param_set.reshape(-1,1).T@param_matrix
                 all_param_sets_new.append(new_set )
 
             all_param_sets = np.vstack(all_param_sets_new)
             #Make pdf
-            dir_name = self.make_results_dir(list(molec))
+            dir_name = self.make_results_dir(molec)
             pdf = PdfPages(dir_name + '/comp_set_props.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
@@ -711,7 +713,7 @@ class Vis_Results(Problem_Setup):
                 train_points = np.concatenate((train_data["x"][:,-1].reshape(-1,1), 
                                             train_data[key].reshape(-1,1)), axis = 1)
                 test_params = tf.convert_to_tensor(all_param_sets, dtype=tf.float64)
-                print(test_params.shape)
+
                 #Plot test vs train for each parameter set
                 pdf.savefig(plot_model_vs_test({label:gp_model}, 
                                             test_params, 

@@ -83,7 +83,9 @@ class Atom_Types:
             # Fill at_matrix with ones or zeros based on the presence of keys
             for i, value in enumerate(self.at_names):
                 if value in map_dict.values():
-                    at_matrix[i, list(map_dict.values()).index(value)] = 1
+                    indices = [i for i, v in enumerate(map_dict.values()) if v == value]
+                    # at_matrix[i, list(map_dict.values()).index(value)] = 1
+                    at_matrix[i, indices] = 1
             #Add matrix to self dictionary
             self.at_matrices[molec_key] = at_matrix
         else:
@@ -126,11 +128,12 @@ class AT_Scheme_7(Atom_Types):
                     "epsilon_F1": "epsilon_F_Hx"}
 
         r32_map_dict = {"sigma_C": "sigma_C1",
-                        "sigma_F": "sigma_F_H2",
                         "sigma_H": "sigma_H1",
+                        "sigma_F": "sigma_F_H2",
                         "epsilon_C": "epsilon_C1",
+                        "epsilon_H": "epsilon_H1",
                         "epsilon_F": "epsilon_F_H2",
-                        "epsilon_H": "epsilon_H1"}
+                        }
 
         r50_map_dict = {"sigma_C1": "sigma_C1",
                         "sigma_H1": "sigma_H1",
@@ -139,34 +142,38 @@ class AT_Scheme_7(Atom_Types):
 
         r125_map_dict = {"sigma_C1":"sigma_C2",
                     "sigma_C2": "sigma_C2",
-                    "sigma_F1": "sigma_F_Hx",
-                    "sigma_F2":"sigma_F_H1",
                     "sigma_H1": "sigma_H1",
+                    "sigma_F2":"sigma_F_H1",
+                    "sigma_F1": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C2",
                     "epsilon_C2": "epsilon_C2",
-                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_H1": "epsilon_H1",
                     "epsilon_F2": "epsilon_F_H1",
-                    "epsilon_H1": "epsilon_H1"}
+                    "epsilon_F1": "epsilon_F_Hx",
+                    }
 
         r134a_map_dict = {"sigma_C1": "sigma_C2",
                     "sigma_C2": "sigma_C2",
-                    "sigma_F1": "sigma_F_Hx",
-                    "sigma_F2": "sigma_F_H2",
                     "sigma_H1": "sigma_H1",
+                    "sigma_F2": "sigma_F_H2",
+                    "sigma_F1": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C2",
                     "epsilon_C2": "epsilon_C2",
-                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_H1":"epsilon_H1",
                     "epsilon_F2": "epsilon_F_H2",
-                    "epsilon_H1":"epsilon_H1"}
+                    "epsilon_F1": "epsilon_F_Hx",
+                    
+                    }
 
         r143a_map_dict = {"sigma_C1": "sigma_C2",
                     "sigma_C2": "sigma_C2",
-                    "sigma_F1": "sigma_F_Hx",
                     "sigma_H1": "sigma_H1",
+                    "sigma_F1": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C2",
                     "epsilon_C2": "epsilon_C2",
+                    "epsilon_H1": "epsilon_H1",
                     "epsilon_F1": "epsilon_F_Hx",
-                    "epsilon_H1": "epsilon_H1"}
+                    }
 
         r170_map_dict = {"sigma_C1": "sigma_C2",
                         "sigma_H1": "sigma_H1",
@@ -209,9 +216,9 @@ class AT_Scheme_9(Atom_Types):
 
         #Create a file that maps param names (keys) to at_param names for atom type 7 (values) for each molecule
         r14_map_dict = {"sigma_C1": "sigma_C1",
-                    "sigma_F1": "sigma_F_Hx",
-                    "epsilon_C1": "epsilon_C1",
-                    "epsilon_F1": "epsilon_F_Hx"}
+                        "sigma_F1": "sigma_F_Hx",
+                        "epsilon_C1": "epsilon_C1",
+                        "epsilon_F1": "epsilon_F_Hx"}
 
         r32_map_dict = {"sigma_C": "sigma_C1",
                         "sigma_H": "sigma_H1",
@@ -228,34 +235,37 @@ class AT_Scheme_9(Atom_Types):
 
         r125_map_dict = {"sigma_C1":"sigma_C2_Fx",
                     "sigma_C2": "sigma_C2_Fx",
-                    "sigma_F1": "sigma_F_Hx",
-                    "sigma_F2":"sigma_F_H1",
                     "sigma_H1": "sigma_H1",
+                    "sigma_F2":"sigma_F_H1",
+                    "sigma_F1": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C2_Fx",
                     "epsilon_C2": "epsilon_C2_Fx",
-                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_H1": "epsilon_H1",
                     "epsilon_F2": "epsilon_F_H1",
-                    "epsilon_H1": "epsilon_H1"}
+                    "epsilon_F1": "epsilon_F_Hx"
+                    }
 
         r134a_map_dict = {"sigma_C1": "sigma_C2_Fx",
                     "sigma_C2": "sigma_C2_Fx",
-                    "sigma_F1": "sigma_F_Hx",
-                    "sigma_F2": "sigma_F_H2",
                     "sigma_H1": "sigma_H1",
+                    "sigma_F2": "sigma_F_H2",
+                    "sigma_F1": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C2_Fx",
                     "epsilon_C2": "epsilon_C2_Fx",
-                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_H1":"epsilon_H1",
                     "epsilon_F2": "epsilon_F_H2",
-                    "epsilon_H1":"epsilon_H1"}
+                    "epsilon_F1": "epsilon_F_Hx"
+                    }
 
-        r143a_map_dict = {"sigma_C1": "sigma_C2_Fx",
-                    "sigma_C2": "sigma_C2_F0",
-                    "sigma_F1": "sigma_F_Hx",
-                    "sigma_H1": "sigma_H1",
-                    "epsilon_C1": "epsilon_C2_Fx",
-                    "epsilon_C2": "epsilon_C2_F0",
-                    "epsilon_F1": "epsilon_F_Hx",
-                    "epsilon_H1": "epsilon_H1"}
+        r143a_map_dict = {"sigma_C2": "sigma_C2_F0",
+                          "sigma_C1": "sigma_C2_Fx",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F1": "sigma_F_Hx",
+                        "epsilon_C2": "epsilon_C2_F0",
+                        "epsilon_C1": "epsilon_C2_Fx",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F1": "epsilon_F_Hx",
+                        }
 
         r170_map_dict = {"sigma_C1": "sigma_C2_F0",
                         "sigma_H1": "sigma_H1",
