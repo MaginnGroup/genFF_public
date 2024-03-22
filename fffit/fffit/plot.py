@@ -293,21 +293,22 @@ def plot_model_vs_test(
         ax.scatter(exp_x_data, exp_y_data, label="Exp Data", zorder = 4, color = "purple")
 
     for i in range(len(param_values)):
-        other = np.tile(param_values[i], (n_samples, 1))
-        xx = np.hstack((other, vals_scaled))
-        
-        for (label, model) in models.items():
-            mean_scaled, var_scaled = model.predict_f(xx)
-            mean = values_scaled_to_real(mean_scaled, property_bounds)
-            var = variances_scaled_to_real(var_scaled, property_bounds)
+        if not np.all(np.isnan(param_values[i])):
+            other = np.tile(param_values[i], (n_samples, 1))
+            xx = np.hstack((other, vals_scaled))
             
-            ax.plot(vals, mean, lw=2, linestyle = linestyles[i], label=label_vals[i])
-            ax.fill_between(
-                vals[:, 0],
-                mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
-                mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
-                alpha=0.25,
-            )
+            for (label, model) in models.items():
+                mean_scaled, var_scaled = model.predict_f(xx)
+                mean = values_scaled_to_real(mean_scaled, property_bounds)
+                var = variances_scaled_to_real(var_scaled, property_bounds)
+                
+                ax.plot(vals, mean, lw=2, linestyle = linestyles[i], label=label_vals[i])
+                ax.fill_between(
+                    vals[:, 0],
+                    mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
+                    mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
+                    alpha=0.25,
+                )
 
     if train_points.shape[0] > 0:
         md_train_temp = values_scaled_to_real(

@@ -689,9 +689,12 @@ class Vis_Results(Problem_Setup):
             
             for i in range(len(all_param_sets_org)):
                 #Change test_params to preferred values to real values
-                param_set = self.values_pref_to_real(all_param_sets_org[i])
-                new_set = param_set.reshape(-1,1).T@param_matrix
-                all_param_sets_new.append(new_set )
+                if all_param_sets_org[i] is not None:
+                    param_set = self.values_pref_to_real(all_param_sets_org[i])
+                    new_set = param_set.reshape(-1,1).T@param_matrix
+                else:
+                    new_set = np.full((param_matrix.shape[1],), np.nan)
+                all_param_sets_new.append(new_set)
 
             all_param_sets = np.vstack(all_param_sets_new)
             #Make pdf
