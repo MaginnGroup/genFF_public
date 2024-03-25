@@ -61,7 +61,7 @@ class Atom_Types:
         self.at_bounds_nm_kjmol = at_bounds_nm_kjmol
 
 
-    def get_transformation_matrix(self, molec_key):
+    def get_transformation_matrix(self, molec_map_dict):
         """
         Creates transformation matrix between new and old atom types
 
@@ -73,6 +73,8 @@ class Atom_Types:
         --------
         at_matrix: array, The transformation matrix from new to old atom types
         """
+        molec_key = list(molec_map_dict.keys())[0]
+        molec_data = molec_map_dict[molec_key]
         assert molec_key in self.molec_map_dicts
         #If you already have this matrix, use it. Otherwise generate it
         if not molec_key in self.at_matrices:
@@ -90,6 +92,12 @@ class Atom_Types:
             self.at_matrices[molec_key] = at_matrix
         else:
             at_matrix = self.at_matrices[molec_key]
+
+        #Ensure correct order of matrix
+        order = molec_data.param_names
+        index_mapping = {elem: idx for idx, elem in enumerate(list(self.molec_map_dicts[molec_key].keys()))}
+        mapped_indices = [index_mapping[elem] for elem in order]
+        at_matrix = at_matrix[:, mapped_indices]
         return at_matrix
     
     def check_for_duplicates(self):
