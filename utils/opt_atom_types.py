@@ -326,8 +326,8 @@ class Problem_Setup:
 
                 #Save pieces
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
-                sse_pieces[molec + "-" + key + "-sse"] = sse
-                sse_var_pieces[molec + "-" + key + "-sse_var"] = sse_var
+                sse_pieces[molec + "-" + key + "-sse"] = float(sse)
+                sse_var_pieces[molec + "-" + key + "-sse_var"] = float(sse_var)
                 res_array += residuals
         
         #List to flattened array
@@ -348,7 +348,7 @@ class Problem_Setup:
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
         """
         res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
-        sse = sum(sse_pieces.values())
+        sse = float(sum(sse_pieces.values()))
         if self.obj_choice == "SSE":
             obj = sse
         else:
@@ -364,8 +364,8 @@ class Problem_Setup:
             obj = expected_sse_val - sse_std
         else:
             pass
-
-        return obj, sse_pieces, mean_wt_pieces
+        
+        return float(obj), sse_pieces, mean_wt_pieces
 
 class Opt_ATs(Problem_Setup):
     """
