@@ -269,7 +269,7 @@ class Problem_Setup:
             #Get constants for molecule
             molec_object = self.molec_data_dict[molec]
             #Get theta associated with each gp
-            param_matrix = self.at_class.get_transformation_matrix(molec)
+            param_matrix = self.at_class.get_transformation_matrix({molec: molec_object})
             #Transform the guess, and scale to bounds
             gp_theta = theta_guess.reshape(-1,1).T@param_matrix
             gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
@@ -294,28 +294,39 @@ class Problem_Setup:
                 y_bounds_2D = np.asarray(y_bounds).reshape(-1,2)
                 gp_covar = gp_covar_scl * (y_bounds_2D[:, 1] - y_bounds_2D[:, 0]) ** 2
                 gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
+
                 #Calculate weight from uncertainty
                 if w_calc == 2:
                     #Get y data uncertainties
                     unc = molec_object.uncertainties[key.replace("sim", "expt")]
                     y_var = (y_exp*unc)**2
-                    weight_mpi = (1/y_var).tolist()
-                    var_ratios.append((gp_var/y_var).tolist())
+                    weight_mpi = 1/y_var
                 else:
-                    weight_mpi = (1/(gp_var)).tolist()
+                    weight_mpi = 1/gp_var
 
-                weight_array += weight_mpi
+                if w_calc == 0:
+                    #Normalize weights to add up to 1 if w_calc is 0
+                    sum_weights = np.sum(weight_mpi)
+                    weight_mpi = weight_mpi / sum_weights
+                    
+                weight_array += weight_mpi.tolist()
+                weights = np.diag(weight_mpi)
+
                 #Calculate residuals
-                res_vals = y_exp.flatten() - gp_mean.flatten()
-                residuals = (res_vals).tolist()
+                res_vals = y_exp.reshape(-1,1) - gp_mean.reshape(-1,1)
+                residuals = (res_vals.flatten()).tolist()
+                #Calculate SSE
+                sse = res_vals.T@weights@res_vals
+                var_ratios_all = weights*gp_covar
+                tr_covar = np.trace(var_ratios_all)
+                var_ratios.append(np.diag(var_ratios_all).flatten())
 
-                dL_dz = -2*(res_vals*np.array(weight_mpi)).reshape(-1,1) 
-                if gp_grad_mean is not None:
-                    dL_dz = dL_dz*gp_grad_mean.reshape(-1,1)
-                # print(dL_dz.T.shape, gp_covar.shape, dL_dz.shape)
-                sse_var = dL_dz.T@gp_covar@dL_dz
+                #Calculate sse Variance
+                sse_var = 4*(res_vals.T@weights)@gp_covar@(weights@res_vals) + 2*np.trace((var_ratios_all)**2)
+
+                #Save pieces
                 mean_wt_pieces[molec + "-" + key + "-wt"] = np.mean(weight_mpi)
-                sse_pieces[molec + "-" + key + "-sse"] = np.sum(np.square(np.array(residuals)))
+                sse_pieces[molec + "-" + key + "-sse"] = sse
                 sse_var_pieces[molec + "-" + key + "-sse_var"] = sse_var
                 res_array += residuals
         
@@ -324,15 +335,9 @@ class Problem_Setup:
         weight_array = np.array(weight_array).flatten()
         var_ratios_arr = np.array(var_ratios).flatten()
 
-        #Normalize weights to add up to 1 if scl_w is True
-        sum_weights = np.sum(weight_array) if w_calc == 0 else 1
-        scaled_weights = weight_array / sum_weights
+        mean_wt_pieces = dict(zip(mean_wt_pieces.keys(), np.array(list(mean_wt_pieces.values()))))
 
-        mean_wt_pieces = dict(zip(mean_wt_pieces.keys(), np.array(list(mean_wt_pieces.values()))/sum_weights))
-
-        #Residual is (y - gp_mean)*sqrt(weight) for each data point
-        res = res_array*np.sqrt(scaled_weights)
-        return res, sse_pieces, sse_var_pieces, var_ratios_arr, mean_wt_pieces
+        return res_array, sse_pieces, sse_var_pieces, var_ratios_arr, mean_wt_pieces
     
     def calc_obj(self, theta_guess, w_calc = None):
         """
@@ -343,13 +348,13 @@ class Problem_Setup:
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
         """
         res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
-        sse = np.sum(np.square(res))
+        sse = sum(sse_pieces.values())
         if self.obj_choice == "SSE":
             obj = sse
         else:
             sum_var_ratios = np.sum(var_ratios)
             expected_sse_val = sse + sum_var_ratios
-            sse_std = np.sqrt(abs(np.sum(np.array(list(sse_var_pieces.values())))))
+            sse_std = np.sqrt(np.array(list(sse_var_pieces.values())))
         
         if self.obj_choice == "ExpVal":
             obj = expected_sse_val
@@ -397,7 +402,6 @@ class Opt_ATs(Problem_Setup):
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        # res, sse_pieces, mean_wt_pieces =self.calc_wt_res(theta_guess)
         obj, sse_pieces, mean_wt_pieces =self.calc_obj(theta_guess)
         
         #Scale theta_guess to preferred units
@@ -681,8 +685,7 @@ class Vis_Results(Problem_Setup):
             molec_gps_dict = self.all_gp_dict[molec]
             #Get testing data for that molecule
             train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
-            param_matrix = self.at_class.get_transformation_matrix(molec)            
-            # print(param_matrix)
+            param_matrix = self.at_class.get_transformation_matrix({molec: molec_object})            
 
             all_param_sets_org =[theta_best, theta_paper, theta_best_all]
             all_param_sets_new = []
@@ -691,7 +694,8 @@ class Vis_Results(Problem_Setup):
                 #Change test_params to preferred values to real values
                 if all_param_sets_org[i] is not None:
                     param_set = self.values_pref_to_real(all_param_sets_org[i])
-                    new_set = param_set.reshape(-1,1).T@param_matrix
+                    param_set_scl = values_real_to_scaled(param_set.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
+                    new_set = param_set_scl.reshape(-1,1).T@param_matrix
                 else:
                     new_set = np.full((param_matrix.shape[1],), np.nan)
                 all_param_sets_new.append(new_set)
@@ -744,7 +748,7 @@ class Vis_Results(Problem_Setup):
             #Get constants for molecule
             molec_object = self.molec_data_dict[molec]
             #Get theta associated with each gp
-            param_matrix = self.at_class.get_transformation_matrix(molec)
+            param_matrix = self.at_class.get_transformation_matrix({molec: molec_object})
             #Transform the guess, and scale to bounds
             gp_theta = theta_guess.reshape(1,-1)@param_matrix
             gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
@@ -798,7 +802,6 @@ class Vis_Results(Problem_Setup):
 
             #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
             #Assume that theta1 and theta2 have equal number of points on the meshgrid
-            # print(self.at_class.at_bounds, self.at_class.at_bounds.shape, idcs)
             theta1 = np.linspace(self.at_class.at_bounds[idcs[0]][0], self.at_class.at_bounds[idcs[0]][1], n_points)
             theta2 = np.linspace(self.at_class.at_bounds[idcs[1]][0], self.at_class.at_bounds[idcs[1]][1], n_points)
             theta12_mesh = np.array(np.meshgrid(theta1, theta2))
