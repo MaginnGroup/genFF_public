@@ -273,14 +273,7 @@ def plot_model_vs_test(
     -------
     matplotlib.figure.Figure
     """
-    molec_name = list(models.keys())[0]
-    label_vals = ["GP " + molec_name, "Paper", "GP All Molecules"]
     linestyles = ["solid", "dashed", "dotted"]
-
-    if len(param_values.shape) == 1:
-        param_values = param_values.reshape(1,-1)
-
-    param_sets = param_values.shape[0]
 
     n_samples = 100
     vals = np.linspace(plot_bounds[0], plot_bounds[1], n_samples).reshape(
@@ -292,9 +285,9 @@ def plot_model_vs_test(
     if exp_x_data is not None and exp_y_data is not None:
         ax.scatter(exp_x_data, exp_y_data, label="Exp Data", zorder = 4, color = "purple")
 
-    for i in range(len(param_values)):
-        if not np.all(np.isnan(param_values[i])):
-            other = np.tile(param_values[i], (n_samples, 1))
+    for i, key in enumerate(list(param_values.keys())):
+        if not np.all(np.isnan(param_values[key])):
+            other = np.tile(param_values[key], (n_samples, 1))
             xx = np.hstack((other, vals_scaled))
             
             for (label, model) in models.items():
@@ -302,7 +295,7 @@ def plot_model_vs_test(
                 mean = values_scaled_to_real(mean_scaled, property_bounds)
                 var = variances_scaled_to_real(var_scaled, property_bounds)
                 
-                ax.plot(vals, mean, lw=2, linestyle = linestyles[i], label=label_vals[i])
+                ax.plot(vals, mean, lw=2, linestyle = linestyles[i], label=key)
                 ax.fill_between(
                     vals[:, 0],
                     mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
@@ -331,7 +324,7 @@ def plot_model_vs_test(
 
     ax.set_xlabel("Temperature")
     ax.set_ylabel(property_name)
-    fig.legend()
+    plt.legend(loc = "best")
 
     if not mpl_is_inline:
         return fig

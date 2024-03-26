@@ -667,7 +667,50 @@ class Vis_Results(Problem_Setup):
 
         return
     
-    def comp_paper_full_ind(self, theta_best, theta_paper, theta_best_all ):
+    def get_best_results(self, molec_data_dict, all_molec_list):
+        #Initialize Dict
+        param_dict = {}
+        #Get names and transformation matrix
+        molec_names = list(molec_data_dict.keys())[0]
+        param_matrix = self.at_class.get_transformation_matrix(molec_data_dict)
+        #Get best_per_run.csv for all molecules
+        all_molec_dir = self.make_results_dir(all_molec_list)
+        if os.path.exists(all_molec_dir+"/best_per_run.csv"):
+            all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+            first_param_name = self.at_class.at_names[0] + "_min"
+            last_param_name = self.at_class.at_names[-1] + "_min"
+            full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+            all_best_real = self.values_pref_to_real(full_opt_best)
+            all_best_scl = values_real_to_scaled(all_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
+            all_best_gp = all_best_scl.reshape(-1,1).T@param_matrix
+            all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
+        else:
+            all_best_gp = None
+        param_dict["Opt All Molec"] = all_best_gp
+
+        molec_dir = self.make_results_dir([molec_names])
+        if os.path.exists(molec_dir+"/best_per_run.csv"):
+            molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
+            molec_best = molec_df.loc[0, first_param_name:last_param_name].values
+            ind_best_real = self.values_pref_to_real(molec_best)
+            ind_best_scl = values_real_to_scaled(ind_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
+            ind_best_gp = ind_best_scl.reshape(-1,1).T@param_matrix
+            ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
+        else:
+            ind_best_gp = None
+        param_dict["Opt " + molec_names] = ind_best_gp
+
+        molec_paper = np.array(list(molec_data_dict[molec_names].lit_param_set.values()))
+        paper_real = self.values_pref_to_real(molec_paper)
+        paper_bounds = param_matrix.T@self.at_class.at_bounds_nm_kjmol.reshape(-1,2)
+        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), paper_bounds)
+        paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
+
+        param_dict["Literature"] = paper_best_gp
+
+        return param_dict
+    
+    def comp_paper_full_ind(self, all_molec_list):
         """
         Compares T vs Property for the best individual molecule param set, the best overall optimization param set,
         the experimental data, and the param set from the paper
@@ -683,24 +726,9 @@ class Vis_Results(Problem_Setup):
             molec_object = self.molec_data_dict[molec]
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
-            #Get testing data for that molecule
-            train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
-            param_matrix = self.at_class.get_transformation_matrix({molec: molec_object})            
 
-            all_param_sets_org =[theta_best, theta_paper, theta_best_all]
-            all_param_sets_new = []
+            test_params = self.get_best_results({molec: molec_object},all_molec_list)
             
-            for i in range(len(all_param_sets_org)):
-                #Change test_params to preferred values to real values
-                if all_param_sets_org[i] is not None:
-                    param_set = self.values_pref_to_real(all_param_sets_org[i])
-                    param_set_scl = values_real_to_scaled(param_set.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
-                    new_set = param_set_scl.reshape(-1,1).T@param_matrix
-                else:
-                    new_set = np.full((param_matrix.shape[1],), np.nan)
-                all_param_sets_new.append(new_set)
-
-            all_param_sets = np.vstack(all_param_sets_new)
             #Make pdf
             dir_name = self.make_results_dir(molec)
             pdf = PdfPages(dir_name + '/comp_set_props.pdf')
@@ -714,12 +742,6 @@ class Vis_Results(Problem_Setup):
                 exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
                 x_data = np.array(list(exp_data.keys()))
                 y_data = np.array(list(exp_data.values()))
-                #Find points in test set with correct param value
-                test_points = np.concatenate((test_data["x"][:,-1].reshape(-1,1), 
-                                                test_data[key].reshape(-1,1)), axis = 1)
-                train_points = np.concatenate((train_data["x"][:,-1].reshape(-1,1), 
-                                            train_data[key].reshape(-1,1)), axis = 1)
-                test_params = tf.convert_to_tensor(all_param_sets, dtype=tf.float64)
 
                 #Plot test vs train for each parameter set
                 pdf.savefig(plot_model_vs_test({label:gp_model}, 
