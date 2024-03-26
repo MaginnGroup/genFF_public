@@ -49,6 +49,25 @@ class R134aConstants:
         )
 
         return param_names
+    
+    @property
+    def lit_param_set(self):
+        """Adjustable parameter names"""
+
+        lit_param_set = {
+            "sigma_C1":3.745,
+            "sigma_C2": 3.754,
+            "sigma_F1":2.982,
+            "sigma_F2":2.607,
+            "sigma_H1":2.237,
+            "epsilon_C1":20.73,
+            "epsilon_C2":72.61,
+            "epsilon_F1":23.13,
+            "epsilon_F2":39.98,
+            "epsilon_H1":2.55,
+        }
+
+        return lit_param_set
 
     @property
     def param_bounds(self):

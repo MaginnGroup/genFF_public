@@ -45,6 +45,19 @@ class R32Constants:
         )
 
         return param_names
+    
+    @property
+    def lit_param_set(self):
+        lit_param_set = {
+            "sigma_C": 3.599044551,					
+            "sigma_F": 2.957368125,
+            "sigma_H": 1.816694298,
+            "epsilon_C": 56.52939454,
+            "epsilon_F": 37.41538957,
+            "epsilon_H": 5.134160772,
+        }
+
+        return lit_param_set
 
     @property
     def param_bounds(self):

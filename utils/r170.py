@@ -53,6 +53,19 @@ class R170Constants:
         )
 
         return param_names
+    
+    @property
+    def lit_param_set(self):
+        """Adjustable parameter names"""
+
+        lit_param_set = {
+            "sigma_C1":3.810,
+            "sigma_H1":2.316,
+            "epsilon_C1":52.20,
+            "epsilon_H1":6.16,
+        }
+
+        return lit_param_set
 
     @property
     def param_bounds(self):
