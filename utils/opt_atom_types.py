@@ -299,7 +299,9 @@ class Problem_Setup:
                 if w_calc == 2:
                     #Get y data uncertainties
                     unc = molec_object.uncertainties[key.replace("sim", "expt")]
-                    y_var = (y_exp*unc)**2
+                    y_var_unc = (y_exp*unc)**2
+                    y_var_2pct = (y_exp*0.02)**2
+                    y_var = np.maximum(y_var_unc, y_var_2pct)
                     weight_mpi = 1/y_var
                 else:
                     weight_mpi = 1/gp_var
