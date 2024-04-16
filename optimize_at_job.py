@@ -9,6 +9,7 @@ repeats = 200
 seed = 1
 w_scheme = 2
 opt_choice = "ExpVal"
+at_class = atom_type.AT_Scheme_10()
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()
@@ -28,7 +29,6 @@ molec_data_dict = {"R14":r14_class,
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
-at_class = atom_type.AT_Scheme_9()
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 
 driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, w_scheme, opt_choice, save_data)

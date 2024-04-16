@@ -308,7 +308,7 @@ class AT_Scheme_10(Atom_Types):
         at_param_bounds_l = [2, 2, 2, 2, 2, 1.5, 2, 2, 2, 2, 10, 10, 10, 10, 10,  2, 15, 15, 15, 15] #Units of Angstroms and Kelvin for Sigmas and Epsilons
         at_param_bounds_u = [4, 4, 4, 4, 4, 3,   4, 4, 4, 4, 75, 75, 75, 75, 75, 10, 50, 50, 50, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
-        self.scheme_name = "at_9"
+        self.scheme_name = "at_10"
         #Get Names
         at_keys = ["sigma_C1", "sigma_C2_0", "sigma_C2_1", "sigma_C2_2", "sigma_C2_3", "sigma_H1",
                    "sigma_F_1","sigma_F_2","sigma_F_3", "sigma_F_4",
