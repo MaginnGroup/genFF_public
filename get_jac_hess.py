@@ -2,6 +2,7 @@
 from utils import r14, r32, r50, r125, r134a, r143a, r170, atom_type, opt_atom_types
 import numpy as np
 import unyt as u
+import pandas as pd
 
 #Set params for saving results, # of repeats, and the seed
 save_data = True
@@ -31,10 +32,12 @@ all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 driver = opt_atom_types.Problem_Setup(molec_data_dict, all_gp_dict, at_class, w_scheme, obj_choice, save_data)
 
 #Set parameter set of interest (in this case get the best parameter set)
-best_results = driver.get_best_results(molec_data_dict, "R14")
-best_res_keys = list(best_results.keys())
-best_pref = best_results[best_res_keys[0]]
-best_real = driver.values_pref_to_real(best_pref)
+all_molec_dir = driver.make_results_dir(list(molec_data_dict.keys()))
+all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+first_param_name = driver.at_class.at_names[0] + "_min"
+last_param_name = driver.at_class.at_names[-1] + "_min"
+full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+best_real = driver.values_pref_to_real(full_opt_best)
 x_label = "best_set"
 
 #Optimize AT scheme parameters
