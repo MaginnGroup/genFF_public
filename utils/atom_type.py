@@ -25,7 +25,7 @@ class Atom_Types:
 
         Parameters
         ----------
-        at_bounds: array, The bounds of the new atom type scheme
+        at_bounds: array, The bounds of the new atom type scheme (sigma in A, epsilon in K)
         at_names: list, The names of the new atom types. Should correspond to each element in at_bounds.shape[1]
         molec_map_dicts: dict, The dictionary of molecule property class for the old atom types
         """
@@ -42,7 +42,7 @@ class Atom_Types:
 
     def scale_bounds(self):
         """
-        Scales bounds to units of nm and kj/mol
+        Scales bounds to units of nm and kj/mol and creates self.at_bounds_nm_kjmol
         """
         #Get upper and lower bounds seperately
         bounds_list = [self.at_bounds[:,x] for x in range(self.at_bounds.shape[1])]
@@ -67,7 +67,7 @@ class Atom_Types:
 
         Parameters:
         -----------
-        molec_key: str, a key from the molec_map_dicts dictionary
+        molec_map_dict: dict, The dictionary of molecule property class for the old atom types
         
         Returns:
         --------
@@ -102,7 +102,11 @@ class Atom_Types:
     
     def check_for_duplicates(self):
         """
-        Checks for duplicates in at_matrix
+        Checks for duplicate matricies in at_matrix
+
+        Returns:
+        --------
+        bool, True if duplicates are present, False otherwise
         """
         arr_list = list(self.at_matrices.values())
         tuple_list = [tuple(map(tuple, arr)) for arr in arr_list]
@@ -222,7 +226,7 @@ class AT_Scheme_9(Atom_Types):
         at_keys = ["sigma_C1", "sigma_C2_F0", "sigma_C2_Fx", "sigma_H1","sigma_F_H2","sigma_F_H1","sigma_F_Hx",
            "epsilon_C1", "epsilon_C2_F0", "epsilon_C2_Fx", "epsilon_H1","epsilon_F_H2","epsilon_F_H1","epsilon_F_Hx"]
 
-        #Create a file that maps param names (keys) to at_param names for atom type 7 (values) for each molecule
+        #Create a file that maps param names (keys) to at_param names for atom type 9 (values) for each molecule
         r14_map_dict = {"sigma_C1": "sigma_C1",
                         "sigma_F1": "sigma_F_Hx",
                         "epsilon_C1": "epsilon_C1",
@@ -297,7 +301,7 @@ class AT_Scheme_9(Atom_Types):
 
 class AT_Scheme_10(Atom_Types):
     """
-    Class for Atom Type Scheme 9
+    Class for Atom Type Scheme 10
 
     Methods
     -------
@@ -315,7 +319,7 @@ class AT_Scheme_10(Atom_Types):
                     "epsilon_C1", "epsilon_C2_0", "epsilon_C2_1", "epsilon_C2_2", "epsilon_C2_3", "epsilon_H1",
                     "epsilon_F_1","epsilon_F_2","epsilon_F_3", "epsilon_F_4"]
 
-        #Create a file that maps param names (keys) to at_param names for atom type 7 (values) for each molecule
+        #Create a file that maps param names (keys) to at_param names for atom type 10 (values) for each molecule
         r14_map_dict = {"sigma_C1": "sigma_C1",
                         "sigma_F1": "sigma_F_4",
                         "epsilon_C1": "epsilon_C1",

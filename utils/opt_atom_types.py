@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import tensorflow as tf
 from itertools import combinations
+import numdifftools as nd
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -80,6 +81,17 @@ class Problem_Setup:
             assert w_calc == 2, "Only objective choice SSE is valid with w_calc methods != 2"
 
     def make_results_dir(self, molecules):
+        """
+        Makes a directory for results based on the scheme name, optimization method, and molecule names
+        
+        Parameters:
+        -----------
+        molecules: str or list of str, names of molecules to make directory for
+
+        Output:
+        -------
+        dir_name: str, directory name for results
+        """
         scheme_name = self.at_class.scheme_name
         if isinstance(molecules, str):
             molecule_str = molecules
@@ -102,6 +114,14 @@ class Problem_Setup:
     def values_pref_to_real(self, theta_guess):
         """
         Scales preferred units (Angstrom and eps/kb) to real units (nm, kJ/mol)
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
+
+        Returns
+        -------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
         """
         midpoint = len(theta_guess) //2
         sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
@@ -113,6 +133,14 @@ class Problem_Setup:
     def values_real_to_pref(self, theta_guess):
         """
         Scales real units (nm, Kj/mol) to preferred units (Angstrom and eps/kb)
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
         """
         midpoint = len(theta_guess) //2
         sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
@@ -166,15 +194,17 @@ class Problem_Setup:
 
     def get_train_test_data(self, molec_key, prop_keys):
         """
-        Get gp data from .pkl files
+        Get training and testing data from csv files
 
         Parameters
         ----------
-        key_list: list of keys to consider. Must be valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
+        molec_key: str, key to consider. Must be in valid Keys: "R14", "R32", "R50", "R125", "R143a", "R134a", "R170"
+        prop_keys: list of str, keys to consider. Must be in valid Keys: "sim_vap_density", "sim_liq_density", "sim_Hvap", "sim_Pvap"
 
         Returns:
         --------
-        all_gp_dict: dict, dictionary of dictionary of gps for each property
+        train_data: dict, dictionary of training data
+        test_data: dict, dictionary of testing data
         """
         #Get dict of testing data
         test_data = {}
@@ -201,7 +231,7 @@ class Problem_Setup:
 
         Parameters
         ----------
-        gp_theta_guess: np.ndarray, the initial gp parameter set to start optimization at (sigma in A, eps in kJ/mol)
+        gp_theta_guess: np.ndarray, the initial gp parameter set to start optimization at (sigma in nm, epsilon in kJ/mol scaled)
         molec_object: Instance of RXXConstants(), The data associated with a refrigerant molecule
         gp_object: gpflow.models.GPR, GP Model for a specific property
         Xexp: np.ndarray, Experimental state point (Temperature (K)) data for the property estimated by gp_object
@@ -209,7 +239,9 @@ class Problem_Setup:
         Returns
         -------
         gp_mean: tf.tensor, The (flattened) mean of the gp prediction
+        gp_covar: tf.tensor, The (squeezed) covariance of the gp prediction
         gp_var: tf.tensor, The (flattened) variance of the gp prediction
+        grad_mean: tf.tensor, The gradient of the mean of the gp prediction
         """
         assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
         assert isinstance(gp_object, gpflow.models.GPR)
@@ -250,7 +282,16 @@ class Problem_Setup:
 
         Parameters
         ----------
-        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
+
+        Returns
+        -------
+        res_array: np.ndarray, the residuals array
+        sse_pieces: dict, dictionary of sse values for each property
+        sse_var_pieces: dict, dictionary of sse variance values for each property
+        var_ratios: np.ndarray, the variance ratios array
+        mean_wt_pieces: dict, dictionary of mean weights for each property
         """
         #Initialize weight and squared error arrays
         res_array  = []
@@ -347,7 +388,14 @@ class Problem_Setup:
 
         Parameters
         ----------
-        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
+
+        Returns
+        -------
+        obj: float, the objective function value
+        sse_pieces: dict, dictionary of sse values for each property
+        mean_wt_pieces: dict, dictionary of mean weights for each property
         """
         res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
         sse = float(sum(sse_pieces.values()))
@@ -394,10 +442,7 @@ class Opt_ATs(Problem_Setup):
 
         Parameters
         ----------
-        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in kJ/mol)
-        molec_data_dict: dict, dictionary of Refrigerant constants
-        all_gp_dict: dict, dictionary of refrigerant GP models
-        at_class: Atom_Types() instance, The class for atom types 
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
 
         Returns
         --------
@@ -424,6 +469,10 @@ class Opt_ATs(Problem_Setup):
     def __get_params_and_df(self):
         """
         Gets parameter guesses and sets up bounds for optimization
+
+        Returns
+        -------
+        param_inits: np.ndarray, the initial atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
         """
         #set seed here
         if self.seed is not None:
@@ -437,7 +486,19 @@ class Opt_ATs(Problem_Setup):
         return param_inits
     
     def __get_scipy_soln(self, run, param_inits):
+        """
+        Gets scipy solution
 
+        Parameters
+        ----------
+        run: int, the current run number
+        param_inits: np.ndarray, the initial atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        solution: scipy.optimize.OptimizeResult, the scipy optimization result
+        time_per_run: float, the time taken for the run
+        """
         #Start timer
         time_start = time.time()
         #Get guess and find scipy.optimize solution
@@ -455,6 +516,16 @@ class Opt_ATs(Problem_Setup):
     def __get_opt_iter_info(self, run, solution, time_per_run):
         """
         Runs Optimization, times progress, and makes iter_df
+
+        Parameters
+        ----------
+        run: int, the current run number
+        solution: scipy.optimize.OptimizeResult, the scipy optimization result
+        time_per_run: float, the time taken for the run
+
+        Returns
+        -------
+        iter_df: pd.DataFrame, the iteration dataframe
         """
         #Get list of iteration, sse, and parameter data
         iter_list = np.array(range(self.iter_count)) + 1
@@ -514,13 +585,9 @@ class Opt_ATs(Problem_Setup):
         """
         Optimizes New atom typing parameters
 
-        Parameters
-        ----------
-        at_class: Atom_Types() instance, The class for atomy types 
-        molec_data_dict: dict, dictionary of Refrigerant constants
-        all_gp_dict: dict, dictionary of refrigerant GP models
-        save_res: bool, Determines whether to save results
-        seed: int, seed for rng. Default None
+        Returns
+        -------
+        ls_results: pd.DataFrame, the results dataframe
         """
         param_inits = self.__get_params_and_df()
         ls_results = pd.DataFrame()
@@ -566,13 +633,54 @@ class Opt_ATs(Problem_Setup):
 
         return ls_results
     
-    def approx_jac_hess(self, theta_guess):
+    def approx_jac(self, x):
         """
         Builds Jacobian Approximation
+
+        Parameters
+        ----------
+        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        jac: np.ndarray, the jacobian approximation
         """
-        jac = optimize.approx_fprime(theta_guess, self.__scipy_min_fxn)
-        hess = jac.T@jac
-        return jac, hess
+        jac = nd.Gradient(self.__scipy_min_fxn)(x)
+        # jac = optimize.approx_fprime(x, self.__scipy_min_fxn)
+            
+        return jac
+    
+    def approx_hess(self, x):
+        '''
+        Calculate gradient of function my_f using central difference formula and my_grad
+        
+        Parameters
+        ----------
+        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        H: np.ndarray, the hessian approximation
+        '''
+        
+        # eps = 1e-6
+        # n = len(theta_guess)
+        # H = np.zeros([n,n])
+        
+        # for i in range(0,n):
+        #     # Create vector of zeros except eps in position i
+        #     e = np.zeros(n)
+        #     e[i] = eps
+            
+        #     # Evaluate gradient twice
+        #     grad_plus = self.approx_jac(theta_guess + e)
+        #     grad_minus = self.approx_jac(theta_guess - e)
+            
+        #     # Notice we are building the Hessian by column (or row)
+        #     H[:,i] = (grad_plus - grad_minus)/(2*eps)
+        H = nd.Hessian(self.__scipy_min_fxn)(x)
+        
+        return H
     
 class Vis_Results(Problem_Setup):
     """
@@ -588,7 +696,7 @@ class Vis_Results(Problem_Setup):
     #Define function to check GP Accuracy
     def check_GPs(self):
         """
-        Makes GPs 
+        Makes GP validation figures for each molecule
         """
         #Loop over molecules
         for molec in list(self.all_gp_dict.keys()):
@@ -670,6 +778,18 @@ class Vis_Results(Problem_Setup):
         return
     
     def get_best_results(self, molec_data_dict, all_molec_list):
+        """
+        Get the best optimization results for each molecule and the overall best results
+
+        Parameters
+        ----------
+        molec_data_dict: dict, dictionary of molecule data
+        all_molec_list: list, list of all molecules in the training set during full optimization to compare with
+        
+        Returns
+        -------
+        param_dict: dict, dictionary of the best optimization results for each molecule, the overall best results, and literature comparison
+        """
         #Initialize Dict
         param_dict = {}
         #Get names and transformation matrix
@@ -714,14 +834,13 @@ class Vis_Results(Problem_Setup):
     
     def comp_paper_full_ind(self, all_molec_list):
         """
-        Compares T vs Property for the best individual molecule param set, the best overall optimization param set,
+        Plots T vs Property for the best individual molecule param set, the best overall optimization param set,
         the experimental data, and the param set from the paper
-        """
-        """
-        Makes GPs 
-        """
-        
 
+        Parameters
+        ----------
+        all_molec_list: list, list of all molecules in the training set during full optimization to compare with
+        """
         #Loop over molecules
         for molec in list(self.all_gp_dict.keys()):
             #Get constants for molecule
@@ -763,6 +882,10 @@ class Vis_Results(Problem_Setup):
     def compare_T_prop_best(self, theta_guess):
         """
         Compares T vs Property for a given set
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set of interest (sigma in nm, epsilon in kJ/mol)
         """
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
@@ -801,7 +924,15 @@ class Vis_Results(Problem_Setup):
     def make_sse_sens_data(self, theta_guess):
         """
         Makes heat map data for obj predictions given a parameter set
-        theta_guess (eps/kb and nm)
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
+        
+        Returns
+        -------
+        param_dict: dict, dictionary of heat map theta data
+        obj_dict: dict, dictionary of heat map obj data
         """
         n_points = 15
         #Create dict of heat map theta data
@@ -854,6 +985,10 @@ class Vis_Results(Problem_Setup):
     def plot_obj_hms(self, theta_guess):
         """
         Plots objective contours given a set of data
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
         """
         #Get HM Data
         param_dict, obj_dict = self.make_sse_sens_data(theta_guess)
