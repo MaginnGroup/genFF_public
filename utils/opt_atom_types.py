@@ -416,6 +416,130 @@ class Problem_Setup:
             pass
         
         return float(obj), sse_pieces, mean_wt_pieces
+    
+    #define one output calc obj
+    def one_output_calc_obj(self, theta_guess):
+        """
+        Helper function. Calls calc_obj and returns only the objective function value
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        --------
+        obj: float, the objective function from the formula defined in the paper
+        """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        obj, sse_pieces, mean_wt_pieces = self.calc_obj(theta_guess)
+
+        return obj
+    
+    def approx_jac(self, x, save_data = False, x_label=None):
+        """
+        Builds Jacobian Approximation
+
+        Parameters
+        ----------
+        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        jac: np.ndarray, the jacobian approximation
+        """
+        jac = nd.Jacobian(self.one_output_calc_obj)(x)
+
+        if save_data:
+            x_label = x_label if x_label is not None else "param_guess"
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_path = os.path.join(dir_name, x_label + "_jac_approx.npy")
+            np.save(save_path, jac)
+            
+        return jac
+    
+    def approx_hess(self, x, save_data = False, x_label=None):
+        '''
+        Calculate gradient of function my_f using central difference formula and my_grad
+        
+        Parameters
+        ----------
+        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        H: np.ndarray, the hessian approximation
+        '''
+        H = nd.Hessian(self.one_output_calc_obj)(x)
+
+        if save_data:
+            x_label = x_label if x_label is not None else "param_guess"
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_path = os.path.join(dir_name, x_label + "_hess_approx.npy")
+            np.save(save_path, H)
+        
+        return H
+    
+    def get_best_results(self, molec_data_dict, molec_ind):
+        """
+        Get the best optimization results for each molecule and the overall best results
+
+        Parameters
+        ----------
+        molec_data_dict: dict, dictionary of molecule training data
+        molec_ind: str, the molecule name to consider
+        
+        Returns
+        -------
+        param_dict: dict, dictionary of the best optimization results for each molecule, the overall best results, and literature comparison
+        """
+        #Initialize Dict
+        param_dict = {}
+        #Get names and transformation matrix
+        all_molec_list = list(molec_data_dict.keys())
+        param_matrix = self.at_class.get_transformation_matrix({molec_ind: molec_data_dict[molec_ind]})
+        #Get best_per_run.csv for all molecules
+        all_molec_dir = self.make_results_dir(all_molec_list)
+        if os.path.exists(all_molec_dir+"/best_per_run.csv"):
+            all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+            first_param_name = self.at_class.at_names[0] + "_min"
+            last_param_name = self.at_class.at_names[-1] + "_min"
+            full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+            all_best_real = self.values_pref_to_real(full_opt_best)
+            all_best_scl = values_real_to_scaled(all_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
+            all_best_gp = all_best_scl.reshape(-1,1).T@param_matrix
+            all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
+        else:
+            all_best_gp = None
+        
+        if len(all_molec_list) > 1 and isinstance(all_molec_list, (list,np.ndarray)):
+            molecule_str = '-'.join(all_molec_list)
+        else:
+            molecule_str = all_molec_list[0]
+        param_dict["Opt " + molecule_str] = all_best_gp
+
+        molec_dir = self.make_results_dir([molec_ind])
+        if os.path.exists(molec_dir+"/best_per_run.csv"):
+            molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
+            first_param_name = self.at_class.at_names[0] + "_min"
+            last_param_name = self.at_class.at_names[-1] + "_min"
+            molec_best = molec_df.loc[0, first_param_name:last_param_name].values
+            ind_best_real = self.values_pref_to_real(molec_best)
+            ind_best_scl = values_real_to_scaled(ind_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
+            ind_best_gp = ind_best_scl.reshape(-1,1).T@param_matrix
+            ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
+        else:
+            ind_best_gp = None
+        param_dict["Opt " + molec_ind] = ind_best_gp
+
+        molec_paper = np.array(list(molec_data_dict[molec_ind].lit_param_set.values()))
+        paper_real = self.values_pref_to_real(molec_paper)
+        paper_bounds = param_matrix.T@self.at_class.at_bounds_nm_kjmol.reshape(-1,2)
+        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), paper_bounds)
+        paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
+
+        param_dict["Literature"] = paper_best_gp
+
+        return param_dict
 
 class Opt_ATs(Problem_Setup):
     """
@@ -631,57 +755,7 @@ class Opt_ATs(Problem_Setup):
             save_path3 = os.path.join(dir_name, "best_per_run.csv")
             best_runs.to_csv(save_path3, index = False)
 
-        return ls_results
-    
-    def approx_jac(self, x):
-        """
-        Builds Jacobian Approximation
-
-        Parameters
-        ----------
-        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
-
-        Returns
-        -------
-        jac: np.ndarray, the jacobian approximation
-        """
-        jac = nd.Gradient(self.__scipy_min_fxn)(x)
-        # jac = optimize.approx_fprime(x, self.__scipy_min_fxn)
-            
-        return jac
-    
-    def approx_hess(self, x):
-        '''
-        Calculate gradient of function my_f using central difference formula and my_grad
-        
-        Parameters
-        ----------
-        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
-
-        Returns
-        -------
-        H: np.ndarray, the hessian approximation
-        '''
-        
-        # eps = 1e-6
-        # n = len(theta_guess)
-        # H = np.zeros([n,n])
-        
-        # for i in range(0,n):
-        #     # Create vector of zeros except eps in position i
-        #     e = np.zeros(n)
-        #     e[i] = eps
-            
-        #     # Evaluate gradient twice
-        #     grad_plus = self.approx_jac(theta_guess + e)
-        #     grad_minus = self.approx_jac(theta_guess - e)
-            
-        #     # Notice we are building the Hessian by column (or row)
-        #     H[:,i] = (grad_plus - grad_minus)/(2*eps)
-        H = nd.Hessian(self.__scipy_min_fxn)(x)
-        
-        return H
-    
+        return ls_results   
 class Vis_Results(Problem_Setup):
     """
     Class For vizualizing GP and Optimization Results
@@ -777,61 +851,6 @@ class Vis_Results(Problem_Setup):
 
         return
     
-    def get_best_results(self, molec_data_dict, all_molec_list):
-        """
-        Get the best optimization results for each molecule and the overall best results
-
-        Parameters
-        ----------
-        molec_data_dict: dict, dictionary of molecule data
-        all_molec_list: list, list of all molecules in the training set during full optimization to compare with
-        
-        Returns
-        -------
-        param_dict: dict, dictionary of the best optimization results for each molecule, the overall best results, and literature comparison
-        """
-        #Initialize Dict
-        param_dict = {}
-        #Get names and transformation matrix
-        molec_names = list(molec_data_dict.keys())[0]
-        param_matrix = self.at_class.get_transformation_matrix(molec_data_dict)
-        #Get best_per_run.csv for all molecules
-        all_molec_dir = self.make_results_dir(all_molec_list)
-        if os.path.exists(all_molec_dir+"/best_per_run.csv"):
-            all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
-            first_param_name = self.at_class.at_names[0] + "_min"
-            last_param_name = self.at_class.at_names[-1] + "_min"
-            full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
-            all_best_real = self.values_pref_to_real(full_opt_best)
-            all_best_scl = values_real_to_scaled(all_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
-            all_best_gp = all_best_scl.reshape(-1,1).T@param_matrix
-            all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
-        else:
-            all_best_gp = None
-        param_dict["Opt All Molec"] = all_best_gp
-
-        molec_dir = self.make_results_dir([molec_names])
-        if os.path.exists(molec_dir+"/best_per_run.csv"):
-            molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
-            molec_best = molec_df.loc[0, first_param_name:last_param_name].values
-            ind_best_real = self.values_pref_to_real(molec_best)
-            ind_best_scl = values_real_to_scaled(ind_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
-            ind_best_gp = ind_best_scl.reshape(-1,1).T@param_matrix
-            ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
-        else:
-            ind_best_gp = None
-        param_dict["Opt " + molec_names] = ind_best_gp
-
-        molec_paper = np.array(list(molec_data_dict[molec_names].lit_param_set.values()))
-        paper_real = self.values_pref_to_real(molec_paper)
-        paper_bounds = param_matrix.T@self.at_class.at_bounds_nm_kjmol.reshape(-1,2)
-        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), paper_bounds)
-        paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
-
-        param_dict["Literature"] = paper_best_gp
-
-        return param_dict
-    
     def comp_paper_full_ind(self, all_molec_list):
         """
         Plots T vs Property for the best individual molecule param set, the best overall optimization param set,
@@ -839,16 +858,16 @@ class Vis_Results(Problem_Setup):
 
         Parameters
         ----------
-        all_molec_list: list, list of all molecules in the training set during full optimization to compare with
+        all_molec_list: list, list of all molecules to generate predictions for
         """
         #Loop over molecules
-        for molec in list(self.all_gp_dict.keys()):
+        for molec in all_molec_list:
             #Get constants for molecule
             molec_object = self.molec_data_dict[molec]
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
 
-            test_params = self.get_best_results({molec: molec_object},all_molec_list)
+            test_params = self.get_best_results(self.molec_data_dict, molec)
             
             #Make pdf
             dir_name = self.make_results_dir(molec)
