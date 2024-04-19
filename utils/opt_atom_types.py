@@ -107,7 +107,6 @@ class Problem_Setup:
             scl_w_str = "wt_y_var"
 
         dir_name = os.path.join("Results" ,scheme_name, molecule_str, self.obj_choice, scl_w_str)
-        os.makedirs(dir_name, exist_ok=True) 
 
         return dir_name
     
@@ -452,6 +451,7 @@ class Problem_Setup:
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            os.makedirs(dir_name, exist_ok=True) 
             save_path = os.path.join(dir_name, x_label + "_jac_approx.npy")
             np.save(save_path, jac)
             
@@ -474,6 +474,7 @@ class Problem_Setup:
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            os.makedirs(dir_name, exist_ok=True) 
             save_path = os.path.join(dir_name, x_label + "_hess_approx.npy")
             np.save(save_path, H)
         
@@ -745,6 +746,7 @@ class Opt_ATs(Problem_Setup):
 
         if self.save_data:
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            os.makedirs(dir_name, exist_ok=True) 
             #Save original results
             save_path1 = os.path.join(dir_name, "opt_at_results.csv")
             ls_results.to_csv(save_path1, index = False)

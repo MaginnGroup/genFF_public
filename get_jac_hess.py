@@ -23,8 +23,7 @@ r170_class = r170.R170Constants()
 molec_data_dict = {"R14":r14_class, 
                    "R32":r32_class, 
                    "R50":r50_class, 
-                   "R170":r170_class, 
-                   "R125":r125_class, 
+                   "R170":r170_class,  
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
