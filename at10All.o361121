@@ -6,3 +6,4 @@
 2024-04-16 11:30:45.052368: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
 To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
 2024-04-16 11:30:46.335685: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/opt/sge/crc/spool/d32cepyc144/job_scripts/361121: line 14: 1361802 Killed                  python3 ${INPUT}

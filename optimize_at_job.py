@@ -5,7 +5,7 @@ import unyt as u
 
 #Set params for saving results, # of repeats, and the seed
 save_data = True
-repeats = 200
+repeats = 100
 seed = 1
 w_scheme = 2
 opt_choice = "ExpVal"
