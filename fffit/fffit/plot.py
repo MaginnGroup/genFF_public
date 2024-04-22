@@ -284,11 +284,11 @@ def plot_model_vs_test(
     fig, ax = plt.subplots()
     if exp_x_data is not None and exp_y_data is not None:
         ax.scatter(exp_x_data, exp_y_data, label="Exp Data", zorder = 4, color = "purple")
-
     for i, key in enumerate(list(param_values.keys())):
-        if not np.all(np.isnan(param_values[key])):
-            other = np.tile(param_values[key], (n_samples, 1))
-            xx = np.hstack((other, vals_scaled))
+        if param_values[key] is not None:
+            if not np.all(np.isnan(param_values[key])):
+                other = np.tile(param_values[key], (n_samples, 1))
+                xx = np.hstack((other, vals_scaled))
             
             for (label, model) in models.items():
                 mean_scaled, var_scaled = model.predict_f(xx)

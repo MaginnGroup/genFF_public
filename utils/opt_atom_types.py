@@ -15,6 +15,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 import tensorflow as tf
 from itertools import combinations
 import numdifftools as nd
+from sklearn.metrics import mean_absolute_percentage_error
+from . import r14, r32, r50, r125, r134a, r143a, r170
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -30,7 +32,7 @@ def get_gp_data_from_pkl(key_list):
 
     Returns:
     --------
-    all_gp_dict: dict, dictionary of dictionary of gps for each property
+    all_gp_dict: dict, dictionary of dictionary of training molecule gps for each property
     """
     valid_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
     assert isinstance(key_list, list), "at_names must be a list"
@@ -53,16 +55,61 @@ class Problem_Setup:
     """
     Gets GP/ Experimental Data For experiments
 
-    Parameters:
-    molec_data_dict: dict, keys are refrigerant names w/ capital R, values are class objects from r***.py
-    all_gp_dict: dict of dict, keys are refrigerant names w/ capital R, values are dictionaries of properties and GP objects
-    at_class: Instance of Atom_Types, class for atom typing
-    w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
-    save_data: bool, whether to save data or not
+    Methods:
+    --------
+    __init__: Initializes the class
+    make_results_dir: Makes a directory for results based on the scheme name, optimization method, and molecule names
+    values_pref_to_real: Scales preferred units (Angstrom and Kelvin) to real units (nm, kJ/mol)
+    values_real_to_pref: Scales real units (nm, kJ/mol) to preferred units (Angstrom and Kelvin) 
+    get_exp_data: Helper function for getting experimental data and bounds
+    get_train_test_data: Get training and testing data from csv files
+    eval_gp_new_theta: Evaluates the gpflow model
+    calc_wt_res: Calculates the residuals for the objective function   
+    calc_obj: Calculates the objective function
+    one_output_calc_obj: Helper function. Calls calc_obj and returns only the objective function value
+    approx_jac: Builds Jacobian Approximation
+    approx_hess: Builds Hessian Approximation
+    get_best_results: Get the best optimization results. Pulls best parameter set from:
+        1) Literature (stored in molecule objects)
+        2) The algorithm trained for one training molecule (molec_ind)
+        3) The algorithm trained for all training molecules (molec_data_dict.values())
+    calc_MAPD_best: Calculate the mean absolute percentage deviation for each training data prediction
     """
     #Inherit objects from General_Analysis
     def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data):
+        """
+        Parameters:
+        -----------
+        molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
+        all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
+        at_class: Instance of Atom_Types, class for atom typing
+        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
+        obj_choice: str, the objective choice. "SSE", "ExpVal", "UCB", "LCB"
+        save_data: bool, whether to save data or not
+        """
+        #Load class properies for each molecule
+        r14_class = r14.R14Constants()
+        r32_class = r32.R32Constants()
+        r50_class = r50.R50Constants()
+        r125_class = r125.R125Constants()
+        r134a_class = r134a.R134aConstants()
+        r143a_class = r143a.R143aConstants()
+        r170_class = r170.R170Constants()
+        #Set a dictionary of all molecule data
+        self.all_train_molec_data = {"R14":r14_class, 
+                   "R32":r32_class, 
+                   "R50":r50_class, 
+                   "R170":r170_class, 
+                   "R125":r125_class, 
+                   "R134a":r134a_class, 
+                   "R143a":r143a_class}
+        self.all_train_gp_dict = get_gp_data_from_pkl(list(self.all_train_molec_data.keys()))
+        
+        self.valid_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
+        self.valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
+        
         assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+        assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(save_data, bool), "save_res must be bool"
@@ -76,6 +123,7 @@ class Problem_Setup:
         self.save_data = save_data
         self.w_calc = w_calc
         self.obj_choice = obj_choice
+        
 
         if obj_choice != "SSE":
             assert w_calc == 2, "Only objective choice SSE is valid with w_calc methods != 2"
@@ -92,11 +140,15 @@ class Problem_Setup:
         -------
         dir_name: str, directory name for results
         """
+        assert isinstance(molecules, (str, list, np.ndarray)), "molecules must be a string or list/np.ndarray of strings"
         scheme_name = self.at_class.scheme_name
         if isinstance(molecules, str):
             molecule_str = molecules
         elif len(molecules) > 1 and isinstance(molecules, (list,np.ndarray)):
-            molecule_str = '-'.join(molecules)
+            #Assure list in correct order
+            desired_order = list(self.all_train_molec_data.keys())
+            molec_sort = sorted(molecules, key=lambda x: desired_order.index(x))
+            molecule_str = '-'.join(molec_sort)
         else:
             molecule_str = molecules[0]
         if self.w_calc == 0:
@@ -112,7 +164,7 @@ class Problem_Setup:
     
     def values_pref_to_real(self, theta_guess):
         """
-        Scales preferred units (Angstrom and eps/kb) to real units (nm, kJ/mol)
+        Scales preferred units (Angstrom and Kelvin) to real units (nm, kJ/mol)
 
         Parameters
         ----------
@@ -122,6 +174,7 @@ class Problem_Setup:
         -------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         midpoint = len(theta_guess) //2
         sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
         epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
@@ -131,7 +184,7 @@ class Problem_Setup:
     
     def values_real_to_pref(self, theta_guess):
         """
-        Scales real units (nm, Kj/mol) to preferred units (Angstrom and eps/kb)
+        Scales real units (nm, kJ/mol) to preferred units (Angstrom and Kelvin)
 
         Parameters
         ----------
@@ -141,6 +194,7 @@ class Problem_Setup:
         -------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         midpoint = len(theta_guess) //2
         sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
         epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
@@ -164,12 +218,11 @@ class Problem_Setup:
         property_bounds: array, array of bounds for the property data
         """
         #How to assert that we have a constants class?
-        valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
-
-        if prop_key not in valid_prop_keys:
+        assert isinstance(prop_key, str), "prop_key must be a string"
+        if prop_key not in self.valid_prop_keys:
             raise ValueError(
                 "Invalid prop_key {}. Supported prop_key names are "
-                "{}".format(prop_key, valid_prop_keys))
+                "{}".format(prop_key, self.valid_prop_keys))
         
         if "vap_density" in prop_key:
             exp_data = molec_object.expt_vap_density
@@ -205,6 +258,22 @@ class Problem_Setup:
         train_data: dict, dictionary of training data
         test_data: dict, dictionary of testing data
         """
+        assert isinstance(molec_key, str), "molec_key must be a string"
+        assert isinstance(prop_keys, list), "prop_keys must be a list"
+        assert all(isinstance(name, str) for name in prop_keys) == True, "all key in prop_keys must be string"
+        
+        #Check property keys
+        for prop_key in prop_keys:
+            if prop_key not in self.valid_prop_keys:
+                raise ValueError(
+                    "Invalid prop_key {}. Supported prop_key names are "
+                    "{}".format(prop_key, self.valid_prop_keys))
+        #Check molecule key
+        if molec_key not in self.valid_mol_keys:
+            raise ValueError(
+                "Invalid molec_key {}. Supported molec_key names are "
+                "{}".format(molec_key, self.valid_mol_keys))
+            
         #Get dict of testing data
         test_data = {}
         train_data = {}
@@ -243,7 +312,9 @@ class Problem_Setup:
         grad_mean: tf.tensor, The gradient of the mean of the gp prediction
         """
         assert isinstance(Xexp, np.ndarray), "Xexp must be an np.ndarray"
-        assert isinstance(gp_object, gpflow.models.GPR)
+        assert isinstance(gp_object, gpflow.models.GPR), "gp_object must be a gpflow.models.GPR"
+        assert isinstance(gp_theta_guess, np.ndarray), "gp_theta_guess must be an np.ndarray"
+        assert isinstance(molec_object, (r14.R14Constants, r32.R32Constants, r50.R50Constants, r125.R125Constants, r134a.R134aConstants, r143a.R143aConstants, r170.R170Constants)), "molec_object must be a class object from r***.py"
         
         #Scale X data
         gp_Xexp = values_real_to_scaled(Xexp, molec_object.temperature_bounds)
@@ -292,6 +363,7 @@ class Problem_Setup:
         var_ratios: np.ndarray, the variance ratios array
         mean_wt_pieces: dict, dictionary of mean weights for each property
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         #Initialize weight and squared error arrays
         res_array  = []
         weight_array = []
@@ -396,6 +468,8 @@ class Problem_Setup:
         sse_pieces: dict, dictionary of sse values for each property
         mean_wt_pieces: dict, dictionary of mean weights for each property
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+
         res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
         sse = float(sum(sse_pieces.values()))
         if self.obj_choice == "SSE":
@@ -446,6 +520,9 @@ class Problem_Setup:
         -------
         jac: np.ndarray, the jacobian approximation
         """
+        assert isinstance(x, np.ndarray), "x must be an np.ndarray"
+        assert isinstance(save_data, bool), "save_data must be a bool"
+        assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
         jac = nd.Jacobian(self.one_output_calc_obj)(x)
 
         if save_data:
@@ -469,6 +546,10 @@ class Problem_Setup:
         -------
         H: np.ndarray, the hessian approximation
         '''
+        assert isinstance(x, np.ndarray), "x must be an np.ndarray"
+        assert isinstance(save_data, bool), "save_data must be a bool"
+        assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
+
         H = nd.Hessian(self.one_output_calc_obj)(x)
 
         if save_data:
@@ -482,7 +563,10 @@ class Problem_Setup:
     
     def get_best_results(self, molec_data_dict, molec_ind):
         """
-        Get the best optimization results for each molecule and the overall best results
+        Get the best optimization results. Pulls best parameter set from:
+            1) Literature (stored in molecule objects)
+            2) The algorithm trained for one training molecule (molec_ind)
+            3) The algorithm trained for all training molecules (molec_data_dict.values())
 
         Parameters
         ----------
@@ -491,13 +575,17 @@ class Problem_Setup:
         
         Returns
         -------
-        param_dict: dict, dictionary of the best optimization results for each molecule, the overall best results, and literature comparison
+        param_dict: dict, dictionary of the best optimization results overall, for each molecule, and literature comparison
         """
+        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+        assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
+        assert isinstance(molec_ind, str), "molec_ind must be a string"
+        assert molec_ind in list(self.all_train_molec_data.keys()), "molec_ind must be a key in all_train_molec_data"
         #Initialize Dict
         param_dict = {}
         #Get names and transformation matrix
         all_molec_list = list(molec_data_dict.keys())
-        param_matrix = self.at_class.get_transformation_matrix({molec_ind: molec_data_dict[molec_ind]})
+        param_matrix = self.at_class.get_transformation_matrix({molec_ind: self.all_train_molec_data[molec_ind]})
         #Get best_per_run.csv for all molecules
         all_molec_dir = self.make_results_dir(all_molec_list)
         if os.path.exists(all_molec_dir+"/best_per_run.csv"):
@@ -542,12 +630,76 @@ class Problem_Setup:
 
         return param_dict
 
+    def calc_MAPD_best(self, all_molec_list):
+        """
+        Calculate the mean absolute percentage deviation for each training data prediction
+        """
+        assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
+        df = pd.DataFrame(columns = ["Molecule", "Property", "Model", "MAPD"])
+        #Loop over all molecules of interest
+        for molec in all_molec_list:
+            #Get constants for molecule
+            molec_object = self.all_train_molec_data[molec]
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+
+            test_params = self.get_best_results(self.molec_data_dict, molec)
+            
+            #Make pdf
+            dir_name = self.make_results_dir(molec)
+            pdf = PdfPages(dir_name + '/comp_set_props.pdf')
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Set label
+                label = molec + "_" + key
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                x_data = np.array(list(exp_data.keys()))
+                y_data = np.array(list(exp_data.values()))
+
+                T_scaled = values_real_to_scaled(x_data, molec_object.temperature_bounds)
+                for param_set_key in list(test_params.keys()):
+                    param_set = test_params[param_set_key]
+                    if param_set is not None:
+                        parm_set_repeat = np.tile(param_set, (len(x_data), 1))
+                        gp_theta_guess = np.hstack((parm_set_repeat, T_scaled))
+                        mean_scaled, var_scaled = gp_model.predict_f(gp_theta_guess)
+                        mean = values_scaled_to_real(mean_scaled, y_bounds)
+                        mapd = mean_absolute_percentage_error(y_data, mean)*100
+                        new_row = pd.DataFrame({"Molecule": [molec], "Property": [key], "Model": [param_set_key],
+                                                "MAPD": [mapd]})
+                        df = pd.concat([df, new_row], ignore_index=True)
+        return df
 class Opt_ATs(Problem_Setup):
     """
     The class for Least Squares regression analysis. Child class of General_Analysis
+
+    Methods:
+    --------
+    __init__: Initializes the class
+    __scipy_min_fxn: The scipy function for minimizing the data
+    __get_params_and_df: Gets parameter guesses and sets up bounds for optimization
+    __get_scipy_soln: Gets scipy solution
+    __get_opt_iter_info: Runs Optimization, times progress, and makes iter_df
+    optimize_ats: Optimizes the atom type parameters
     """
     #Inherit objects from General_Analysis
     def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, w_calc, obj_choice, save_data):
+        """
+        Parameters:
+        -----------
+        molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
+        all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
+        at_class: Instance of Atom_Types, class for atom typing
+        repeats: int, number of optimization runs to do
+        seed: int, random seed for optimization
+        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
+        obj_choice: str, the objective choice for optimization. "SSE" or "ExpVal"
+        save_data: bool, whether to save data or not
+        """
+
         #Asserts
         super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
@@ -772,14 +924,14 @@ class Vis_Results(Problem_Setup):
     #Define function to check GP Accuracy
     def check_GPs(self):
         """
-        Makes GP validation figures for each molecule
+        Makes GP validation figures for each training molecule
         """
         #Loop over molecules
-        for molec in list(self.all_gp_dict.keys()):
+        for molec in list(self.all_train_molec_data.keys()):
             #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
+            molec_object = self.all_train_molec_data[molec]
             #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
+            molec_gps_dict = self.all_train_gp_dict[molec]
             #Get testing data for that molecule
             train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
             #Make pdf
@@ -862,12 +1014,13 @@ class Vis_Results(Problem_Setup):
         ----------
         all_molec_list: list, list of all molecules to generate predictions for
         """
+        assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
         #Loop over molecules
         for molec in all_molec_list:
             #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
+            molec_object = self.all_train_molec_data[molec]
             #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
+            molec_gps_dict = self.all_train_gp_dict[molec]
 
             test_params = self.get_best_results(self.molec_data_dict, molec)
             
@@ -900,7 +1053,7 @@ class Vis_Results(Problem_Setup):
             pdf.close()
         return 
     
-    def compare_T_prop_best(self, theta_guess):
+    def compare_T_prop_best(self, theta_guess, all_molec_list):
         """
         Compares T vs Property for a given set
 
@@ -908,20 +1061,23 @@ class Vis_Results(Problem_Setup):
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set of interest (sigma in nm, epsilon in kJ/mol)
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
+
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         pdf = PdfPages(dir_name + '/prop_vs_T.pdf')
         #Loop over molecules
-        for molec in list(self.molec_data_dict.keys()):
+        for molec in all_molec_list:
             #Get constants for molecule
-            molec_object = self.molec_data_dict[molec]
+            molec_object = self.all_train_molec_data[molec]
             #Get theta associated with each gp
             param_matrix = self.at_class.get_transformation_matrix({molec: molec_object})
             #Transform the guess, and scale to bounds
             gp_theta = theta_guess.reshape(1,-1)@param_matrix
             gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
             #Get GPs associated with each molecule
-            molec_gps_dict = self.all_gp_dict[molec]
+            molec_gps_dict = self.all_train_gp_dict[molec]
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
@@ -955,6 +1111,7 @@ class Vis_Results(Problem_Setup):
         param_dict: dict, dictionary of heat map theta data
         obj_dict: dict, dictionary of heat map obj data
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         n_points = 15
         #Create dict of heat map theta data
         param_dict = {}
@@ -1011,6 +1168,7 @@ class Vis_Results(Problem_Setup):
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
         """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         #Get HM Data
         param_dict, obj_dict = self.make_sse_sens_data(theta_guess)
         #Make pdf
