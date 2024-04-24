@@ -1098,6 +1098,32 @@ class Vis_Results(Problem_Setup):
                 plt.close()
         pdf.close()
 
+    def __del_unphysical_hms(self, data_set_name):
+        """
+        Deletes unphysical heat maps
+        """
+        #Only create grids for legal combinations
+        #Don't create grids for C1-C2 parameters
+        condition1 = 'C1' in data_set_name[0] and 'C2' in data_set_name[1]
+        condition2 = 'C2' in data_set_name[0] and 'C1' in data_set_name[1]
+        #Don't create grids for F_4 and C2 parameters
+        condition3 = 'C2' in data_set_name[0] and 'F_4' in data_set_name[1]
+        condition4 = 'F_4' in data_set_name[0] and 'C2' in data_set_name[1]
+        #Don't create grids for F_4 and H parameters
+        condition5 = 'H1' in data_set_name[0] and 'F_4' in data_set_name[1]
+        condition6 = 'F_4' in data_set_name[0] and 'H1' in data_set_name[1]
+        # condition7 = 'C2_3' in data_set_name[0] and 'H' in data_set_name[1]
+        # condition8 = 'H' in data_set_name[0] and 'C2_3' in data_set_name[1]
+        # #Don't create grids for H or C2_0 parameters
+        # condition9 = 'C2_0' in data_set_name[0] and 'F' in data_set_name[1]
+        # condition10 = 'F' in data_set_name[0] and 'C2_0' in data_set_name[1]
+        
+        cond_list = [condition1, condition2, condition3, condition4, condition5, condition6]
+
+
+        return cond_list
+
+
     def make_sse_sens_data(self, theta_guess):
         """
         Makes heat map data for obj predictions given a parameter set
@@ -1126,25 +1152,31 @@ class Vis_Results(Problem_Setup):
 
         #Loop over all possible theta combinations of 2
         for i in range(len(mesh_combos)):
-            #Create a copy of the true values to change the mehsgrid valus on
-            theta_set_copy = np.copy(theta_set)
             #Set the indeces of theta_set for evaluation as each row of mesh_combos
             idcs = mesh_combos[i]
             #define name of parameter set as tuple ("param_1,param_2")
             data_set_name = (self.at_class.at_names[idcs[0]], self.at_class.at_names[idcs[1]])
 
-            #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
-            #Assume that theta1 and theta2 have equal number of points on the meshgrid
-            theta1 = np.linspace(self.at_class.at_bounds[idcs[0]][0], self.at_class.at_bounds[idcs[0]][1], n_points)
-            theta2 = np.linspace(self.at_class.at_bounds[idcs[1]][0], self.at_class.at_bounds[idcs[1]][1], n_points)
-            theta12_mesh = np.array(np.meshgrid(theta1, theta2))
-            theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
-            
-            #Set initial values for evaluation (true values) to meshgrid values
-            theta_set_copy[:,idcs] = theta12_vals
-            
-            #Append data set to dictionary with name
-            param_dict[data_set_name] = theta_set_copy
+            #Ensure unphysical parameters are filtered out
+            cond_list = self.__del_unphysical_hms(data_set_name)
+
+            #If the parameter combination is feasible, create heat map data for it
+            if not any(cond_list):
+                #Create a copy of the true values to change the mehsgrid valus on
+                theta_set_copy = np.copy(theta_set)
+
+                #Create a meshgrid of values of the 2 selected values of theta and reshape to the correct shape
+                #Assume that theta1 and theta2 have equal number of points on the meshgrid
+                theta1 = np.linspace(self.at_class.at_bounds[idcs[0]][0], self.at_class.at_bounds[idcs[0]][1], n_points)
+                theta2 = np.linspace(self.at_class.at_bounds[idcs[1]][0], self.at_class.at_bounds[idcs[1]][1], n_points)
+                theta12_mesh = np.array(np.meshgrid(theta1, theta2))
+                theta12_vals = np.array(theta12_mesh).T.reshape(-1,2)
+                
+                #Set initial values for evaluation (true values) to meshgrid values
+                theta_set_copy[:,idcs] = theta12_vals
+                
+                #Append data set to dictionary with name
+                param_dict[data_set_name] = theta_set_copy
 
         #Initialize obj dictionary
         obj_dict = {}
