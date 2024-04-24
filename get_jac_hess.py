@@ -8,7 +8,7 @@ import pandas as pd
 save_data = True
 w_scheme = 2
 obj_choice = "ExpVal"
-at_class = atom_type.AT_Scheme_9()
+at_class = atom_type.AT_Scheme_10()
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()

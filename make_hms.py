@@ -2,11 +2,13 @@
 from utils import r14, r32, r50, r125, r134a, r143a, r170, atom_type, opt_atom_types
 import numpy as np
 import unyt as u
+import pandas as pd
 
 #Set params for saving results and whether obj wts are scaled
 save_data = True
 scl_w = 2
 opt_choice = "ExpVal"
+at_class = atom_type.AT_Scheme_10()
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()
@@ -26,9 +28,15 @@ molec_data_dict = {"R14":r14_class,
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
-at_class = atom_type.AT_Scheme_9()
+
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
-#Best set from Experiment
-best_set = np.array([3.43222589608333,3.8608505577545786,3.9999999999999996,1.9211526390460762,2.554453505316342,2.8776761377012368,2.997222431322794,45.538857572560964,47.52298488436068,75.00000000000001,10.000000000000002,50.00000000000001,50.00000000000001,50.00000000000001])
 visual = opt_atom_types.Vis_Results(molec_data_dict, all_gp_dict, at_class, scl_w, opt_choice, save_data)
+#Best set from Experiment
+#Set parameter set of interest (in this case get the best parameter set)
+all_molec_dir = visual.make_results_dir(list(molec_data_dict.keys()))
+all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+first_param_name = visual.at_class.at_names[0] + "_min"
+last_param_name = visual.at_class.at_names[-1] + "_min"
+full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+best_set = visual.values_pref_to_real(full_opt_best)
 visual.plot_obj_hms(best_set)
