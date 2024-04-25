@@ -861,20 +861,20 @@ class Opt_ATs(Problem_Setup):
         run_best = sort_ls_res.groupby('Run').first().reset_index()
         best_runs = run_best.sort_values(['Min Obj Cum.'], ascending= True)
 
-        if self.save_data:
-            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            os.makedirs(dir_name, exist_ok=True) 
-            #Save original results
-            save_path1 = os.path.join(dir_name, "opt_at_results.csv")
-            ls_results.to_csv(save_path1, index = False)
-            #Save sorted results
-            save_path2 = os.path.join(dir_name, "sorted_at_res.csv")
-            sort_ls_res.to_csv(save_path2, index = False)
-            #Save sorted results for each run
-            save_path3 = os.path.join(dir_name, "best_per_run.csv")
-            best_runs.to_csv(save_path3, index = False)
+        # if self.save_data:
+        #     dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        #     os.makedirs(dir_name, exist_ok=True) 
+        #     #Save original results
+        #     save_path1 = os.path.join(dir_name, "opt_at_results.csv")
+        #     ls_results.to_csv(save_path1, index = False)
+        #     #Save sorted results
+        #     save_path2 = os.path.join(dir_name, "sorted_at_res.csv")
+        #     sort_ls_res.to_csv(save_path2, index = False)
+        #     #Save sorted results for each run
+        #     save_path3 = os.path.join(dir_name, "best_per_run.csv")
+        #     best_runs.to_csv(save_path3, index = False)
 
-        return ls_results   
+        return ls_results, sort_ls_res, best_runs   
 class Vis_Results(Problem_Setup):
     """
     Class For vizualizing GP and Optimization Results

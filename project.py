@@ -36,7 +36,7 @@ class Project(FlowProject):
 @Project.label
 def results_computed(job):
     #Write script that checks whether the intermediate job files are there
-    return job.isfile("best_per_run.csv")
+    return job.isfile("opt_at_results.csv") and job.isfile("sorted_at_res.csv")
 
 @Project.post(results_computed)
 @Project.operation(with_job = True)
@@ -84,15 +84,24 @@ def run_obj_alg(job):
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
     driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice, save_data)
     #Optimize AT scheme parameters
-    ls_results = driver.optimize_ats()
+    ls_results, sort_ls_res, best_runs = driver.optimize_ats()
     
-    #Save results for best set for each run and iter to a csv file in Results
+    if job.sp.save_data == True:
+        #Save results for best set for each run and iter to a csv file in Results
+        #Ensure directory exists
+        dir_name = driver.make_results_dir(training_molecules)
+        os.makedirs(dir_name, exist_ok=True) 
+        save_path3 = os.path.join(dir_name, "best_per_run.csv")
+        #Save results
+        best_runs.to_csv(save_path3, index = False)
+
     #Store intermediate results in job directory
-    #Ensure file exists
-    dir_name = driver.make_results_dir(training_molecules)
-    save_path_job1 = job.fn("test" + ".csv")
-    #Save results
-    driver.save_results(ls_results, dir_name)
+    #Save original results
+    save_path1 = job.fn("opt_at_results.csv")
+    ls_results.to_csv(save_path1, index = False)
+    #Save sorted results
+    save_path2 =  job.fn("sorted_at_res.csv")
+    sort_ls_res.to_csv(save_path2, index = False)
 
 if __name__ == "__main__":
     Project().main()
