@@ -8,6 +8,26 @@ from .r170 import R170Constants
 import numpy as np
 import unyt as u
 
+def make_atom_type_class(at_number):
+    """
+    Creates an atom type class based on the atom type number
+
+    Parameters
+    ----------
+    at_number: int, The atom type number
+
+    Returns
+    -------
+    class, The atom type class
+    """
+    if at_number == 7:
+        return AT_Scheme_7()
+    elif at_number == 9:
+        return AT_Scheme_9()
+    elif at_number == 10:
+        return AT_Scheme_10()
+    else:
+        raise ValueError("Invalid atom type number")
 class Atom_Types:
     """
     Base class for atom typing schemes
