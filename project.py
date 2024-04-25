@@ -79,11 +79,12 @@ def run_obj_alg(job):
         if molec in list(all_molec_data_dict.keys()):
             molec_data_dict[molec] = all_molec_data_dict[molec]
 
-    #Create param sets for the AT optimization
-
+    #TO DO: Create param sets for the AT optimization as its own function
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
     driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice, save_data)
     #Optimize AT scheme parameters
+
+    #TO DO: Make this take an initial guess or set of intital guesses
     ls_results, sort_ls_res, best_runs = driver.optimize_ats()
     
     if job.sp.save_data == True:
