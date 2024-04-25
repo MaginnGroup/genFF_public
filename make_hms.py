@@ -37,6 +37,5 @@ all_molec_dir = visual.make_results_dir(list(molec_data_dict.keys()))
 all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
 first_param_name = visual.at_class.at_names[0] + "_min"
 last_param_name = visual.at_class.at_names[-1] + "_min"
-full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
-best_set = visual.values_pref_to_real(full_opt_best)
+best_set = all_df.loc[0, first_param_name:last_param_name].values
 visual.plot_obj_hms(best_set)
