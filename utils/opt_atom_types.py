@@ -76,15 +76,14 @@ class Problem_Setup:
     calc_MAPD_best: Calculate the mean absolute percentage deviation for each training data prediction
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice, save_data):
         """
         Parameters:
         -----------
         molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
         all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
         at_class: Instance of Atom_Types, class for atom typing
-        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
-        obj_choice: str, the objective choice. "SSE", "ExpVal", "UCB", "LCB"
+        obj_choice: str, the objective choice. "SSE" (SSE) or "ExpVal" (Expected Value of SSE)
         save_data: bool, whether to save data or not
         """
         #Load class properies for each molecule
@@ -113,20 +112,14 @@ class Problem_Setup:
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(save_data, bool), "save_res must be bool"
-        assert isinstance(w_calc, int) and w_calc in [0,1,2], "w_calc must be 0, 1 or 2"
         assert isinstance(obj_choice, str), "obj_choice must be string"
-        assert obj_choice in ["ExpVal", "UCB", "LCB", "SSE"], "obj_choice must be SSE, ExpVal, UCB, or LCB"
+        assert obj_choice in ["ExpVal", "SSE"], "obj_choice must be SSE or ExpVal"
         #Placeholder that will be overwritten if None
         self.molec_data_dict = molec_data_dict
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
         self.save_data = save_data
-        self.w_calc = w_calc
         self.obj_choice = obj_choice
-        
-
-        if obj_choice != "SSE":
-            assert w_calc == 2, "Only objective choice SSE is valid with w_calc methods != 2"
 
     def make_results_dir(self, molecules):
         """
@@ -151,14 +144,8 @@ class Problem_Setup:
             molecule_str = '-'.join(molec_sort)
         else:
             molecule_str = molecules[0]
-        if self.w_calc == 0:
-            scl_w_str = "wt_sum1_gp_var"
-        elif self.w_calc == 1:
-            scl_w_str = "wt_gp_var"
-        else:
-            scl_w_str = "wt_y_var"
 
-        dir_name = os.path.join("Results" ,scheme_name, molecule_str, self.obj_choice, scl_w_str)
+        dir_name = os.path.join("Results" ,scheme_name, molecule_str, self.obj_choice)
 
         return dir_name
     
@@ -346,14 +333,13 @@ class Problem_Setup:
         gp_var = np.diag(np.squeeze(gp_covar))
         return np.squeeze(gp_mean),  np.squeeze(gp_covar), gp_var, grad_mean
     
-    def calc_wt_res(self, theta_guess, w_calc = None):
+    def calc_wt_res(self, theta_guess):
         """
         Calculates the sse objective function
 
         Parameters
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
-        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
 
         Returns
         -------
@@ -372,9 +358,6 @@ class Problem_Setup:
         mean_wt_pieces = {}
         sse_pieces = {}
         key_list = []
-
-        w_calc = self.w_calc if w_calc == None else w_calc
-        assert isinstance(w_calc, int) and w_calc in [0,1,2], "w_calc must be 0, 1 or 2"
         
         #Loop over molecules
         for molec in list(self.molec_data_dict.keys()):
@@ -408,20 +391,12 @@ class Problem_Setup:
                 gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
 
                 #Calculate weight from uncertainty
-                if w_calc == 2:
-                    #Get y data uncertainties
-                    unc = molec_object.uncertainties[key.replace("sim", "expt")]
-                    y_var_unc = (y_exp*unc)**2
-                    y_var_2pct = (y_exp*0.02)**2
-                    y_var = np.maximum(y_var_unc, y_var_2pct)
-                    weight_mpi = 1/y_var
-                else:
-                    weight_mpi = 1/gp_var
-
-                if w_calc == 0:
-                    #Normalize weights to add up to 1 if w_calc is 0
-                    sum_weights = np.sum(weight_mpi)
-                    weight_mpi = weight_mpi / sum_weights
+                #Get y data uncertainties
+                unc = molec_object.uncertainties[key.replace("sim", "expt")]
+                y_var_unc = (y_exp*unc)**2
+                y_var_2pct = (y_exp*0.02)**2
+                y_var = np.maximum(y_var_unc, y_var_2pct)
+                weight_mpi = 1/y_var
                     
                 weight_array += weight_mpi.tolist()
                 weights = np.diag(weight_mpi)
@@ -453,14 +428,13 @@ class Problem_Setup:
 
         return res_array, sse_pieces, sse_var_pieces, var_ratios_arr, mean_wt_pieces
     
-    def calc_obj(self, theta_guess, w_calc = None):
+    def calc_obj(self, theta_guess):
         """
         Calculates the sse objective function
 
         Parameters
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
-        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
 
         Returns
         -------
@@ -470,7 +444,7 @@ class Problem_Setup:
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
 
-        res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess, w_calc)
+        res, sse_pieces, sse_var_pieces, var_ratios, mean_wt_pieces = self.calc_wt_res(theta_guess)
         sse = float(sum(sse_pieces.values()))
         if self.obj_choice == "SSE":
             obj = sse
@@ -478,15 +452,7 @@ class Problem_Setup:
             sum_var_ratios = np.sum(var_ratios)
             expected_sse_val = sse + sum_var_ratios
             sse_std = np.sqrt(np.array(list(sse_var_pieces.values())))
-        
-        if self.obj_choice == "ExpVal":
             obj = expected_sse_val
-        elif self.obj_choice == "UCB":
-            obj = expected_sse_val + sse_std
-        elif self.obj_choice == "LCB":
-            obj = expected_sse_val - sse_std
-        else:
-            pass
         
         return float(obj), sse_pieces, mean_wt_pieces
     
@@ -686,7 +652,7 @@ class Opt_ATs(Problem_Setup):
     optimize_ats: Optimizes the atom type parameters
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, w_calc, obj_choice, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice, save_data):
         """
         Parameters:
         -----------
@@ -695,13 +661,12 @@ class Opt_ATs(Problem_Setup):
         at_class: Instance of Atom_Types, class for atom typing
         repeats: int, number of optimization runs to do
         seed: int, random seed for optimization
-        w_calc: int, 0,1, or 2. The calculation to use for weights in objective calculation. 0 = 1/gp_var scaled to 1, 1 = 1/gp var, 2 = 1/y_exp_var
         obj_choice: str, the objective choice for optimization. "SSE" or "ExpVal"
         save_data: bool, whether to save data or not
         """
 
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice, save_data)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.repeats = repeats
@@ -916,9 +881,9 @@ class Vis_Results(Problem_Setup):
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice, save_data):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, w_calc, obj_choice, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice, save_data)
         
 
     #Define function to check GP Accuracy
@@ -1187,7 +1152,7 @@ class Vis_Results(Problem_Setup):
             for i in range(len(value)):
                 #Values pref to real
                 val_real = self.values_pref_to_real(value[i])
-                obj_arr[i] = self.calc_obj(val_real, self.w_calc)[0]
+                obj_arr[i] = self.calc_obj(val_real)[0]
             obj_dict[key] = obj_arr
 
         return param_dict, obj_dict
