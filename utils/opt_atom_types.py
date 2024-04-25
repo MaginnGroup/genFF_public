@@ -76,7 +76,7 @@ class Problem_Setup:
     calc_MAPD_best: Calculate the mean absolute percentage deviation for each training data prediction
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice):
         """
         Parameters:
         -----------
@@ -84,7 +84,6 @@ class Problem_Setup:
         all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
         at_class: Instance of Atom_Types, class for atom typing
         obj_choice: str, the objective choice. "SSE" (SSE) or "ExpVal" (Expected Value of SSE)
-        save_data: bool, whether to save data or not
         """
         #Load class properies for each molecule
         r14_class = r14.R14Constants()
@@ -111,14 +110,12 @@ class Problem_Setup:
         assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
-        assert isinstance(save_data, bool), "save_res must be bool"
         assert isinstance(obj_choice, str), "obj_choice must be string"
         assert obj_choice in ["ExpVal", "SSE"], "obj_choice must be SSE or ExpVal"
         #Placeholder that will be overwritten if None
         self.molec_data_dict = molec_data_dict
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
-        self.save_data = save_data
         self.obj_choice = obj_choice
 
     def make_results_dir(self, molecules):
@@ -652,7 +649,7 @@ class Opt_ATs(Problem_Setup):
     optimize_ats: Optimizes the atom type parameters
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice):
         """
         Parameters:
         -----------
@@ -662,11 +659,10 @@ class Opt_ATs(Problem_Setup):
         repeats: int, number of optimization runs to do
         seed: int, random seed for optimization
         obj_choice: str, the objective choice for optimization. "SSE" or "ExpVal"
-        save_data: bool, whether to save data or not
         """
 
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.repeats = repeats
@@ -881,9 +877,9 @@ class Vis_Results(Problem_Setup):
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice, save_data):
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice, save_data)
+        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice)
         
 
     #Define function to check GP Accuracy
