@@ -593,10 +593,12 @@ class Problem_Setup:
 
         return param_dict
 
-    def calc_MAPD_best(self, all_molec_list):
+    def calc_MAPD_best(self, all_molec_list, save_data = False, save_label = None):
         """
         Calculate the mean absolute percentage deviation for each training data prediction
         """
+        assert isinstance(save_data, bool), "save_data must be a bool"
+        assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
         assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
         df = pd.DataFrame(columns = ["Molecule", "Property", "Model", "MAPD"])
         #Loop over all molecules of interest
@@ -634,6 +636,11 @@ class Problem_Setup:
                         new_row = pd.DataFrame({"Molecule": [molec], "Property": [key], "Model": [param_set_key],
                                                 "MAPD": [mapd]})
                         df = pd.concat([df, new_row], ignore_index=True)
+        
+        if save_data == True:
+            save_label = save_label if save_label is not None else "MAPD_set"
+            df.to_csv(save_label + ".csv", index = False, header = True)
+            
         return df
 class Opt_ATs(Problem_Setup):
     """
