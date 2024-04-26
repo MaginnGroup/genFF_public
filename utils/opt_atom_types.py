@@ -45,7 +45,7 @@ def get_gp_data_from_pkl(key_list):
         #Get dict of vle gps
         #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
         file = os.path.join(key +"-vlegp/vle-gps.pkl")
-        assert os.path.isfile(file), "key-vlegp/vle-gps.pkl does not exist. Check key list carefully"
+        assert os.path.isfile(file), f"{file} does not exist. Check file path carefully."
         with open(file, 'rb') as pickle_file:
             all_gp_dict[key] = pickle.load(pickle_file)
 
@@ -619,7 +619,8 @@ class Problem_Setup:
         
         if save_data == True:
             save_label = save_label if save_label is not None else "MAPD_set"
-            df.to_csv(save_label + ".csv", index = False, header = True)
+            save_csv_path = os.path.join(dir_name, save_label + ".csv")
+            df.to_csv(save_csv_path, index = False, header = True)
             
         return df
 class Opt_ATs(Problem_Setup):
