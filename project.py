@@ -46,11 +46,12 @@ def run_obj_alg(job):
     try:
         training_molecules = json.loads(training_molecules)
     except:
-        training_molecules = job.sp.training_molecules
+        training_molecules = list([job.sp.training_molecules])
     
     #Set params for saving results, # of repeats, and the seed
     obj_choice = job.sp.obj_choice
-    repeats  = job.sp.repeats
+    total_repeats  = job.sp.total_repeats
+    repeat_num = job.sp.repeat_number
     seed = job.sp.seed
     save_data = job.sp.save_data
     at_class = atom_type.make_atom_type_class(job.sp.atom_type)
@@ -79,13 +80,15 @@ def run_obj_alg(job):
         if molec in list(all_molec_data_dict.keys()):
             molec_data_dict[molec] = all_molec_data_dict[molec]
 
-    #TO DO: Create param sets for the AT optimization as its own function
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
-    driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice, save_data)
-    #Optimize AT scheme parameters
+    driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, total_repeats, seed, obj_choice)
 
-    #TO DO: Make this take an initial guess or set of intital guesses
-    ls_results, sort_ls_res, best_runs = driver.optimize_ats()
+    #Create param sets for the AT optimization based on seed and such
+    param_inits = driver.get_param_inits()
+    #Get the correct parameter set from the param_inits based on which repeat we are evaluating
+    param_guess = param_inits[repeat_num-1].reshape(1,-1)
+    #Optimize atom types
+    ls_results, sort_ls_res, best_runs = driver.optimize_ats(param_guess, repeat_num-1)
     
     if job.sp.save_data == True:
         #Save results for best set for each run and iter to a csv file in Results
@@ -93,8 +96,11 @@ def run_obj_alg(job):
         dir_name = driver.make_results_dir(training_molecules)
         os.makedirs(dir_name, exist_ok=True) 
         save_path3 = os.path.join(dir_name, "best_per_run.csv")
-        #Save results
-        best_runs.to_csv(save_path3, index = False)
+        #Save results. Append to file if it already exists
+        if os.path.exists(save_path3):
+            best_runs.to_csv(save_path3, mode = "a", index = False, header = False)
+        else:
+            best_runs.to_csv(save_path3, index = False)
 
     #Store intermediate results in job directory
     #Save original results
