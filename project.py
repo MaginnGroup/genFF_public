@@ -17,6 +17,7 @@ from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, vari
 from fffit.fffit.plot import plot_obj_contour
 import pickle
 import gzip
+import os
 
 #Ignore warnings caused by "nan" values
 import warnings
@@ -39,14 +40,14 @@ def results_computed(job):
     return job.isfile("opt_at_results.csv") and job.isfile("sorted_at_res.csv")
 
 @Project.post(results_computed)
-@Project.operation(with_job = True)
+@Project.operation()
 def run_obj_alg(job):
     #Define method, ep_enum classes, indecies to consider, and kernel
     training_molecules = job.sp.training_molecules
     try:
-        training_molecules = json.loads(training_molecules)
+        training_molecules = list(json.loads(training_molecules))
     except:
-        training_molecules = list([job.sp.training_molecules])
+        training_molecules = list(job.sp.training_molecules)
     
     #Set params for saving results, # of repeats, and the seed
     obj_choice = job.sp.obj_choice
@@ -76,9 +77,10 @@ def run_obj_alg(job):
     
     #Make molec data dict given molecules:
     molec_data_dict = {}
-    for molec in training_molecules:
-        if molec in list(all_molec_data_dict.keys()):
-            molec_data_dict[molec] = all_molec_data_dict[molec]
+    if isinstance(training_molecules, list):
+        for molec in training_molecules:
+            if molec in list(all_molec_data_dict.keys()):
+                molec_data_dict[molec] = all_molec_data_dict[molec]
 
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
     driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, total_repeats, seed, obj_choice)

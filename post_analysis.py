@@ -9,7 +9,7 @@ import copy
 #Set params for saving results and whether obj wts are scaled
 save_data = True
 opt_choice = "ExpVal"
-at_class = atom_type.AT_Scheme_10()
+at_class = atom_type.AT_Scheme_9()
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()
@@ -29,6 +29,7 @@ molec_data_dict = {"R14":r14_class,
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
+molec_data_dict = {"R32":r32_class}
 
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 visual = opt_atom_types.Vis_Results(molec_data_dict, all_gp_dict, at_class, opt_choice)
@@ -48,16 +49,16 @@ best_set = all_df.loc[0, first_param_name:last_param_name].values
 best_real = visual.values_pref_to_real(copy.copy(best_set))
 x_label = "best_set"
 
-#Plot optimization result heat maps
-visual.plot_obj_hms(best_set)
+#Get Property Predictions for all training molecules
+molec_names = list(molec_data_dict.keys())
+visual.comp_paper_full_ind(molec_names)
+
+#Calculate MAPD for predictions and save results
+df = visual.calc_MAPD_best(molec_names, save_data, save_label=x_label)
 
 #Gat Jac and Hess Approximations
 jac = visual.approx_jac(best_real, save_data, x_label=x_label)
 hess = visual.approx_hess(best_real, save_data, x_label=x_label)
 
-#Get Property Predictions
-molec_names = list(["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"])
-visual.comp_paper_full_ind(molec_names)
-
-#Calculate MAPD for predictions and save results
-df = visual.calc_MAPD_best(molec_names, save_data)
+#Plot optimization result heat maps
+visual.plot_obj_hms(best_set)
