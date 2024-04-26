@@ -90,10 +90,12 @@ def run_obj_alg(job):
     #Optimize atom types
     ls_results, sort_ls_res, best_runs = driver.optimize_ats(param_guess, repeat_num-1)
     
+    dir_name = driver.make_results_dir(training_molecules)
+    job.document.dir_name = dir_name
+
     if job.sp.save_data == True:
         #Save results for best set for each run and iter to a csv file in Results
         #Ensure directory exists
-        dir_name = driver.make_results_dir(training_molecules)
         os.makedirs(dir_name, exist_ok=True) 
         save_path3 = os.path.join(dir_name, "best_per_run.csv")
         #Save results. Append to file if it already exists

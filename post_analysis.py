@@ -36,8 +36,12 @@ visual = opt_atom_types.Vis_Results(molec_data_dict, all_gp_dict, at_class, opt_
 #Best set from Experiment
 #Set parameter set of interest (in this case get the best parameter set)
 all_molec_dir = visual.make_results_dir(list(molec_data_dict.keys()))
-assert os.path.exists(all_molec_dir+"/best_per_run.csv"), "best_per_run.csv not found in directory"
-all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+path_best_sets = os.path.join(all_molec_dir, "best_per_run.csv")
+assert os.path.exists(path_best_sets), "best_per_run.csv not found in directory"
+unsorted_df = pd.read_csv(path_best_sets, header = 0)
+#Sort df and overwrite it with sorted df
+all_df = unsorted_df.sort_values(by = "Min Obj")
+all_df.to_csv(path_best_sets, index=False)
 first_param_name = visual.at_class.at_names[0] + "_min"
 last_param_name = visual.at_class.at_names[-1] + "_min"
 best_set = all_df.loc[0, first_param_name:last_param_name].values
