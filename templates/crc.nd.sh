@@ -10,7 +10,7 @@
 #$ -m ae
 #$ -M mcarlozo@nd.edu
 
-export PATH=/afs/crc.nd.edu/user/m/mcarlozo/.conda/envs/Toy_Problem_env/bin:$PATH
+export PATH=/afs/crc.nd.edu/user/m/mcarlozo/.conda/envs/hfcs-fffit/bin:$PATH
 
 {% block tasks %}
 {% endblock %}
