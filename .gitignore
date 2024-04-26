@@ -3,3 +3,4 @@
 *.pyc
 *opt_at_results.csv
 *sorted_at_res.csv
+workspace/*
