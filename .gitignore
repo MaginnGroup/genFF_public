@@ -1,4 +1,5 @@
 *ipynb_checkpoints*
 *__pycache__
 *.pyc
-*.csv
+*opt_at_results.csv
+*sorted_at_res.csv
