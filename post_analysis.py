@@ -29,8 +29,6 @@ molec_data_dict = {"R14":r14_class,
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
-molec_data_dict = {"R32":r32_class}
-
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
 visual = opt_atom_types.Vis_Results(molec_data_dict, all_gp_dict, at_class, opt_choice)
 
