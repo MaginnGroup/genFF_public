@@ -44,10 +44,7 @@ def results_computed(job):
 def run_obj_alg(job):
     #Define method, ep_enum classes, indecies to consider, and kernel
     training_molecules = job.sp.training_molecules
-    try:
-        training_molecules = list(json.loads(training_molecules))
-    except:
-        training_molecules = list(job.sp.training_molecules)
+    training_molecules = list(json.loads(training_molecules))
     
     #Set params for saving results, # of repeats, and the seed
     obj_choice = job.sp.obj_choice

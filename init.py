@@ -4,9 +4,9 @@ import json
 project = signac.init_project()
 
 #Set Initial Parameters
-Atom_Type = 9
-repeats  = 1
-repeats_ind = 1
+Atom_Type = 10
+repeats  = 200
+repeats_ind = 20
 seed = 1
 save_data = True
 training_molecules = list(["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"])
@@ -30,11 +30,13 @@ for i in range(0, repeats):
 
 if len(training_molecules) > 1:
     for molec in training_molecules:
+        #Make a dumped list of the molecule to pass to the job
+        molec_dump = json.dumps(list([molec]))
         for j in range(0, repeats_ind):
             sp = {"atom_type": Atom_Type,
                 "total_repeats": repeats_ind,
                 "repeat_number": j+1,
-                "training_molecules": molec,
+                "training_molecules": molec_dump,
                 "obj_choice": Objective,
                 "save_data": save_data,
                 "seed": seed}
