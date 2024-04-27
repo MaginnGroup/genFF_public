@@ -25,6 +25,8 @@ molec_data_dict = {"R14":r14_class,
                    "R32":r32_class, 
                    "R50":r50_class, 
                    "R170":r170_class, 
+                   "R125":r125_class, 
+                   "R134a":r134a_class,
                    "R143a":r143a_class}
 
 all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
@@ -47,7 +49,7 @@ x_label = "best_set"
 
 #Get Property Predictions for all training molecules
 molec_names = list(molec_data_dict.keys())
-# visual.comp_paper_full_ind(molec_names)
+visual.comp_paper_full_ind(molec_names)
 
 #Calculate MAPD for predictions and save results
 df = visual.calc_MAPD_best(molec_names, save_data, save_label=x_label)
