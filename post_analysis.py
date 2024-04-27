@@ -59,4 +59,4 @@ jac = visual.approx_jac(best_real, save_data, x_label=x_label)
 hess = visual.approx_hess(best_real, save_data, x_label=x_label)
 
 #Plot optimization result heat maps
-visual.plot_obj_hms(best_set)
+visual.plot_obj_hms(best_set, x_label)

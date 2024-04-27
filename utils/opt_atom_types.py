@@ -1147,7 +1147,7 @@ class Vis_Results(Problem_Setup):
 
         return param_dict, obj_dict
     
-    def plot_obj_hms(self, theta_guess):
+    def plot_obj_hms(self, theta_guess, set_label = None):
         """
         Plots objective contours given a set of data
 
@@ -1160,7 +1160,8 @@ class Vis_Results(Problem_Setup):
         param_dict, obj_dict = self.make_sse_sens_data(theta_guess)
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-        pdf = PdfPages(dir_name + '/obj_contours.pdf')
+        set_label = set_label if set_label is not None else "best"
+        pdf = PdfPages(dir_name + '/obj_cont_' + set_label + '.pdf')
         #Loop over keys
         for key in list(param_dict.keys()):
             #Get parameter and sse data
