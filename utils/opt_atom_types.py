@@ -581,6 +581,8 @@ class Problem_Setup:
         assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
         assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
         df = pd.DataFrame(columns = ["Molecule", "Property", "Model", "MAPD"])
+        #Make pdf
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         #Loop over all molecules of interest
         for molec in all_molec_list:
             #Get constants for molecule
@@ -590,9 +592,6 @@ class Problem_Setup:
 
             test_params = self.get_best_results(self.molec_data_dict, molec)
             
-            #Make pdf
-            dir_name = self.make_results_dir(molec)
-            pdf = PdfPages(dir_name + '/comp_set_props.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
@@ -619,7 +618,7 @@ class Problem_Setup:
         
         if save_data == True:
             save_label = save_label if save_label is not None else "MAPD_set"
-            save_csv_path = os.path.join(dir_name, save_label + ".csv")
+            save_csv_path = os.path.join(dir_name, "MAPD_" + save_label + ".csv")
             df.to_csv(save_csv_path, index = False, header = True)
             
         return df
