@@ -5,6 +5,7 @@ import unyt as u
 import pandas as pd
 import os
 import copy
+import scipy 
 
 #Set params for saving results and whether obj wts are scaled
 save_data = True
@@ -57,6 +58,13 @@ df = visual.calc_MAPD_best(molec_names, save_data, save_label=x_label)
 #Gat Jac and Hess Approximations
 jac = visual.approx_jac(best_real, save_data, x_label=x_label)
 hess = visual.approx_hess(best_real, save_data, x_label=x_label)
+eigval, eigvec = scipy.linalg.eig(hess)
+if save_data == True:
+    eig_val_path = os.path.join(all_molec_dir, "Hess_EigVals")
+    eig_vec_path = os.path.join(all_molec_dir, "Hess_EigVecs")
+    eigval = [np.real(num) for num in eigval]
+    np.savetxt(eig_val_path,eigval,delimiter=",")
+    np.savetxt(eig_vec_path,eigvec,delimiter=",")
 
 #Plot optimization result heat maps
 visual.plot_obj_hms(best_set, x_label)
