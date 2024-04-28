@@ -50,7 +50,7 @@ x_label = "best_set"
 
 #Get Property Predictions for all training molecules
 molec_names = list(molec_data_dict.keys())
-visual.comp_paper_full_ind(molec_names)
+visual.comp_paper_full_ind(molec_names, save_label=x_label)
 
 #Calculate MAPD for predictions and save results
 df = visual.calc_MAPD_best(molec_names, save_data, save_label=x_label)

@@ -532,7 +532,8 @@ class Problem_Setup:
         #Get best_per_run.csv for all molecules
         all_molec_dir = self.make_results_dir(all_molec_list)
         if os.path.exists(all_molec_dir+"/best_per_run.csv"):
-            all_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+            unsorted_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+            all_df = unsorted_df.sort_values(by = "Min Obj")
             first_param_name = self.at_class.at_names[0] + "_min"
             last_param_name = self.at_class.at_names[-1] + "_min"
             full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
@@ -551,7 +552,8 @@ class Problem_Setup:
 
         molec_dir = self.make_results_dir([molec_ind])
         if os.path.exists(molec_dir+"/best_per_run.csv"):
-            molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
+            unsorted_molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
+            molec_df = unsorted_molec_df.sort_values(by = "Min Obj")
             first_param_name = self.at_class.at_names[0] + "_min"
             last_param_name = self.at_class.at_names[-1] + "_min"
             molec_best = molec_df.loc[0, first_param_name:last_param_name].values
@@ -959,7 +961,7 @@ class Vis_Results(Problem_Setup):
 
         return
     
-    def comp_paper_full_ind(self, all_molec_list):
+    def comp_paper_full_ind(self, all_molec_list, save_label=None):
         """
         Plots T vs Property for the best individual molecule param set, the best overall optimization param set,
         the experimental data, and the param set from the paper
@@ -969,6 +971,12 @@ class Vis_Results(Problem_Setup):
         all_molec_list: list, list of all molecules to generate predictions for
         """
         assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
+        assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
+        #Make pdf
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        save_label = save_label if save_label is not None else "best_set"
+        pdf = PdfPages(dir_name + '/prop_pred_' + save_label + '.pdf')
+        
         #Loop over molecules
         for molec in all_molec_list:
             #Get constants for molecule
@@ -978,9 +986,6 @@ class Vis_Results(Problem_Setup):
 
             test_params = self.get_best_results(self.molec_data_dict, molec)
             
-            #Make pdf
-            dir_name = self.make_results_dir(molec)
-            pdf = PdfPages(dir_name + '/comp_set_props.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
@@ -1004,7 +1009,7 @@ class Vis_Results(Problem_Setup):
                                             exp_x_data = x_data,
                                             exp_y_data = y_data ))
                 plt.close()
-            pdf.close()
+        pdf.close()
         return 
     
     def compare_T_prop_best(self, theta_guess, all_molec_list):
