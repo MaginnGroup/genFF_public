@@ -175,13 +175,13 @@ class AT_Scheme_7(Atom_Types):
         r125_map_dict = {"sigma_C1":"sigma_C2",
                     "sigma_C2": "sigma_C2",
                     "sigma_H1": "sigma_H1",
-                    "sigma_F2":"sigma_F_H1",
-                    "sigma_F1": "sigma_F_Hx",
+                    "sigma_F1":"sigma_F_H1",
+                    "sigma_F2": "sigma_F_Hx",
                     "epsilon_C1": "epsilon_C2",
                     "epsilon_C2": "epsilon_C2",
                     "epsilon_H1": "epsilon_H1",
-                    "epsilon_F2": "epsilon_F_H1",
-                    "epsilon_F1": "epsilon_F_Hx",
+                    "epsilon_F1": "epsilon_F_H1",
+                    "epsilon_F2": "epsilon_F_Hx",
                     }
 
         r134a_map_dict = {"sigma_C1": "sigma_C2",
