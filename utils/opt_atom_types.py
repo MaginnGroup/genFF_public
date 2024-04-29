@@ -1062,22 +1062,31 @@ class Vis_Results(Problem_Setup):
         Deletes unphysical heat maps
         """
         #Only create grids for legal combinations
+        #Don't create grids for Cm and C parameters
+        condition1 = 'Cm' in data_set_name[0] and 'C2' in data_set_name[1]
+        condition2 = 'C2' in data_set_name[0] and 'Cm' in data_set_name[1]
+        condition3 = 'C1' in data_set_name[0] and 'Cm' in data_set_name[1]
+        condition4 = 'Cm' in data_set_name[0] and 'C1' in data_set_name[1]
+        #Don't create grids for Cm and F parameters
+        condition5 = 'Cm' in data_set_name[0] and 'F' in data_set_name[1]
+        condition6 = 'F' in data_set_name[0] and 'Cm' in data_set_name[1]
         #Don't create grids for C1-C2 parameters
-        condition1 = 'C1' in data_set_name[0] and 'C2' in data_set_name[1]
-        condition2 = 'C2' in data_set_name[0] and 'C1' in data_set_name[1]
+        condition7 = 'C1' in data_set_name[0] and 'C2' in data_set_name[1]
+        condition8 = 'C2' in data_set_name[0] and 'C1' in data_set_name[1]
         #Don't create grids for F_4 and C2 parameters
-        condition3 = 'C2' in data_set_name[0] and 'F_4' in data_set_name[1]
-        condition4 = 'F_4' in data_set_name[0] and 'C2' in data_set_name[1]
+        condition9 = 'C2' in data_set_name[0] and 'F_4' in data_set_name[1]
+        condition10 = 'F_4' in data_set_name[0] and 'C2' in data_set_name[1]
         #Don't create grids for F_4 and H parameters
-        condition5 = 'H1' in data_set_name[0] and 'F_4' in data_set_name[1]
-        condition6 = 'F_4' in data_set_name[0] and 'H1' in data_set_name[1]
+        condition11 = 'H1' in data_set_name[0] and 'F_4' in data_set_name[1]
+        condition12 = 'F_4' in data_set_name[0] and 'H1' in data_set_name[1]
         # condition7 = 'C2_3' in data_set_name[0] and 'H' in data_set_name[1]
         # condition8 = 'H' in data_set_name[0] and 'C2_3' in data_set_name[1]
         # #Don't create grids for H or C2_0 parameters
         # condition9 = 'C2_0' in data_set_name[0] and 'F' in data_set_name[1]
         # condition10 = 'F' in data_set_name[0] and 'C2_0' in data_set_name[1]
         
-        cond_list = [condition1, condition2, condition3, condition4, condition5, condition6]
+        cond_list = [condition1, condition2, condition3, condition4, condition5, condition6,
+                     condition7, condition8, condition9, condition10, condition11, condition12]
 
 
         return cond_list
