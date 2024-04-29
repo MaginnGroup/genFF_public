@@ -15,7 +15,6 @@ if isinstance(training_molecules, list):
     training_molecules_all = json.dumps(training_molecules)
 Objective = "ExpVal"
 
-
 #Create job parameter dict
 for i in range(0, repeats):
     sp = {"atom_type": Atom_Type,
