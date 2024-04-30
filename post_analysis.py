@@ -10,7 +10,7 @@ import scipy
 #Set params for saving results and whether obj wts are scaled
 save_data = True
 opt_choice = "ExpVal"
-at_class = atom_type.AT_Scheme_7()
+at_class = atom_type.AT_Scheme_11()
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()
@@ -40,7 +40,7 @@ path_best_sets = os.path.join(all_molec_dir, "best_per_run.csv")
 assert os.path.exists(path_best_sets), "best_per_run.csv not found in directory"
 unsorted_df = pd.read_csv(path_best_sets, header = 0)
 #Sort df and overwrite it with sorted df
-all_df = unsorted_df.sort_values(by = "Min Obj")
+all_df = unsorted_df.sort_values(by='Min Obj', ascending = True).reset_index(drop = True)
 all_df.to_csv(path_best_sets, index=False)
 first_param_name = visual.at_class.at_names[0] + "_min"
 last_param_name = visual.at_class.at_names[-1] + "_min"
