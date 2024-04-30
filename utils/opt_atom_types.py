@@ -538,8 +538,8 @@ class Problem_Setup:
             last_param_name = self.at_class.at_names[-1] + "_min"
             full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
             all_best_real = self.values_pref_to_real(full_opt_best)
-            all_best_scl = values_real_to_scaled(all_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
-            all_best_gp = all_best_scl.reshape(-1,1).T@param_matrix
+            all_best_nec = all_best_real.reshape(-1,1).T@param_matrix
+            all_best_gp = values_real_to_scaled(all_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
             all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
         else:
             all_best_gp = None
@@ -558,8 +558,8 @@ class Problem_Setup:
             last_param_name = self.at_class.at_names[-1] + "_min"
             molec_best = molec_df.loc[0, first_param_name:last_param_name].values
             ind_best_real = self.values_pref_to_real(molec_best)
-            ind_best_scl = values_real_to_scaled(ind_best_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol)
-            ind_best_gp = ind_best_scl.reshape(-1,1).T@param_matrix
+            ind_best_nec = ind_best_real.reshape(-1,1).T@param_matrix
+            ind_best_gp = values_real_to_scaled(ind_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
             ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
         else:
             ind_best_gp = None
@@ -567,8 +567,7 @@ class Problem_Setup:
 
         molec_paper = np.array(list(molec_data_dict[molec_ind].lit_param_set.values()))
         paper_real = self.values_pref_to_real(molec_paper)
-        paper_bounds = param_matrix.T@self.at_class.at_bounds_nm_kjmol.reshape(-1,2)
-        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), paper_bounds)
+        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
         paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
 
         param_dict["Literature"] = paper_best_gp
