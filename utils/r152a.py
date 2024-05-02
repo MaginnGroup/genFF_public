@@ -165,13 +165,13 @@ class R152aConstants:
     def uncertainties(self):
         """
         Dictionary with uncertainty for each calculation
-        from: https://doi.org/10.1063/1.555958
+        from: https://doi.org/10.1063/1.555979
         """
         uncertainty = {
-            "expt_liq_density": 0.0005,
-            "expt_vap_density": 0.0005,
-            "expt_Pvap": 0.0002,
-            "expt_Hvap": 0.01
+            "expt_liq_density": 0.0005, # not mentioned
+            "expt_vap_density": 0.0005, # not mentioned
+            "expt_Pvap": 0.005,
+            "expt_Hvap": 0.01 # not mentioned
         }
         return uncertainty
     

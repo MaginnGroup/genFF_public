@@ -157,13 +157,13 @@ class R116Constants:
     def uncertainties(self):
         """
         Dictionary with uncertainty for each calculation
-        from: Platzer, B.; Polt, A.; Maurer, G. Thermophysical Properties of Refrigerants; Springer-Verlag: Berlin, 1990.
+        from: https://doi.org/10.1021/je050186n
         Note: Hvap is set at 1% because a value was not given in the reference provided
         """
         uncertainty = {
-            "expt_liq_density": 0.0164125,
-            "expt_vap_density": 0.0034,
-            "expt_Pvap": 0.001038,
+            "expt_liq_density": 0.002,
+            "expt_vap_density": 0.002,
+            "expt_Pvap": 0.002,
             "expt_Hvap": 0.01
         }
         return uncertainty
