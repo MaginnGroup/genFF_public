@@ -4,7 +4,7 @@ import json
 project = signac.init_project()
 
 #Set Initial Parameters
-Atom_Type = 13
+Atom_Type = 14
 repeats  = 200
 repeats_ind = 20
 seed = 1

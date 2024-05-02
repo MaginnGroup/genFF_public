@@ -32,6 +32,8 @@ def make_atom_type_class(at_number):
         return AT_Scheme_12()
     elif at_number == 13:
         return AT_Scheme_13()
+    elif at_number == 14:
+        return AT_Scheme_14()
     else:
         raise ValueError("Invalid atom type number")
 class Atom_Types:
@@ -675,6 +677,99 @@ class AT_Scheme_13(Atom_Types):
                         "epsilon_C1": "epsilon_C2_3",
                         "epsilon_H1": "epsilon_H1",
                         "epsilon_F1": "epsilon_F_3",
+                        }
+
+        r170_map_dict = {"sigma_C1": "sigma_C2_0",
+                        "sigma_H1": "sigma_H1",
+                        "epsilon_C1": "epsilon_C2_0",
+                        "epsilon_H1": "epsilon_H1"}
+
+        at_names = at_keys.copy()
+        
+        molec_map_dicts = {"R14":r14_map_dict,
+            "R32":r32_map_dict,
+            "R50":r50_map_dict,
+            "R125":r125_map_dict,
+            "R134a":r134a_map_dict,
+            "R143a":r143a_map_dict,
+            "R170":r170_map_dict}
+        
+        super().__init__(at_bounds, at_names, molec_map_dicts)
+        #Get scaled bounds
+        self.scale_bounds()
+
+class AT_Scheme_14(Atom_Types):
+    """
+    Class for Atom Type Scheme 14
+
+    Methods
+    -------
+    __init__(self)
+    """
+    def __init__(self):
+        #Get Bounds
+        at_param_bounds_l = [2, 2, 2, 2, 2, 2, 1.5, 2, 2, 10, 10, 10, 10, 10, 10,  2, 15, 15] #Units of Angstroms and Kelvin for Sigmas and Epsilons
+        at_param_bounds_u = [4, 4, 4, 4, 4, 4, 3,   4, 4, 75, 75, 75, 75, 75, 75, 15, 50, 50]
+        at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
+        self.scheme_name = "at_14"
+        #Get Names
+        at_keys = ["sigma_Cm", "sigma_C1", "sigma_C2_0", "sigma_C2_1", "sigma_C2_2", "sigma_C2_3", "sigma_H1",
+                   "sigma_F_x", "sigma_F_4",
+                    "epsilon_Cm", "epsilon_C1", "epsilon_C2_0", "epsilon_C2_1", "epsilon_C2_2", "epsilon_C2_3", "epsilon_H1",
+                    "epsilon_F_x", "epsilon_F_4"]
+        assert len(at_keys) == len(at_param_bounds_l) == len(at_param_bounds_u), "Length of at_keys, at_param_bounds_l, and at_param_bounds_u must be the same"
+
+        #Create a file that maps param names (keys) to at_param names for atom type 13 (values) for each molecule
+        r14_map_dict = {"sigma_C1": "sigma_C1",
+                        "sigma_F1": "sigma_F_4",
+                        "epsilon_C1": "epsilon_C1",
+                        "epsilon_F1": "epsilon_F_4"}
+
+        r32_map_dict = {"sigma_C": "sigma_C1",
+                        "sigma_H": "sigma_H1",
+                        "sigma_F": "sigma_F_x",
+                        "epsilon_C": "epsilon_C1",
+                        "epsilon_H": "epsilon_H1",
+                        "epsilon_F": "epsilon_F_x"
+                        }
+
+        r50_map_dict = {"sigma_C1": "sigma_Cm",
+                        "sigma_H1": "sigma_H1",
+                        "epsilon_C1": "epsilon_Cm",
+                        "epsilon_H1": "epsilon_H1"}
+
+        r125_map_dict = {"sigma_C1":"sigma_C2_2",
+                    "sigma_C2": "sigma_C2_3",
+                    "sigma_H1": "sigma_H1",
+                    "sigma_F1":"sigma_F_x",
+                    "sigma_F2": "sigma_F_x",
+                    "epsilon_C1": "epsilon_C2_2",
+                    "epsilon_C2": "epsilon_C2_3",
+                    "epsilon_H1": "epsilon_H1",
+                    "epsilon_F1": "epsilon_F_x",
+                    "epsilon_F2": "epsilon_F_x"
+                    }
+
+        r134a_map_dict = {"sigma_C2": "sigma_C2_1",
+                    "sigma_C1": "sigma_C2_3",
+                    "sigma_H1": "sigma_H1",
+                    "sigma_F2": "sigma_F_x",
+                    "sigma_F1": "sigma_F_x",
+                    "epsilon_C2": "epsilon_C2_1",
+                    "epsilon_C1": "epsilon_C2_3",
+                    "epsilon_H1":"epsilon_H1",
+                    "epsilon_F2": "epsilon_F_x",
+                    "epsilon_F1": "epsilon_F_x"
+                    }
+
+        r143a_map_dict = {"sigma_C2": "sigma_C2_0",
+                          "sigma_C1": "sigma_C2_3",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F1": "sigma_F_x",
+                        "epsilon_C2": "epsilon_C2_0",
+                        "epsilon_C1": "epsilon_C2_3",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F1": "epsilon_F_x",
                         }
 
         r170_map_dict = {"sigma_C1": "sigma_C2_0",
