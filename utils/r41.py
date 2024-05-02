@@ -162,12 +162,13 @@ class R41Constants:
         """
         Dictionary with uncertainty for each calculation
         from: https://doi.org/10.1021/je050186n
+        Hvap not mentioned, put 2%
         """
         uncertainty = {
             "expt_liq_density": 0.002,
             "expt_vap_density": 0.002,
             "expt_Pvap": 0.002,
-            "expt_Hvap": 0.01
+            "expt_Hvap": 0.02
         }
         return uncertainty
     

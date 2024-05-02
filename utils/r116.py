@@ -158,13 +158,13 @@ class R116Constants:
         """
         Dictionary with uncertainty for each calculation
         from: https://doi.org/10.1021/je050186n
-        Note: Hvap is set at 1% because a value was not given in the reference provided
+        Note: Hvap is set at 2% because a value was not given in the reference provided
         """
         uncertainty = {
             "expt_liq_density": 0.002,
             "expt_vap_density": 0.002,
             "expt_Pvap": 0.002,
-            "expt_Hvap": 0.01
+            "expt_Hvap": 0.02
         }
         return uncertainty
 

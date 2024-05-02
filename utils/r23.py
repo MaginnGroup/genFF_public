@@ -161,13 +161,14 @@ class R23Constants:
     def uncertainties(self):
         """
         Dictionary with uncertainty for each calculation
-        from: https://doi.org/10.1063/1.1559671
+        from: https://doi.org/10.1063/1.1559671 
+        Hvap not mentioned, put 2%
         """
         uncertainty = {
             "expt_liq_density": 0.001,
             "expt_vap_density": 0.001,
             "expt_Pvap": 0.002,
-            "expt_Hvap": 0.01
+            "expt_Hvap": 0.02
         }
         return uncertainty
     
