@@ -10,7 +10,7 @@ import scipy
 #Set params for saving results and whether obj wts are scaled
 save_data = True
 opt_choice = "ExpVal"
-at_class = atom_type.AT_Scheme_13()
+at_class = atom_type.AT_Scheme_14()
 
 #Load class properies for each molecule
 r14_class = r14.R14Constants()
