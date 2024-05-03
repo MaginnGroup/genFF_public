@@ -16,7 +16,7 @@ import tensorflow as tf
 from itertools import combinations
 import numdifftools as nd
 from sklearn.metrics import mean_absolute_percentage_error
-from . import r14, r32, r50, r125, r134a, r143a, r170
+from . import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -93,6 +93,15 @@ class Problem_Setup:
         r134a_class = r134a.R134aConstants()
         r143a_class = r143a.R143aConstants()
         r170_class = r170.R170Constants()
+
+        r41_class = r41.R41Constants()
+        r23_class = r23.R23Constants()
+        r161_class = r161.R161Constants()
+        r152a_class = r152a.R152aConstants()
+        r152_class = r152.R152Constants()
+        r143_class = r143.R143Constants()
+        r134_class = r134.R134Constants()
+        r116_class = r116.R116Constants()
         #Set a dictionary of all molecule data
         self.all_train_molec_data = {"R14":r14_class, 
                    "R32":r32_class, 
@@ -101,6 +110,16 @@ class Problem_Setup:
                    "R125":r125_class, 
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
+
+        self.all_molec_data = {"R41":r41_class, 
+                   "R23":r23_class, 
+                   "R161":r161_class, 
+                   "R152a":r152a_class, 
+                   "R152":r152_class, 
+                   "R134":r134_class, 
+                   "R143":r143_class,
+                   "R116": r116_class}
+
         self.all_train_gp_dict = get_gp_data_from_pkl(list(self.all_train_molec_data.keys()))
         
         self.valid_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
