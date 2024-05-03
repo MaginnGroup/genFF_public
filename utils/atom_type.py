@@ -498,6 +498,76 @@ class AT_Scheme_11(Atom_Types):
                         "epsilon_C1": "epsilon_C2_0",
                         "epsilon_H1": "epsilon_H1"}
 
+        #Test molecules
+        r41_map_dict = {"sigma_C1": "sigma_C1",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F1": "sigma_F_1",
+                        "epsilon_C1": "epsilon_C1",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F1": "epsilon_F_1"
+                        } 
+
+        r23_map_dict = {"sigma_C1": "sigma_C1",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F3": "sigma_F_3",
+                        "epsilon_C1": "epsilon_C1",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F3": "epsilon_F_3"
+                        } 
+        
+        r161_map_dict = {"sigma_C1": "sigma_C2_0",
+                         "sigma_C2": "sigma_C2_1",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F1": "sigma_F_1",
+                        "epsilon_C1": "epsilon_C2_0",
+                        "epsilon_C2": "epsilon_C2_1",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F1": "epsilon_F_1",
+                        }
+        
+        r152a_map_dict = {"sigma_C1": "sigma_C2_0",
+                         "sigma_C2": "sigma_C2_2",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F1": "sigma_F_2",
+                        "epsilon_C1": "epsilon_C2_0",
+                        "epsilon_C2": "epsilon_C2_2",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F1": "epsilon_F_2",
+                        }
+        
+        r152_map_dict = {"sigma_C1": "sigma_C2_1",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F1": "sigma_F_1",
+                        "epsilon_C1": "epsilon_C2_1",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F1": "epsilon_F_1",
+                        }
+
+        r143_map_dict = {"sigma_C2": "sigma_C2_1",
+                         "sigma_C1": "sigma_C2_2",
+                        "sigma_H1": "sigma_H1",
+                        "sigma_F2": "sigma_F_1",
+                        "sigma_F1": "sigma_F_2",
+                        "epsilon_C2": "epsilon_C2_1",
+                        "epsilon_C1": "epsilon_C2_2",
+                        "epsilon_H1": "epsilon_H1",
+                        "epsilon_F2": "epsilon_F_1",
+                        "epsilon_F1": "epsilon_F_2",
+                        }
+        
+        r134_map_dict = {"sigma_C": "sigma_C2_2",
+                        "sigma_H": "sigma_H1",
+                        "sigma_F": "sigma_F_2",
+                        "epsilon_C": "epsilon_C2_2",
+                        "epsilon_H": "epsilon_H1",
+                        "epsilon_F": "epsilon_F_2"
+                        } 
+        
+        r116_map_dict = {"sigma_C1": "sigma_C2_3",
+                        "sigma_F1": "sigma_F_3",
+                        "epsilon_C1": "epsilon_C2_3",
+                        "epsilon_F1": "epsilon_F_3"}
+        
         at_names = at_keys.copy()
         
         molec_map_dicts = {"R14":r14_map_dict,
@@ -506,7 +576,15 @@ class AT_Scheme_11(Atom_Types):
             "R125":r125_map_dict,
             "R134a":r134a_map_dict,
             "R143a":r143a_map_dict,
-            "R170":r170_map_dict}
+            "R170":r170_map_dict,
+            "R41":r41_map_dict,
+            "R23":r23_map_dict,
+            "R161":r161_map_dict,
+            "R152a":r152a_map_dict,
+            "R152":r152_map_dict,
+            "R143":r143_map_dict,
+            "R134":r134_map_dict,
+            "R116":r116_map_dict}
         
         super().__init__(at_bounds, at_names, molec_map_dicts)
         #Get scaled bounds
