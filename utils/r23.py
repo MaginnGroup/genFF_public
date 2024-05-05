@@ -38,10 +38,10 @@ class R23Constants:
         param_names = (
             "sigma_C1",
             "sigma_H1",
-            "sigma_F3",
+            "sigma_F1",
             "epsilon_C1",
             "epsilon_H1",
-            "epsilon_F3",
+            "epsilon_F1",
         )
 
         return param_names

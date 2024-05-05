@@ -40,10 +40,12 @@ class R152aConstants:
             "sigma_C2",
             "sigma_F1",
             "sigma_H1",
+            "sigma_H2",
             "epsilon_C1",
             "epsilon_C2",
             "epsilon_F1",
             "epsilon_H1",
+            "epsilon_H2",
         )
 
         return param_names
@@ -60,6 +62,7 @@ class R152aConstants:
                         [2.0,4.0], #[3.0, 4.0],  # C
                         [2.0,4.0], #[2.5, 3.5],  # F
                         [1.5, 3.0],  # H
+                        [1.5, 3.0],  # H
                     ]
                 )
                 * u.Angstrom
@@ -75,6 +78,7 @@ class R152aConstants:
                         [10.0,75.0], #[20.0, 75.0],  # C
                         [10.0,75.0], #[20.0, 75.0],  # C
                         [15.0,50.0], #[15.0, 40.0],  # F
+                        [2.0, 10.0],  # H
                         [2.0, 10.0],  # H
                     ]
                 )
