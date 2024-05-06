@@ -44,7 +44,7 @@ def get_gp_data_from_pkl(key_list):
     for key in key_list:
         #Get dict of vle gps
         #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-        file = os.path.join(key +"-vlegp/vle-gps.pkl")
+        file = os.path.join("molec_gp_data/" + key +"-vlegp/vle-gps.pkl")
         assert os.path.isfile(file), f"{file} does not exist. Check file path carefully."
         with open(file, 'rb') as pickle_file:
             all_gp_dict[key] = pickle.load(pickle_file)
@@ -281,15 +281,15 @@ class Problem_Setup:
         test_data = {}
         train_data = {}
         for str in ["train", "test"]:
-            #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-            file_x = os.path.join(molec_key +"-vlegp/x_" + str +".csv")
-            assert os.path.isfile(file_x), "key-vlegp/x_****.csv does not exist. Check key list carefully"
+            #OPTIONAL (but not implemented here) append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
+            file_x = os.path.join("molec_gp_data/" + molec_key +"-vlegp/x_" + str +".csv")
+            assert os.path.isfile(file_x), "molec_gp_data/key-vlegp/x_****.csv does not exist. Check key list carefully"
             x = np.loadtxt(file_x, delimiter=",",skiprows=1)
             dict = train_data if str == "train" else test_data
             dict["x"]=x
 
             for prop_key in prop_keys:
-                file_y = os.path.join(molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
+                file_y = os.path.join("molec_gp_data/" + molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
                 prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
                 dict[prop_key]=prop_data
 
