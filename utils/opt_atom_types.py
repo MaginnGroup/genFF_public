@@ -593,6 +593,56 @@ class Problem_Setup:
 
         return param_dict
 
+    def calc_MAPD_any(self, all_molec_list, theta_guess, save_data = False, save_label = None):
+        """
+        Calculate the mean absolute percentage deviation for each training data prediction
+        """
+        assert isinstance(save_data, bool), "save_data must be a bool"
+        assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
+        assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
+        df = pd.DataFrame(columns = ["Molecule", "Property", "Model", "MAPD"])
+        
+        #Make pdf
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        #Loop over all molecules of interest
+        for molec in all_molec_list:
+            #Get constants for molecule
+            molec_object = self.all_train_molec_data[molec]
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            #Get param matrix
+            param_matrix = self.at_class.get_transformation_matrix({molec: self.all_train_molec_data[molec]})
+
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                x_data = np.array(list(exp_data.keys()))
+                y_data = np.array(list(exp_data.values()))
+
+                #get theta guess into scaled units
+                all_best_real = self.values_pref_to_real(theta_guess)
+                all_best_nec = all_best_real.reshape(-1,1).T@param_matrix
+                all_best_gp = values_real_to_scaled(all_best_nec.reshape(1,-1), self.all_train_molec_data[molec].param_bounds)
+                theta_guess_scl = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
+
+                T_scaled = values_real_to_scaled(x_data, molec_object.temperature_bounds)
+                parm_set_repeat = np.tile(theta_guess_scl, (len(x_data), 1))
+                gp_theta_guess = np.hstack((parm_set_repeat, T_scaled))
+                mean_scaled, var_scaled = gp_model.predict_f(gp_theta_guess)
+                mean = values_scaled_to_real(mean_scaled, y_bounds)
+                mapd = mean_absolute_percentage_error(y_data, mean)*100
+                new_row = pd.DataFrame({"Molecule": [molec], "Property": [key], "Model": ["Opt"], "MAPD": [mapd]})
+                df = pd.concat([df, new_row], ignore_index=True)
+        
+        if save_data == True:
+            save_label = save_label if save_label is not None else "MAPD_set"
+            save_csv_path = os.path.join(dir_name, "MAPD_" + save_label + ".csv")
+            df.to_csv(save_csv_path, index = False, header = True)
+        return df
+    
     def calc_MAPD_best(self, all_molec_list, save_data = False, save_label = None):
         """
         Calculate the mean absolute percentage deviation for each training data prediction
