@@ -16,7 +16,7 @@ import tensorflow as tf
 from itertools import combinations
 import numdifftools as nd
 from sklearn.metrics import mean_absolute_percentage_error
-from . import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+from .molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -44,7 +44,7 @@ def get_gp_data_from_pkl(key_list):
     for key in key_list:
         #Get dict of vle gps
         #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-        file = os.path.join("molec_gp_data/" + key +"-vlegp/vle-gps.pkl")
+        file = os.path.join("molec_gp_data", key +"-vlegp/vle-gps.pkl")
         assert os.path.isfile(file), f"{file} does not exist. Check file path carefully."
         with open(file, 'rb') as pickle_file:
             all_gp_dict[key] = pickle.load(pickle_file)

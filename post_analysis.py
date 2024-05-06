@@ -1,5 +1,6 @@
 #Imports
-from utils import r14, r32, r50, r125, r134a, r143a, r170, atom_type, opt_atom_types
+from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170
+from utils import atom_type, opt_atom_types
 import numpy as np
 import unyt as u
 import pandas as pd
