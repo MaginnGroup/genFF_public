@@ -82,6 +82,7 @@ def init_project():
             for sample in scaled_params:
                 # Define the initial state point
                 state_point = {
+                    "atom_type": at_number,
                     "mol_name": molec_name,
                     "mol_weight": molec_data.molecular_weight.in_units(u.amu).value,
                     "smiles": molec_data.smiles_str,

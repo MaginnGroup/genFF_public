@@ -50,10 +50,15 @@ molec_dict = {"R14": R14,
                 # "R134": R134,
                 "R116": R116}
 
-
-project_path = "gaff_ff_ms" #Options: "" or "gaff_ff_ms" or "opt_ff_ms"
+at_number = 11
+project_path = "gaff_ff_ms" #Options: "gaff_ff_ms" or "opt_ff_ms"
 project = signac.get_project(project_path)
-csv_root = os.path.join("Results_MS", project_path)
+if project_path == "opt_ff_ms":
+    project = project.find_jobs({"atom_type": at_number})
+    at_num_str = str(at_number)
+else:
+    at_num_str = ""
+csv_root = os.path.join("Results_MS", at_num_str, project_path)
 os.makedirs(csv_root, exist_ok=True)
 
 #Loop over all constants
@@ -70,8 +75,8 @@ for molec in list(molec_dict.keys()):
 
     #Get data from molecular simulations
     project_molec = project.find_jobs({"mol_name": molec})
-    csv_name = os.path.join(csv_root, molec + "_results.csv")
-    df_molec = save_signac_results(project_molec, mol_data.param_names, property_names, csv_name)
+    csv_molec = os.path.join(csv_root, molec)
+    df_molec = save_signac_results(project_molec, mol_data.param_names, property_names, csv_molec)
 
     #Calculate MAPD and MSE for each T point
     df_all = prepare_df_vle(df_molec, mol_data)

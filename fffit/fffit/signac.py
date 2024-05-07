@@ -1,6 +1,7 @@
 import numpy as np
 import signac
 import pandas as pd
+import os
 
 
 def save_signac_results(project, param_names, property_names, csv_name):
@@ -57,6 +58,7 @@ def save_signac_results(project, param_names, property_names, csv_name):
 
     # Save to csv file for record-keeping
     df = pd.DataFrame(data)
-    df.to_csv(csv_name)
+    path = os.path.join(csv_name,"ms_data.csv")
+    df.to_csv(path)
 
     return df

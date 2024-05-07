@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -152,146 +153,96 @@ def prepare_df_vle_errors(df, molecule):
     new_df = pd.DataFrame(new_data, columns=columns)
     return new_df
 
-def plot_vle_envelopes(df_opt_ms, df_lit_ms, df_gaff_ms, molec_data_dict):
+def get_min_max(curr_min, curr_max, new_vals):
+    for val in new_vals:
+        if min(val) < curr_min:
+            curr_min = val
+        if max(val) > curr_max:
+            curr_max = val
+    return curr_min, curr_max
+
+def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
+    molec = str(molec_dict.keys())
+    mol_data = molec_dict[molec]
     # Plot VLE envelopes
     fig, ax2 = plt.subplots(1, 1, figsize=(6,6))
-    temps_r14 = R14.expt_liq_density.keys()
+    temps = mol_data.expt_liq_density
 
-    #clrs = seaborn.color_palette('bright', n_colors=len(df_r14))
-    #np.random.seed(11)
-    #np.random.shuffle(clrs)
+    #Initialize min and max values
+    min_temp = min(temps)
+    max_temp = mol_data.expt_Tc
+    min_rho = min(mol_data.expt_vap_density.values())
+    max_rho = max(mol_data.expt_liq_density.values())
 
-    for temp in temps_r14:
-        print(df_r14.loc[f"sim_liq_density_{float(temp):.0f}K"])
+    for temp in temps:
+        #Plot opt_scheme_ms vle curve
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt.loc[f"sim_liq_density_{float(temp):.0f}K"])
+        print(df_opt.loc[f"sim_liq_density_{float(temp):.0f}K"])
         ax2.scatter(
-            df_r14.loc[f"sim_liq_density_{float(temp):.0f}K"],
-            temp,
-            c='blue',
-            s=160,
-            alpha=0.7,
-        )
+            df_opt.loc[f"sim_liq_density_{float(temp):.0f}K"], temp,
+            c='blue', s=160, alpha=0.7,)
         ax2.scatter(
-            df_r14.loc[f"sim_vap_density_{float(temp):.0f}K"],
-            temp,
-            c='blue',
-            s=160,
-            alpha=0.7,
-        )
-    ax2.scatter(
-        df_r14.loc["sim_rhoc"],
-        df_r14.loc["sim_Tc"],
-        c='blue',
-        s=160,
-        alpha=0.7,
-    )
+            df_opt.loc[f"sim_vap_density_{float(temp):.0f}K"],temp,
+            c='blue',s=160,alpha=0.7,)
+        
+    #Plot critical points
+    ax2.scatter(df_opt.loc["sim_rhoc"],df_opt.loc["sim_Tc"],
+        c='blue',s=160,alpha=0.7,)
 
-    tc, rhoc = calc_critical(df_r14_gaff)
-    print("GAFF: ", tc, " K ",rhoc)
-    ax2.scatter(
-        df_r14_gaff["liq_density"],
-        df_r14_gaff["temperature"],
-        c='gray',
-        s=120,
-        alpha=0.7,
-        marker='s',
-        label="GAFF",
-    )
-    ax2.scatter(
-        df_r14_gaff["vap_density"],
-        df_r14_gaff["temperature"],
-        c='gray',
-        s=120,
-        alpha=0.7,
-        marker='s',
-    )
-    ax2.scatter(
-        rhoc,
-        tc,
-        c='gray',
-        s=120,
-        alpha=0.7,
-        marker='s',
-    )
+    #Plot GAFF VLE Data if it exists
+    if df_gaff is not None:
+        tc, rhoc = calc_critical(df_gaff)
+        min_temp, max_temp = get_min_max(min_temp, max_temp, tc)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["liq_density"])
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["vap_density"])
+        print("GAFF: ", tc, " K ",rhoc)
+        ax2.scatter(df_gaff["liq_density"], df_gaff["temperature"],
+            c='gray',s=120,alpha=0.7,marker='s',label="GAFF",)
+        ax2.scatter(df_gaff["vap_density"],df_gaff["temperature"],
+            c='gray',s=120,alpha=0.7, marker='s',)
+        ax2.scatter(rhoc,tc,
+            c='gray',s=120,alpha=0.7,marker='s',)
 
-    tc, rhoc = calc_critical(df_r14_lit)
-    print(tc,rhoc)
-    ax2.scatter(
-        df_r14_lit["liq_density"],
-        df_r14_lit["temperature"],
-        c='#0989d9',
-        s=160,
-        alpha=0.7,
-        marker='^',
-        label="Potoff et al.",
-    )
-    ax2.scatter(
-        df_r14_lit["vap_density"],
-        df_r14_lit["temperature"],
-        c='#0989d9',
-        s=160,
-        alpha=0.7,
-        marker='^',
-    )
-    ax2.scatter(
-        rhoc,
-        tc,
-        c='#0989d9',
-        s=160,
-        alpha=0.7,
-        marker='^',
-    )
+    #Plot Potoff Data if it exists
+    if df_lit is not None:
+        tc, rhoc = calc_critical(df_lit)
+        min_temp, max_temp = get_min_max(min_temp, max_temp, tc)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["liq_density"])
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["vap_density"])
+        print(tc,rhoc)
+        ax2.scatter(df_lit["liq_density"],df_lit["temperature"],
+            c='#0989d9',s=160,alpha=0.7,marker='^',label="Potoff et al.",)
+        ax2.scatter(df_lit["vap_density"], df_lit["temperature"],
+            c='#0989d9',s=160,alpha=0.7,marker='^',)
+        ax2.scatter(rhoc,tc,
+            c='#0989d9',s=160,alpha=0.7,marker='^',)
 
-    tc, rhoc = calc_critical(df_r14_trappe)
-    ax2.scatter(
-        df_r14_trappe["liq_density"],
-        df_r14_trappe["temperature"],
-        c='red',
-        s=160,
-        alpha=0.7,
-        marker='*',
-        label="TraPPE",
-    )
-    ax2.scatter(
-        df_r14_trappe["vap_density"],
-        df_r14_trappe["temperature"],
-        c='red',
-        s=160,
-        alpha=0.7,
-        marker='*',
-    )
-    ax2.scatter(
-        rhoc,
-        tc,
-        c='red',
-        s=160,
-        alpha=0.7,
-        marker='*',
-    )
+    #Plot TraPPE data if it exists
+    if df_trappe is not None:
+        tc, rhoc = calc_critical(df_trappe)
+        min_temp, max_temp = get_min_max(min_temp, max_temp, tc)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["liq_density"])
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["vap_density"])
+        ax2.scatter(df_trappe["liq_density"],df_trappe["temperature"],
+            c='red',s=160,alpha=0.7,marker='*',label="TraPPE",)
+        ax2.scatter(df_trappe["vap_density"],df_trappe["temperature"],
+            c='red',s=160,alpha=0.7,marker='*',)
+        ax2.scatter(rhoc,tc,
+            c='red',s=160, alpha=0.7,marker='*',)
 
-    ax2.scatter(
-        R14.expt_liq_density.values(),
-        R14.expt_liq_density.keys(),
-        color="black",
-        marker="x",
-        linewidths=2,
-        s=200,
-        label="Experiment",
-    )
-    ax2.scatter(
-        R14.expt_vap_density.values(),
-        R14.expt_vap_density.keys(),
-        color="black",
-        marker="x",
-        linewidths=2,
-        s=200,
-    )
-    ax2.scatter(R14.expt_rhoc, R14.expt_Tc, color="black", marker="x", linewidths=2, s=200)
+    #Plot experimental data
+    ax2.scatter(mol_data.expt_liq_density.values(),mol_data.expt_liq_density.keys(),
+        color="black",marker="x",linewidths=2,s=200,label="Experiment",)
+    ax2.scatter(mol_data.expt_vap_density.values(),mol_data.expt_vap_density.keys(),
+        color="black",marker="x",linewidths=2,s=200,)
+    ax2.scatter(mol_data.expt_rhoc, mol_data.expt_Tc, color="black", marker="x", linewidths=2, s=200)
 
-    ax2.set_xlim(-50, 1850)
+    #Set Axes
+    ax2.set_xlim(min_rho*0.95,max_rho*1.05)
     ax2.xaxis.set_major_locator(MultipleLocator(500))
     ax2.xaxis.set_minor_locator(AutoMinorLocator(4))
     
-    ax2.set_ylim(120,280)
+    ax2.set_ylim(min_temp*0.95, max_temp*1.05)
     ax2.yaxis.set_major_locator(MultipleLocator(40))
     ax2.yaxis.set_minor_locator(AutoMinorLocator(4))
     
@@ -303,17 +254,15 @@ def plot_vle_envelopes(df_opt_ms, df_lit_ms, df_gaff_ms, molec_data_dict):
     ax2.set_ylabel("T (K)", fontsize=32, labelpad=10)
     ax2.set_xlabel(r"$\mathregular{\rho}$ (kg/m$\mathregular{^3}$)", fontsize=32, labelpad=15)
     for axis in ['top','bottom','left','right']:
-    #    ax1.spines[axis].set_linewidth(2.0)
         ax2.spines[axis].set_linewidth(2.0)
 
     ax2.legend(loc="lower left", bbox_to_anchor=(-0.16, 1.03), ncol=2, fontsize=22, handletextpad=0.1, markerscale=0.9, edgecolor="dimgrey")
-    #ax1.text(0.08, 0.82, "a", fontsize=40, transform=ax1.transAxes)
-    #ax1.text(0.5, 0.82, "HFC-32", fontsize=34, transform=ax1.transAxes)
-    #ax2.text(0.08, 0.82, "a", fontsize=40, transform=ax2.transAxes)
-    ax2.text(0.7,  0.82, "R-14", fontsize=30, transform=ax2.transAxes)
+    ax2.text(0.7,  0.82, molec, fontsize=30, transform=ax2.transAxes)
     fig.subplots_adjust(bottom=0.2, top=0.75, left=0.15, right=0.95, wspace=0.55)
 
-    fig.savefig("pdfs/fig3_r14-results-vle.png",dpi=300)
+    if save_name is not None:
+        path = os.path.join(save_name, "vle_plt.png")
+        fig.savefig(path,dpi=300)
 
 
 def calc_critical(df):
@@ -343,59 +292,58 @@ def calc_critical(df):
 
     return Tc, rhoc
 
-def plot_pvap_hvap():
-        #fig, ax2 = plt.subplots(1, 1, figsize=(6,6))
-    temps_r14 = R14.expt_liq_density.keys()
+def plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
+    molec = str(molec_dict.keys())
+    mol_data = molec_dict[molec]
+    # Plot Pvap and Hvap
+    fig, ax2 = plt.subplots(1, 1, figsize=(6,6))
+    temps = mol_data.expt_Hvap.keys()
+
+    #Initialize min and max values
+    min_temp = min(temps)
+    max_temp = mol_data.expt_Tc
+    min_pvap = min(mol_data.expt_Pvap.values())
+    max_pvap = max(mol_data.expt_Pvap.values())
+    min_hvap = min(mol_data.expt_Hvap.values())
+    max_hvap = max(mol_data.expt_Hvap.values())
 
     # Plot Pvap / Hvap
     fig, axs = plt.subplots(nrows=1, ncols=2,figsize=(12,6))
     #fig, ax1 = plt.subplots(1, 1, figsize=(6,6))
-    clrs = seaborn.color_palette('bright', n_colors=len(df_r14))
+    clrs = seaborn.color_palette('bright', n_colors=len(df_opt))
     np.random.seed(11)
     np.random.shuffle(clrs)
 
-    for temp in temps_r14:
-        axs[0].scatter(
-            temp,
-            df_r14.loc[f"sim_Pvap_{float(temp):.0f}K"],
-            #np.tile(temp, len(df_r14)),
-            #df_r14.filter(regex=(f"Pvap_{float(temp):.0f}K")),
-            c='blue',
-            s=70,
-            alpha=0.7,
-        )
-    axs[0].scatter(
-        df_r14_gaff["temperature"],
-        df_r14_gaff["Pvap"],
-        c='gray',
-        s=70,
-        alpha=0.7,
-        label="GAFF",
-        marker='s',
-    )
-    axs[0].scatter(
-        df_r14_lit["temperature"],
-        df_r14_lit["Pvap"],
-        c='#0989d9',
-        s=70,
-        alpha=0.7,
-        label="Potoff et al.",
-        marker='^',
-    )
-    axs[0].scatter(
-        R14.expt_Pvap.keys(),
-        R14.expt_Pvap.values(),
-        color="black",
-        marker="x",
-        label="Experiment",
-        s=80,
-    )
+    #Plot opt pvap
+    for temp in temps:
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_opt.loc[f"sim_Pvap_{float(temp):.0f}K"])
+        axs[0].scatter(temp, df_opt.loc[f"sim_Pvap_{float(temp):.0f}K"],
+            c='blue',s=70,alpha=0.7,)
+    
+    #Plot GAFF pvap if it exists
+    if df_gaff is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"])
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_gaff["Pvap"])
+        axs[0].scatter(df_gaff["temperature"],df_gaff["Pvap"],
+            c='gray',s=70,alpha=0.7,marker='s',label="GAFF",)
 
-    axs[0].set_xlim(120,230)
+    #Plot potoff pvap if it exists
+    if df_lit is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"])
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_lit["Pvap"])
+        axs[0].scatter(df_lit["temperature"],df_lit["Pvap"],
+            c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
+
+    #Plot experimental pvap
+    axs[0].scatter(mol_data.expt_Pvap.keys(),mol_data.expt_Pvap.values(),
+        color="black",marker="x",label="Experiment",s=80,)
+
+
+    axs[0].set_xlim(min_temp*0.95,max_temp*1.05)
     axs[0].xaxis.set_major_locator(MultipleLocator(40))
     axs[0].xaxis.set_minor_locator(AutoMinorLocator(4))
 
-    axs[0].set_ylim(-2,35)
+    axs[0].set_ylim(min_pvap*0.95,max_pvap*1.05)
     axs[0].yaxis.set_major_locator(MultipleLocator(10))
     axs[0].yaxis.set_minor_locator(AutoMinorLocator(5))
 
@@ -406,53 +354,36 @@ def plot_pvap_hvap():
 
     axs[0].set_xlabel("T (K)", fontsize=16, labelpad=8)
     axs[0].set_ylabel(r"$\mathregular{P_{vap}}$ (bar)", fontsize=16, labelpad=8)
-    #for axis in ['top','bottom','left','right']:
-    #    axs[0,0].spines[axis].set_linewidth(2.0)
-    #    axs[0,1].spines[axis].set_linewidth(2.0)
-    #    axs[1,0].spines[axis].set_linewidth(2.0)
-    #    axs[1,1].spines[axis].set_linewidth(2.0)
 
     # Plot Enthalpy of Vaporization
-    for temp in temps_r14:
-        axs[1].scatter(
-            temp,
-            df_r14.loc[f"sim_Hvap_{float(temp):.0f}K"],
-            #np.tile(temp, len(df_r14)),
-            #df_r14.filter(regex=(f"Hvap_{float(temp):.0f}K")),
-            c='blue',
-            s=70,
-            alpha=0.7,
-        )
-    axs[1].scatter(
-        df_r14_gaff["temperature"],
-        df_r14_gaff["Hvap"] / R14.molecular_weight * 1000.0,
-        c='gray',
-        s=70,
-        alpha=0.7,
-        marker='s',
-    )
-    print(df_r14_gaff["temperature"],df_r14_gaff["Hvap"] / R14.molecular_weight * 1000.0)
-    axs[1].scatter(
-        df_r14_lit["temperature"],
-        df_r14_lit["Hvap"] ,#kj/kg
-        c='#0989d9',
-        s=70,
-        alpha=0.7,
-        marker='^',
-    )
-    axs[1].scatter(
-        R14.expt_Hvap.keys(),
-        R14.expt_Hvap.values(),
-        color="black",
-        marker="x",
-        s=80,
-    )
+    for temp in temps:
+        axs[1].scatter(temp,df_opt.loc[f"sim_Hvap_{float(temp):.0f}K"],
+            c='blue',s=70,alpha=0.7,)
+        
+    #Plot GAFF Hvap if it exists
+    if df_gaff is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"])
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_gaff["Hvap"]/mol_data.molecular_weight * 1000.0)
+        axs[1].scatter(df_gaff["temperature"],df_gaff["Hvap"]/ mol_data.molecular_weight * 1000.0,
+            c='gray',s=70,alpha=0.7,marker='s',label="GAFF",)
+        print(df_gaff["temperature"],df_gaff["Hvap"] / mol_data.molecular_weight * 1000.0)
 
-    axs[1].set_xlim(120,230)
+    #Plot potoff Hvap if it exists
+    if df_lit is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"])
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_lit["Hvap"])
+        axs[1].scatter(df_lit["temperature"],df_lit["Hvap"],
+            c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
+
+    #Plot experimental Hvap
+    axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
+        color="black",marker="x",label="Experiment",s=80,)
+
+    axs[1].set_xlim(min_temp*0.95,max_temp*1.05)
     axs[1].xaxis.set_major_locator(MultipleLocator(40))
     axs[1].xaxis.set_minor_locator(AutoMinorLocator(4))
 
-    axs[1].set_ylim(20,210)
+    axs[1].set_ylim(min_hvap*0.95, max_hvap*1.05)
     axs[1].yaxis.set_major_locator(MultipleLocator(100))
     axs[1].yaxis.set_minor_locator(AutoMinorLocator(5))
 
@@ -464,9 +395,10 @@ def plot_pvap_hvap():
     axs[1].set_xlabel("T (K)", fontsize=16, labelpad=8)
     axs[1].set_ylabel(r"$\mathregular{\Delta H_{vap}}$ (kJ/kg)", fontsize=16, labelpad=8)
 
-
-    axs[0].text(0.08, 0.8, "R-14", fontsize=20, transform=axs[0].transAxes)
+    axs[0].text(0.08, 0.8, molec, fontsize=20, transform=axs[0].transAxes)
     axs[0].legend(loc="lower left", bbox_to_anchor=(0.35, 1.05), ncol=3, fontsize=16, handletextpad=0.1, markerscale=0.8, edgecolor="dimgrey")
 
     fig.subplots_adjust(bottom=0.15, top=0.85, left=0.15, right=0.85, wspace=0.55, hspace=0.5)
-    fig.savefig("pdfs/fig3-p-h-png",dpi=300)
+    if save_name is not None:
+        path = os.path.join(save_name, "h_p_vap_plt.png")
+        fig.savefig(path,dpi=300)
