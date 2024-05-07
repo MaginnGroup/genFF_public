@@ -43,6 +43,42 @@ custom_args_gemc["prop_freq"] = 1000
 custom_args_gemc["vdw_cutoff_box1"] = custom_args["vdw_cutoff"] 
 custom_args_gemc["charge_cutoff_box1"] = custom_args["charge_cutoff"]
 
+from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+from utils import atom_type, opt_atom_types
+
+#Load class properies for each training and testing molecule
+R14 = r14.R14Constants()
+R32 = r32.R32Constants()
+R50 = r50.R50Constants()
+R125 = r125.R125Constants()
+R134a = r134a.R134aConstants()
+R143a = r143a.R143aConstants()
+R170 = r170.R170Constants()
+R41 = r41.R41Constants()
+R23 = r23.R23Constants()
+R161 = r161.R161Constants()
+R152a = r152a.R152aConstants()
+R152 = r152.R152Constants()
+R143 = r143.R143Constants()
+R134 = r134.R134Constants()
+R116 = r116.R116Constants()
+
+molec_dict = {"R14": R14,
+                "R32": R32,
+                "R50": R50,
+                "R125": R125,
+                "R134a": R134a,
+                "R143a": R143a,
+                "R170": R170,
+                "R41": R41,
+                "R23": R23,
+                "R161":R161,
+                "R152a":R152a,
+                # "R152": R152,
+                # "R143": R143,
+                # "R134": R134,
+                "R116": R116}
+
 vle = Project.make_group(name="vle")
 
 @vle
@@ -120,8 +156,19 @@ def calc_boxl(job):
     "Calculate the initial box length of the boxes"
 
     import unyt as u
-
-    ref = {t.in_units(u.K).to_value(): (rho_liq, rho_vap, p_vap) for t, rho_liq, rho_vap, p_vap in reference_data}
+    #Get reference data from constants file
+    #Load class properies for each training and testing molecule
+    class_dict = _get_class_from_molecule(job.sp.mol_name)
+    class_data = class_dict[job.sp.mol_name]
+    # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in project_gaff.py as needed)
+    # Loop over the keys of the dictionaries
+    ref = {}
+    for t in class_data.expt_Pvap.keys():
+        rho_liq = class_data.expt_liq_density[t]
+        rho_vap = class_data.expt_vap_density[t]
+        p_vap = class_data.expt_Pvap[t]
+        # Create a tuple containing the values from each dictionary
+        ref[t.in_units(u.K).to_value()] = (rho_liq, rho_vap, p_vap)
 
     vap_density = ref[job.sp.T][1]
     mol_density = vap_density / (job.sp.mol_weight * u.amu)
@@ -301,9 +348,14 @@ def NPT_liqbox(job):
     # Move into the job dir and start doing things
     with job:
         # Run equilibration
-        for item in reference_data:
-            if item[0].value == job.sp.T:
-                pressure = item[-1]
+        #Load class properies for each training and testing molecule
+        class_dict = _get_class_from_molecule(job.sp.mol_name)
+        class_data = class_dict[job.sp.mol_name]
+        # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in project_gaff.py as needed)
+        # Loop over the keys of the dictionaries
+        for t, pvap in class_data.expt_Pvap.items():
+            if t == job.sp.T:
+                pressure = pvap
 
         mc.run(
             system=system,
@@ -798,6 +850,40 @@ def plot(job):
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
 #####################################################################
+def _get_class_from_molecule(molecule_name):
+    #Load class properies for each training and testing molecule
+    R14 = r14.R14Constants()
+    R32 = r32.R32Constants()
+    R50 = r50.R50Constants()
+    R125 = r125.R125Constants()
+    R134a = r134a.R134aConstants()
+    R143a = r143a.R143aConstants()
+    R170 = r170.R170Constants()
+    R41 = r41.R41Constants()
+    R23 = r23.R23Constants()
+    R161 = r161.R161Constants()
+    R152a = r152a.R152aConstants()
+    R152 = r152.R152Constants()
+    R143 = r143.R143Constants()
+    R134 = r134.R134Constants()
+    R116 = r116.R116Constants()
+
+    molec_dict = {"R14": R14,
+                    "R32": R32,
+                    "R50": R50,
+                    "R125": R125,
+                    "R134a": R134a,
+                    "R143a": R143a,
+                    "R170": R170,
+                    "R41": R41,
+                    "R23": R23,
+                    "R161":R161,
+                    "R152a":R152a,
+                    # "R152": R152,
+                    # "R143": R143,
+                    # "R134": R134,
+                    "R116": R116}
+    return {molecule_name: molec_dict[molecule_name]}
 def _get_xml_from_molecule(molecule_name):
     if molecule_name == "r41":
         molec_xml_function = _generate_r41_xml
