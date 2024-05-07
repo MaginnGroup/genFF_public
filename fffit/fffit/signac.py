@@ -58,3 +58,5 @@ def save_signac_results(project, param_names, property_names, csv_name):
     # Save to csv file for record-keeping
     df = pd.DataFrame(data)
     df.to_csv(csv_name)
+
+    return df
