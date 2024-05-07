@@ -8,7 +8,7 @@ import os
 import copy
 import scipy 
 from utils.id_new_samples import prepare_df_vle
-from utils.analyze_ms import prepare_df_vle_errors
+from utils.analyze_ms import *
 
 #After jobs are finished
 #save signac results for each atom for a given atom typing scheme and number of training parameters
@@ -81,5 +81,17 @@ for molec in list(molec_dict.keys()):
     #Calculate MAPD and MSE for each T point
     df_all = prepare_df_vle(df_molec, mol_data)
     df_paramsets = prepare_df_vle_errors(df_all, mol_data)
-    
+
+    #Save each paramset to csv (if we actually need df_paramsets)
+
+for molec in list(molec_dict.keys()):
+    mol_data_dict = {molec:molec_dict[molec]}
+    #Get data from molecular simulations
+    project_molec = project.find_jobs({"mol_name": molec})
+    csv_molec = os.path.join(csv_root, molec)
+    #Get csvs for NW, Trappe, GAFF, Potoff, and our reswults (opt) for each molecule if the file exists
+
     #Plot Pvap and Hvap vs T and compare to GAFF, exp, our old results, and literature
+    plot_vle_envelopes(mol_data_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+    plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+    
