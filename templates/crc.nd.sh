@@ -4,7 +4,7 @@
 #!/bin/bash
 
 #$ -N {{ id }}
-#$ -pe smp 1
+#$ -pe smp {{ np_global }}
 #$ -r n
 #$ -q long
 #$ -m ae
