@@ -75,7 +75,7 @@ def init_project():
             state_point = {
                 "mol_name": molec_name,
                 "mol_weight": molec_data.molecular_weight.in_units(u.amu).value,
-                "smiles": molec_data.smiles,
+                "smiles": molec_data.smiles_str,
                 "N_atoms": molec_data.n_atoms,
                 "T": float(temp.in_units(u.K).value),
                 "N_vap": n_vap,
