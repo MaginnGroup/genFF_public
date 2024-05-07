@@ -27,6 +27,16 @@ class R152aConstants:
         return 368
 
     @property
+    def n_atoms(self):
+        """Number of atoms in molecule"""
+        return 8
+        
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "CC(F)F"
+    
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)

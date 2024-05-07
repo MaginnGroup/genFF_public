@@ -27,6 +27,16 @@ class R14Constants:
         return 625.66161
 
     @property
+    def n_atoms(self):
+        """Number of adjustable parameters"""
+        return 5
+
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "C(F)(F)(F)F"
+    
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)
@@ -49,10 +59,10 @@ class R14Constants:
         """Adjustable parameter names"""
 
         lit_param_set = {
-            "sigma_C1":3.490,
-            "sigma_F1":2.917,
-            "epsilon_C1":36.240,
-            "epsilon_F1":29.070,
+            "sigma_C1":3.4895482012148435,
+            "sigma_F1":2.917216063390504,
+            "epsilon_C1":36.246581269369244,
+            "epsilon_F1":29.068536341766947,
         }
 
         return lit_param_set

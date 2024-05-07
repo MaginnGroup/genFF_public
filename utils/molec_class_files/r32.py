@@ -27,6 +27,16 @@ class R32Constants:
         return 429.756
 
     @property
+    def n_atoms(self):
+        """Number of adjustable parameters"""
+        return 5
+    
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "C(F)(F)"
+    
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)

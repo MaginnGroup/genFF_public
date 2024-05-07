@@ -27,6 +27,16 @@ class R143aConstants:
         return 431
 
     @property
+    def n_atoms(self):
+        """Number of atoms in molecule"""
+        return 8
+        
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "C(F)(F)(F)C"
+    
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)
@@ -53,14 +63,14 @@ class R143aConstants:
         """Adjustable parameter names"""
 
         lit_param_set = {
-            "sigma_C1":3.809,
-            "sigma_C2": 3.037,
-            "sigma_F1":3.424,
-            "sigma_H1":1.711,
-            "epsilon_C1":69.97,
-            "epsilon_C2":55.40,
-            "epsilon_F1":17.05,
-            "epsilon_H1":3.55,
+            "sigma_C1":3.8090599247748402,
+            "sigma_C2": 3.037119312093674,
+            "sigma_F1":3.424309963103194,
+            "sigma_H1":1.711397937309018,
+            "epsilon_C1":69.97073896121991,
+            "epsilon_C2":55.40701504905475,
+            "epsilon_F1":17.051878638985517,
+            "epsilon_H1":3.5509367860039087,
         }
 
         return lit_param_set

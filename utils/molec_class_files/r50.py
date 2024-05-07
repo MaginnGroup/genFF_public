@@ -27,6 +27,16 @@ class R50Constants:
         return 162.66
 
     @property
+    def n_atoms(self):
+        """Number of adjustable parameters"""
+        return 5
+
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "C"
+        
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)
@@ -49,10 +59,10 @@ class R50Constants:
         """Adjustable parameter names"""
 
         lit_param_set = {
-            "sigma_C1":3.727,
-            "sigma_H1":2.569,
-            "epsilon_C1":71.730,
-            "epsilon_H1":4.530,
+            "sigma_C1":3.726699841772199,
+            "sigma_H1":2.569446100985295,
+            "epsilon_C1":71.73508265569421,
+            "epsilon_H1":4.53179013137165,
         }
 
         return lit_param_set

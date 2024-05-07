@@ -27,6 +27,16 @@ class R116Constants:
         return 613.32
 
     @property
+    def n_atoms(self):
+        """Number of atoms in molecule"""
+        return 8
+
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "C(C(F)(F)F)(F)(F)F"
+
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)

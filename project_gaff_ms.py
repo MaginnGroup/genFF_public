@@ -18,15 +18,7 @@ class Project(FlowProject):
 # simulation_length must be consistent with the "units" field in custom args below
 # For instance, if the "units" field is "sweeps" and simulation_length = 1000, 
 # This will run a total of 1000 sweeps 
-# (1 sweep = N steps, where N is the total number of molecules (job.sp.N_vap + job.sp.N_liq) 
-
-sim_length = {}
-sim_length["liq"] = {}
-sim_length["liq"]["nvt"] = 2500000
-sim_length["liq"]["npt"] = 2000
-sim_length["gemc"] = {}
-sim_length["gemc"]["eq"] = 10000000
-sim_length["gemc"]["prod"] = 25000000
+# (1 sweep = N steps, where N is the total number of molecules (job.sp.N_vap + job.sp.N_liq)
 
 # Define custom args
 # See page below for all options 
@@ -39,15 +31,12 @@ custom_args = {
     "charge_cutoff": 12.0 * u.angstrom, 
     "ewald_accuracy": 1.0e-5, 
     "mixing_rule": "lb",
-    #"units": "sweeps",
-    #"steps_per_sweep": job.sp.N_liq,
     "units": "steps",
     "coord_freq": 1000,
     "prop_freq": 1000,
 }
 
 custom_args_gemc = copy.deepcopy(custom_args)
-
 custom_args_gemc["units"] = "steps"
 custom_args_gemc["coord_freq"] = 5000
 custom_args_gemc["prop_freq"] = 1000
@@ -56,6 +45,19 @@ custom_args_gemc["charge_cutoff_box1"] = custom_args["charge_cutoff"]
 
 vle = Project.make_group(name="vle")
 
+@vle
+@Project.post.isfile("ff.xml")
+@Project.operation
+def create_forcefield(job):
+    """Create the forcefield .xml file for the job"""
+
+    #Generate content based on job sp molecule name
+    molec_xml_function = _get_xml_from_molecule(job.sp.mol_name)       
+    content = molec_xml_function(job)
+
+    with open(job.fn("ff.xml"), "w") as ff:
+        ff.write(content)
+        
 @Project.label
 def nvt_finished(job):
     "Confirm a given simulation is completed"
@@ -67,7 +69,7 @@ def nvt_finished(job):
             thermo_data = np.genfromtxt(
                 "nvt.eq.out.prp", skip_header=3
             )
-            completed = int(thermo_data[-1][0]) == sim_length["liq"]["nvt"] #job.sp.nsteps_liqeq
+            completed = int(thermo_data[-1][0]) == job.sp.nsteps_nvt #job.sp.nsteps_liqeq
         except:
             completed = False
             pass
@@ -85,7 +87,7 @@ def npt_finished(job):
             thermo_data = np.genfromtxt(
                 "npt.eq.out.prp", skip_header=3
             )
-            completed = int(thermo_data[-1][0]) == sim_length["liq"]["npt"] #job.sp.nsteps_liqeq
+            completed = int(thermo_data[-1][0]) == job.sp.nsteps_npt #job.sp.nsteps_liqeq
         except:
             completed = False
             pass
@@ -103,7 +105,7 @@ def gemc_finished(job):
             thermo_data = np.genfromtxt(
                 "gemc.eq.rst.001.out.box1.prp", skip_header=3
             )
-            completed = int(thermo_data[-1][0]) == sim_length["gemc"]["prod"] #job.sp.nsteps_liqeq
+            completed = int(thermo_data[-1][0]) == job.sp.job.nsteps_gemc_prod #job.sp.nsteps_liqeq
         except:
             completed = False
             pass
@@ -160,7 +162,7 @@ def NVT_liqbox(job):
     import mosdef_cassandra as mc
     import unyt as u
 
-    ff = foyer.Forcefield("r50_gaff.xml")
+    ff = foyer.Forcefield(job.fn("ff.xml"))
 
     # Load the compound and apply the ff
     compound = mbuild.load(job.sp.smiles, smiles=True)
@@ -197,7 +199,7 @@ def NVT_liqbox(job):
             system=system,
             moveset=moves,
             run_type="equilibration",
-            run_length=sim_length["liq"]["nvt"],
+            run_length=job.sp.nsteps_nvt,
             temperature=job.sp.T * u.K,
             **custom_args
         )
@@ -249,7 +251,7 @@ def NPT_liqbox(job):
     import mosdef_cassandra as mc
     import unyt as u
 
-    ff = foyer.Forcefield("r50_gaff.xml")
+    ff = foyer.Forcefield(job.fn("ff.xml"))
 
     # Load the compound and apply the ff
     compound = mbuild.load(job.sp.smiles, smiles=True)
@@ -307,7 +309,7 @@ def NPT_liqbox(job):
             system=system,
             moveset=moves,
             run_type="equilibration",
-            run_length=sim_length["liq"]["npt"],
+            run_length=job.sp.nsteps_npt,
             temperature=job.sp.T * u.K,
             pressure= pressure,
             **custom_args
@@ -359,7 +361,7 @@ def GEMC(job):
     import mosdef_cassandra as mc
     import unyt as u
 
-    ff = foyer.Forcefield("r50_gaff.xml")
+    ff = foyer.Forcefield(job.fn("ff.xml"))
 
     # Load the compound and apply the ff
     compound = mbuild.load(job.sp.smiles, smiles=True)
@@ -432,7 +434,7 @@ def GEMC(job):
             system=system,
             moveset=moves,
             run_type="equilibration",
-            run_length=sim_length["gemc"]["eq"],
+            run_length=job.sp.nsteps_gemc_eq,
             temperature=job.sp.T * u.K,
             **custom_args_gemc
         )
@@ -443,7 +445,7 @@ def GEMC(job):
         mc.restart(
             restart_from="gemc.eq",
             run_type="production",
-            total_run_length=sim_length["gemc"]["prod"],
+            total_run_length=job.sp.job.nsteps_gemc_prod,
         )
 
 
@@ -793,6 +795,470 @@ def plot(job):
     ax.legend(loc="best")
     plt.savefig(f"all-energy-{job.sp.T}.png")
 
+#####################################################################
+################# HELPER FUNCTIONS BEYOND THIS POINT ################
+#####################################################################
+def _get_xml_from_molecule(molecule_name):
+    if molecule_name == "r41":
+        molec_xml_function = _generate_r41_xml
+    elif molecule_name == "r116":
+        molec_xml_function = _generate_r116_xml
+    elif molecule_name == "r23":
+        molec_xml_function = _generate_r23_xml
+    elif molecule_name == "r152a":
+        molec_xml_function = _generate_r152a_xml
+    # elif molecule_name == "r152":
+    #     molec_xml_function = _generate_r152_xml
+    # elif molecule_name == "r143":
+    #     molec_xml_function = _generate_r143_xml
+    # elif molecule_name == "r134":
+    #     molec_xml_function = _generate_r134_xml
+    elif molecule_name == "r161":
+        molec_xml_function = _generate_r161_xml
+    elif molecule_name == "r14":
+        molec_xml_function = _generate_r14_xml
+    elif molecule_name == "r32":
+        molec_xml_function = _generate_r32_xml
+    elif molecule_name == "r50":
+        molec_xml_function = _generate_r50_xml
+    elif molecule_name == "r125":
+        molec_xml_function = _generate_r125_xml
+    elif molecule_name == "r143a":
+        molec_xml_function = _generate_r143a_xml
+    elif molecule_name == "r170":
+        molec_xml_function = _generate_r170_xml
+    elif molecule_name == "r134a":
+        molec_xml_function = _generate_r134a_xml
+    else:
+        raise ValueError("Molecule name not recognized")
+    return molec_xml_function
+
+def _generate_r14_xml(job): 
+
+    content = """<ForceField name="R14 GAFF" version="1.0">
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(F)(F)(F)(F)" desc="carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="FC(F)(F)F" desc="F bonded to C"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029" k="596.30"/>
+ </HarmonicAngleForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.781024"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="F1" charge="-0.195256" sigma="0.3118" epsilon="0.255221"/>
+ </NonbondedForce>
+</ForceField>
+"""
+
+    return content
+
+def _generate_r50_xml(job): 
+
+    content = """<ForceField name="R50 GAFF" version="1.0">
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(H)(H)(H)(H)" desc="carbon"/>
+  <Type name="H1" class="hc" element="H" mass="1.008" def="HC(H)(H)H" desc="H bonded to C"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="hc" length="0.1092" k="282252.68637877"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="hc" class2="c3" class3="hc" angle="1.89106424" k="329.95108893"/>
+ </HarmonicAngleForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="-0.512608"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="H1" charge="0.128152" sigma="0.265" epsilon="0.06569256"/>
+ </NonbondedForce>
+</ForceField>"""
+    return content
+
+def _generate_r170_xml(job): 
+
+    content = """<ForceField name="R170 GAFF" version="1.0">
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon"/>
+  <Type name="H1" class="hc" element="H" mass="1.008" def="H" desc="H bonded to C"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31000265"/>
+  <Bond class1="c3" class2="hc" length="0.1092" k="282252.68637877"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="hc" angle="1.92073484" k="388.01928783"/>
+  <Angle class1="hc" class2="c3" class3="hc" angle="1.89106424" k="329.95108893"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="hc" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.62757555" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="-0.006120"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="H1" charge="0.002040"  sigma="0.265" epsilon="0.06569256"/>
+ </NonbondedForce>
+</ForceField>"""
+
+    return content
+
+def _generate_r134a_xml(job): 
+
+    content = """<ForceField name="HFC-134a GAFF" version="1.0">
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(F)(F)" desc="carbon bonded to 3 Fs and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(F)" desc="carbon bonded to 2 Hs and another carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="FC(C)(F)F" desc="F bonded to C1"/>
+  <Type name="F2" class="f" element="F" mass="19.000" def="FC(C)(H)H" desc="F bonded to C2"/>
+  <Type name="H1" class="h1" element="H" mass="1.008" def="H" desc="H bonded to C2"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="h1" length="0.1093" k="281080.35"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956" k="544.13"/>
+  <Angle class1="c3" class2="c3" class3="h1" angle="1.92108" k="387.94"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029" k="596.30"/>
+  <Angle class1="f" class2="c3" class3="h1" angle="1.88234" k="431.54"/>
+  <Angle class1="h1" class2="c3" class3="h1" angle="1.91201" k="327.86"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="f" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="5.0207707" phase2="3.141592653589793"/>
+  <Proper class1="f" class2="c3" class3="c3" class4="h1" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.79494566" phase2="0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.61542"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="C2" charge="-0.020709"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="F1" charge="-0.210427" sigma="0.3118" epsilon="0.255221"/>
+  <Atom type="F2" charge="-0.193556" sigma="0.3118" epsilon="0.255221"/>
+  <Atom type="H1" charge="0.115063"  sigma="0.247" epsilon="0.06569256"/>
+ </NonbondedForce>
+</ForceField>"""
+    return content
+
+def _generate_r143a_xml(job):
+
+    content = """<ForceField name="HFC-143a GAFF", version="1.0">
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(F)(F)" desc="carbon bonded to 3 Fs and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
+  <Type name="H1" class="hc" element="H" mass="1.008" def="H(C)" desc="H bonded to C2"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.35"/>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.40"/>
+  <Bond class1="c3" class2="hc" length="0.1092" k="282252.73"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956" k="544.13"/>
+  <Angle class1="c3" class2="c3" class3="hc" angle="1.920735" k="388.02"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029" k="596.30"/>
+  <Angle class1="hc" class2="c3" class3="hc" angle="1.89106" k="329.95"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.794946" phase2="0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.78821"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="C2" charge="-0.583262"  sigma="0.340" epsilon="0.45773"/>
+  <Atom type="F1" charge="-0.252614" sigma="0.3118" epsilon="0.255221"/>
+  <Atom type="H1" charge="0.184298"  sigma="0.265" epsilon="0.065693"/>
+ </NonbondedForce>
+</ForceField>"""
+
+    return content
+
+def _generate_r32_xml(job):
+
+    content = """<ForceField>
+<AtomTypes>
+ <Type name="C" class="C" element="C" mass="12.011" def="C(F)(F)" desc="central carbon"/>
+ <Type name="H" class="H" element="H" mass="1.008" def="H(C)" desc="first H bonded to C1_s1"/>
+ <Type name="F" class="F" element="F" mass="18.998" def="F(C)" desc="F bonded to C1_s1"/>
+</AtomTypes>
+<HarmonicBondForce>
+ <Bond class1="C" class2="H" length="0.10961" k="277566.56"/>
+ <Bond class1="C" class2="F" length="0.13497" k="298653.92"/>
+</HarmonicBondForce>
+<HarmonicAngleForce>
+ <Angle class1="H" class2="C" class3="H" angle="1.9233528356977512" k="326.352"/>
+ <Angle class1="F" class2="C" class3="H" angle="1.898743693244631" k="427.6048"/>
+ <Angle class1="F" class2="C" class3="F" angle="1.8737854849411122" k="593.2912"/>
+</HarmonicAngleForce>
+<NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+ <Atom type="C" charge="0.405467" sigma="{sigma_C}" epsilon="{epsilon_C}"/>
+ <Atom type="H" charge="0.0480495" sigma="{sigma_H}" epsilon="{epsilon_H}"/>
+ <Atom type="F" charge="-0.250783" sigma="{sigma_F}" epsilon="{epsilon_F}"/>
+</NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C=job.sp.sigma_C,
+        sigma_F=job.sp.sigma_F,
+        sigma_H=job.sp.sigma_H,
+        epsilon_C=job.sp.epsilon_C,
+        epsilon_F=job.sp.epsilon_F,
+        epsilon_H=job.sp.epsilon_H,
+    )
+
+    return content
+
+def _generate_r125_xml(job):
+
+    content = """<ForceField>
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.011" def="C(C)(H)(F)(F)" desc="carbon bonded to 2 Fs, a H, and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.011" def="C(C)(F)(F)(F)" desc="carbon bonded to 3 Fs and another carbon"/>
+  <Type name="F1" class="f" element="F" mass="18.998" def="FC(C)(F)H" desc="F bonded to C1"/>
+  <Type name="F2" class="f" element="F" mass="18.998" def="FC(C)(F)F" desc="F bonded to C2"/>
+  <Type name="H1" class="h2" element="H" mass="1.008" def="H(C)" desc="single H bonded to C1"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="c3" length="0.15375" k="251793.12"/>
+  <Bond class1="c3" class2="f" length="0.13497" k="298653.92"/>
+  <Bond class1="c3" class2="h2" length="0.10961" k="277566.56"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.9065976748786053" k="553.1248"/>
+  <Angle class1="c3" class2="c3" class3="h2" angle="1.9237019015481498" k="386.6016"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.8737854849411122" k="593.2912"/>
+  <Angle class1="f" class2="c3" class3="h2" angle="1.898743693244631" k="427.6048"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="f" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="5.0208" phase2="3.141592653589793"/>
+  <Proper class1="" class2="c3" class3="c3" class4="" periodicity1="3" k1="0.6508444444444444" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.224067"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="C2" charge="0.500886"  sigma="{sigma_C2:0.6f}" epsilon="{epsilon_C2:0.6f}"/>
+  <Atom type="F1" charge="-0.167131" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="F2" charge="-0.170758" sigma="{sigma_F2:0.6f}" epsilon="{epsilon_F2:0.6f}"/>
+  <Atom type="H1" charge="0.121583"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_C2=job.sp.sigma_C2,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_F2=job.sp.sigma_F2,
+        sigma_H1=job.sp.sigma_H1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_C2=job.sp.epsilon_C2,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_F2=job.sp.epsilon_F2,
+        epsilon_H1=job.sp.epsilon_H1,
+    )
+
+    return content
+
+def _generate_r41_xml(job):
+
+    content = """<ForceField>
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(F)" desc="carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
+  <Type name="H1" class="h1" element="H" mass="1.008" def="H(C)" desc="H bonded to C1"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="h1" length="0.1093" k="281080.35"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="f" class2="c3" class3="h1" angle="1.8823376" k="431.53717916"/>
+  <Angle class1="h1" class2="c3" class3="h1" angle="1.9120082" k="327.85584464"/>
+ </HarmonicAngleForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.119281"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="F1" charge="-0.274252" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="H1" charge="0.051657"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
+        
+    )
+
+
+    return content
+
+def _generate_r116_xml(job): 
+
+    content = """<ForceField>
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(F)(F)" desc="carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956473" k="554.12559906"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029483" k="596.29654763"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="f" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="5.0207707" phase2="3.14159"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.420069"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="F1" charge="-0.140023" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_F1=job.sp.sigma_F1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_F1=job.sp.epsilon_F1,
+    )
+
+    return content
+
+def _generate_r23_xml(job):
+
+    content = """<ForceField>
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(F)(F)(F)" desc="carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
+  <Type name="H1" class="h3" element="H" mass="1.008" def="H(C)" desc="H bonded to C1"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="h3" length="0.1095" k="278988.43"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029483" k="596.29654763"/>
+  <Angle class1="f" class2="c3" class3="h3" angle="1.92003671" k="427.18040135"/>
+ </HarmonicAngleForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.605792"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="F1" charge="-0.222094" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="H1" charge="0.060490"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
+        
+    )
+
+
+    return content
+
+def _generate_r152a_xml(job):
+
+    content = """<ForceField>
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(H)(F)" desc="carbon bonded to 2 Fs and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
+  <Type name="H1" class="h2" element="H" mass="1.008" def="H(C)(F)(F)" desc="H bonded to C1"/>
+  <Type name="H2" class="hc" element="H" mass="1.008" def="H(C)(H)(H)" desc="H bonded to C2"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="hc" length="0.1092" k="282252.69"/>
+  <Bond class1="c3" class2="h2" length="0.1100" k="273131.72"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="hc" angle="1.92073484" k="388.01928783"/>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956473" k="554.12559906"/>
+  <Angle class1="f" class2="c3" class3="h2" angle="1.89211144" k="429.77451333"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029483" k="596.29654763"/>
+  <Angle class1="c3" class2="c3" class3="h2" angle="1.94761291" k="385.0925974"/>
+  <Angle class1="hc" class2="c3" class3="hc" angle="1.89106424" k="329.95108893"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.79494566" phase2="0"/>
+  <Proper class1="h2" class2="c3" class3="c3" class4="h1" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.613473"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="C2" charge="-0.502181"  sigma="{sigma_C2:0.6f}" epsilon="{epsilon_C2:0.6f}"/>
+  <Atom type="F1" charge="-0.293648" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="H1" charge="0.021315"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+  <Atom type="H2" charge="0.151563"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_C2=job.sp.sigma_C2,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        sigma_H2=job.sp.sigma_H2,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_C2=job.sp.epsilon_C2,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
+        epsilon_H2=job.sp.epsilon_H2,
+        
+    )
+
+
+    return content
+
+def _generate_r161_xml(job):
+
+    content = """<ForceField>
+ <AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(H)(H)" desc="carbon bonded to 2 Fs and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
+  <Type name="H1" class="h1" element="H" mass="1.008" def="H(C)(F)(H)" desc="H bonded to C1"/>
+  <Type name="H2" class="hc" element="H" mass="1.008" def="H(C)(H)(H)" desc="H bonded to C2"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+  <Bond class1="c3" class2="h1" length="0.1093" k="281080.35"/>
+  <Bond class1="c3" class2="hc" length="0.1092" k="282252.69"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="hc" angle="1.92073484" k="388.01928783"/>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956473" k="554.12559906"/>
+  <Angle class1="f" class2="c3" class3="h1" angle="1.8823376" k="431.53717916"/>
+  <Angle class1="c3" class2="c3" class3="h1" angle="1.92108391" k="387.93614322"/>
+  <Angle class1="h1" class2="c3" class3="h1" angle="1.9120082" k="327.85584464"/>
+  <Angle class1="hc" class2="c3" class3="hc" angle="1.89106424" k="329.95108893"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.79494566" phase2="0"/>
+  <Proper class1="h1" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.444699"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="C2" charge="-0.304621"  sigma="{sigma_C2:0.6f}" epsilon="{epsilon_C2:0.6f}"/>
+  <Atom type="F1" charge="-0.334359" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="H1" charge="-0.028030"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+  <Atom type="H2" charge="0.083447"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_C2=job.sp.sigma_C2,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        sigma_H2=job.sp.sigma_H2,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_C2=job.sp.epsilon_C2,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
+        epsilon_H2=job.sp.epsilon_H2,
+        
+    )
+
+
+    return content
 
 if __name__ == "__main__":
     Project().main()

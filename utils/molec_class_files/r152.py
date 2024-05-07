@@ -27,6 +27,11 @@ class R152Constants:
         return None
 
     @property
+    def n_atoms(self):
+        """Number of atoms in molecule"""
+        return 8
+        
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)

@@ -27,6 +27,16 @@ class R134aConstants:
         return 511.9
 
     @property
+    def n_atoms(self):
+        """Number of atoms in molecule"""
+        return 8
+    
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "FCC(F)(F)F"
+    
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)
@@ -55,16 +65,16 @@ class R134aConstants:
         """Adjustable parameter names"""
 
         lit_param_set = {
-            "sigma_C1":3.745,
-            "sigma_C2": 3.754,
-            "sigma_F1":2.982,
-            "sigma_F2":2.607,
-            "sigma_H1":2.237,
-            "epsilon_C1":20.73,
-            "epsilon_C2":72.61,
-            "epsilon_F1":23.13,
-            "epsilon_F2":39.98,
-            "epsilon_H1":2.55,
+            "sigma_C1":3.745147778484348,
+            "sigma_C2": 3.754395219500661,
+            "sigma_F1":2.9817731619451933,
+            "sigma_F2":2.606847950246527,
+            "sigma_H1":2.2373062685352583,
+            "epsilon_C1":20.72900866634978,
+            "epsilon_C2":72.61894548387387,
+            "epsilon_F1":23.131678109575127,
+            "epsilon_F2":39.9851926881429,
+            "epsilon_H1":2.5510146363411708,
         }
 
         return lit_param_set

@@ -37,6 +37,16 @@ class R170Constants:
         return 218
 
     @property
+    def n_atoms(self):
+        """Number of atoms in molecule"""
+        return 8
+
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "CC"
+        
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)
@@ -59,10 +69,10 @@ class R170Constants:
         """Adjustable parameter names"""
 
         lit_param_set = {
-            "sigma_C1":3.810,
-            "sigma_H1":2.316,
-            "epsilon_C1":52.20,
-            "epsilon_H1":6.16,
+            "sigma_C1":3.810015297830543,
+            "sigma_H1":2.316436485908808,
+            "epsilon_C1":52.20082568065277,
+            "epsilon_H1":6.157530985944937,
         }
 
         return lit_param_set

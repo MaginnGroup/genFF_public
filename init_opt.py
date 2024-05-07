@@ -1,7 +1,7 @@
 import signac
 import json
 
-project = signac.init_project()
+project = signac.init_project("optimization")
 
 #Set Initial Parameters
 Atom_Type = 14

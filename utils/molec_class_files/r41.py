@@ -27,6 +27,16 @@ class R41Constants:
         return 316.51
 
     @property
+    def n_atoms(self):
+        """Number of adjustable parameters"""
+        return 5
+
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return "CF"
+
+    @property
     def n_params(self):
         """Number of adjustable parameters"""
         return len(self.param_names)
@@ -37,11 +47,11 @@ class R41Constants:
 
         param_names = (
             "sigma_C1",
-            "sigma_H1",
             "sigma_F1",
+            "sigma_H1",
             "epsilon_C1",
-            "epsilon_H1",
             "epsilon_F1",
+            "epsilon_H1",
         )
 
         return param_names
@@ -55,8 +65,8 @@ class R41Constants:
                 np.asarray(
                     [
                         [2.0, 4.0], #[3.0, 4.0],  # C
-                        [1.5, 3.0],  # H
                         [2, 4.0],  # F
+                        [1.5, 3.0],  # H
                     ]
                 )
                 * u.Angstrom
@@ -70,8 +80,8 @@ class R41Constants:
                 np.asarray(
                     [
                         [10.0,75.0], #[20.0, 75.0],  # C
-                        [2.0, 10.0],  # H
                         [15.0, 50.0],  # F
+                        [2.0, 10.0],  # H
                     ]
                 )
                 * u.K
