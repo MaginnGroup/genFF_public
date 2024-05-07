@@ -163,6 +163,7 @@ def calc_boxl(job):
     # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in project_gaff.py as needed)
     # Loop over the keys of the dictionaries
     ref = {}
+    #What is the best way to automate this if exp data crashes simulation?
     for t in class_data.expt_Pvap.keys():
         rho_liq = class_data.expt_liq_density[t]
         rho_vap = class_data.expt_vap_density[t]
@@ -180,8 +181,6 @@ def calc_boxl(job):
 
     # Save to job document file
     job.doc.vapboxl = vapboxl  # nm, compatible with mbuild
-
-
 
     liq_density = ref[job.sp.T][0]
     mol_density = liq_density / (job.sp.mol_weight * u.amu)
@@ -1161,12 +1160,12 @@ def _generate_r41_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_H1=job.sp.sigma_H1,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_H1=job.sp.epsilon_H1,
+        sigma_C1= float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F1=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_H1=float((2.471 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C1= float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F1=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H1=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
         
     )
 
@@ -1197,10 +1196,10 @@ def _generate_r116_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_F1=job.sp.sigma_F1,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_F1=job.sp.epsilon_F1,
+        sigma_C1=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F1=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C1=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F1=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
     )
 
     return content
@@ -1228,12 +1227,12 @@ def _generate_r23_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_H1=job.sp.sigma_H1,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_H1=job.sp.epsilon_H1,
+        sigma_C1=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F1=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_H1=float((2.115 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C1=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F1=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H1=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
         
     )
 
@@ -1277,19 +1276,18 @@ def _generate_r152a_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_C2=job.sp.sigma_C2,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_H1=job.sp.sigma_H1,
-        sigma_H2=job.sp.sigma_H2,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_C2=job.sp.epsilon_C2,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_H1=job.sp.epsilon_H1,
-        epsilon_H2=job.sp.epsilon_H2,
+        sigma_C1=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_C2=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F1=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_H1=float((2.293 * u.Angstrom).in_units(u.nm).value),
+        sigma_H2=float((2.650 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C1=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_C2=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F1=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H1=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H2=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
         
     )
-
 
     return content
 
@@ -1330,16 +1328,16 @@ def _generate_r161_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_C2=job.sp.sigma_C2,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_H1=job.sp.sigma_H1,
-        sigma_H2=job.sp.sigma_H2,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_C2=job.sp.epsilon_C2,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_H1=job.sp.epsilon_H1,
-        epsilon_H2=job.sp.epsilon_H2,
+        sigma_C1=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_C2=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F1=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_H1=float((2.471 * u.Angstrom).in_units(u.nm).value),
+        sigma_H2=float((2.650 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C1=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_C2=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F1=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H1=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H2=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
         
     )
 
