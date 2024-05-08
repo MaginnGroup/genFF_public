@@ -4,7 +4,7 @@ import pandas as pd
 import os
 
 
-def save_signac_results(project, param_names, property_names, csv_name):
+def save_signac_results(project, param_names, property_names):
     """Save the signac results to a CSV file.
 
     Parameters
@@ -12,7 +12,7 @@ def save_signac_results(project, param_names, property_names, csv_name):
     project : signac.Project
         signac project to load
     param_names : set
-        set of parameter names (excluding temperature)
+        molecule name
     property_names : set
         set of property names
     csv_name : string
@@ -36,9 +36,10 @@ def save_signac_results(project, param_names, property_names, csv_name):
 
         for job in job_group:
             # Extract the parameters into a dict
-            new_row = {
-                name: param for (name, param) in zip(job_groupby, params)
-            }
+            # new_row = {
+            #     name: param for (name, param) in zip(job_groupby, params)
+            # }
+            new_row = {"molecule": job.sp.mol_name}
 
             # Extract the temperature for each job.
             # Assumes temperature increments >= 1 K
@@ -58,7 +59,6 @@ def save_signac_results(project, param_names, property_names, csv_name):
 
     # Save to csv file for record-keeping
     df = pd.DataFrame(data)
-    path = os.path.join(csv_name,"ms_data.csv")
-    df.to_csv(path)
+    
 
     return df

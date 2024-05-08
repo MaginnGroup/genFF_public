@@ -7,8 +7,7 @@ import pandas as pd
 import os
 import copy
 import scipy 
-from utils.id_new_samples import prepare_df_vle
-from utils.analyze_ms import *
+from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes, plot_pvap_hvap
 
 #After jobs are finished
 #save signac results for each atom for a given atom typing scheme and number of training parameters
@@ -51,21 +50,17 @@ molec_dict = {"R14": R14,
                 "R116": R116}
 
 at_number = 11
-project_path = "gaff_ff_ms" #Options: "gaff_ff_ms" or "opt_ff_ms"
-project = signac.get_project(project_path)
-if project_path == "opt_ff_ms":
-    project = project.find_jobs({"atom_type": at_number})
-    at_num_str = str(at_number)
-else:
-    at_num_str = ""
-csv_root = os.path.join("Results_MS", at_num_str, project_path)
-os.makedirs(csv_root, exist_ok=True)
+for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
+    project = signac.get_project(project_path)
+    if project_path == "opt_ff_ms":
+        project = project.find_jobs({"atom_type": at_number})
+        at_num_str = str(at_number)
+    else:
+        at_num_str = ""
+    csv_root = os.path.join("Results_MS", at_num_str, project_path)
+    os.makedirs(csv_root, exist_ok=True)
 
-#Create a large df with just the molecule name and property predictions
-#Save intermediate (with param values) in the job workspace directory as supplemental data
-#Loop over all constants
-for molec in list(molec_dict.keys()):
-    mol_data = molec_dict[molec]
+    #Create a large df with just the molecule name and property predictions (param values calculated in Results)
     property_names = [
         "liq_density",
         "vap_density",
@@ -75,25 +70,21 @@ for molec in list(molec_dict.keys()):
         "vap_enthalpy",
     ]
 
-    #Get data from molecular simulations
-    project_molec = project.find_jobs({"mol_name": molec})
-    csv_molec = os.path.join(csv_root, molec)
-    df_molec = save_signac_results(project_molec, mol_data.param_names, property_names, csv_molec)
-
+    #Get data from molecular simulations. Group by molecule name
+    df_molec = save_signac_results(project, "mol_name", property_names)
+    #Prepare data with correct value names and units
+    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root)
     #Calculate MAPD and MSE for each T point
-    df_all = prepare_df_vle(df_molec, mol_data)
-    df_paramsets = prepare_df_vle_errors(df_all, mol_data)
+    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root)
 
-    #Save each paramset to csv (if we actually need df_paramsets)
-
-for molec in list(molec_dict.keys()):
-    mol_data_dict = {molec:molec_dict[molec]}
-    #Get data from molecular simulations
-    project_molec = project.find_jobs({"mol_name": molec})
-    csv_molec = os.path.join(csv_root, molec)
-    #Get csvs for NW, Trappe, GAFF, Potoff, and our reswults (opt) for each molecule if the file exists
+    #Get csvs for NW, Trappe, GAFF, Potoff, and our results (opt) for each molecule if the file exists
+    #Use prepare_df_vle to get the dataframes into correct units and such
 
     #Plot Pvap and Hvap vs T and compare to GAFF, exp, our old results, and literature
-    plot_vle_envelopes(mol_data_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
-    plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+    molecules = df_paramsets['molecule'].unique().tolist()
+    for molec in molecules:
+        one_molec_dict = {molec: molec_dict[molec]}
+        df_molec = copy.copy(df_all[df_all['molecule'] == molec])
+        plot_vle_envelopes(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+        plot_pvap_hvap(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
     
