@@ -133,54 +133,37 @@ def prepare_df_vle(df_csv, molecule):
     #df_all.drop(columns="liq_enthalpy", inplace=True)
 
     # Convert Hvap to kJ/kg
-    df_all["sim_Hvap"] = (
-        df_all["sim_Hvap"] / molecule.molecular_weight * 1000.0
-    )
-
+    df_all["sim_Hvap"] = (df_all["sim_Hvap"] / molecule.molecular_weight*1000.0)
     df_all["expt_liq_density"] = df_all["temperature"].apply(
-        lambda temp: molecule.expt_liq_density[int(temp)]
-    )
+        lambda temp: molecule.expt_liq_density[int(temp)])
     df_all["expt_vap_density"] = df_all["temperature"].apply(
-        lambda temp: molecule.expt_vap_density[int(temp)]
-    )
+        lambda temp: molecule.expt_vap_density[int(temp)] )
     df_all["expt_Pvap"] = df_all["temperature"].apply(
-        lambda temp: molecule.expt_Pvap[int(temp)]
-    )
+        lambda temp: molecule.expt_Pvap[int(temp)])
     df_all["expt_Hvap"] = df_all["temperature"].apply(
-        lambda temp: molecule.expt_Hvap[int(temp)]
-    )
+        lambda temp: molecule.expt_Hvap[int(temp)])
 
     # Scale all values
     scaled_param_values = values_real_to_scaled(
-        df_all[list(molecule.param_names)], molecule.param_bounds
-    )
+        df_all[list(molecule.param_names)], molecule.param_bounds)
     scaled_temperature = values_real_to_scaled(
-        df_all["temperature"], molecule.temperature_bounds
-    )
+        df_all["temperature"], molecule.temperature_bounds)
     scaled_sim_liq_density = values_real_to_scaled(
-        df_all["sim_liq_density"], molecule.liq_density_bounds
-    )
+        df_all["sim_liq_density"], molecule.liq_density_bounds)
     scaled_sim_vap_density = values_real_to_scaled(
-        df_all["sim_vap_density"], molecule.vap_density_bounds
-    )
+        df_all["sim_vap_density"], molecule.vap_density_bounds)
     scaled_sim_Pvap = values_real_to_scaled(
-        df_all["sim_Pvap"], molecule.Pvap_bounds
-    )
+        df_all["sim_Pvap"], molecule.Pvap_bounds)
     scaled_sim_Hvap = values_real_to_scaled(
-        df_all["sim_Hvap"], molecule.Hvap_bounds
-    )
+        df_all["sim_Hvap"], molecule.Hvap_bounds)
     scaled_expt_liq_density = values_real_to_scaled(
-        df_all["expt_liq_density"], molecule.liq_density_bounds
-    )
+        df_all["expt_liq_density"], molecule.liq_density_bounds)
     scaled_expt_vap_density = values_real_to_scaled(
-        df_all["expt_vap_density"], molecule.vap_density_bounds
-    )
+        df_all["expt_vap_density"], molecule.vap_density_bounds)
     scaled_expt_Pvap = values_real_to_scaled(
-        df_all["expt_Pvap"], molecule.Pvap_bounds
-    )
+        df_all["expt_Pvap"], molecule.Pvap_bounds)
     scaled_expt_Hvap = values_real_to_scaled(
-        df_all["expt_Hvap"], molecule.Hvap_bounds
-    )
+        df_all["expt_Hvap"], molecule.Hvap_bounds)
     df_all[list(molecule.param_names)] = scaled_param_values
     df_all["temperature"] = scaled_temperature
     df_all["sim_liq_density"] = scaled_sim_liq_density

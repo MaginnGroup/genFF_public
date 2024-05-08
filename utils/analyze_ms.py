@@ -37,100 +37,47 @@ def prepare_df_vle_errors(df, molecule):
 
     for group, values in df.groupby(list(molecule.param_names)):
         # Temperatures
-        temps = values_scaled_to_real(
-            values["temperature"], molecule.temperature_bounds
-        )
+        temps = values_scaled_to_real(values["temperature"], molecule.temperature_bounds)
         # Liquid density
-        sim_liq_density = values_scaled_to_real(
-            values["sim_liq_density"], molecule.liq_density_bounds
-        )
-        expt_liq_density = values_scaled_to_real(
-            values["expt_liq_density"], molecule.liq_density_bounds
-        )
+        sim_liq_density = values_scaled_to_real(values["sim_liq_density"], molecule.liq_density_bounds)
+        expt_liq_density = values_scaled_to_real(values["expt_liq_density"], molecule.liq_density_bounds)
         mse_liq_density = np.mean((sim_liq_density - expt_liq_density) ** 2)
-        mape_liq_density = (
-            np.mean(
-                np.abs((sim_liq_density - expt_liq_density) / expt_liq_density)
-            )
-            * 100.0
-        )
-        properties = {
-            f"sim_liq_density_{float(temp):.0f}K": float(liq_density)
-            for temp, liq_density in zip(temps, sim_liq_density)
-        }
+        mape_liq_density = (np.mean(np.abs((sim_liq_density - expt_liq_density) / expt_liq_density))*100.0)
+        properties = {f"sim_liq_density_{float(temp):.0f}K": float(liq_density)
+                      for temp, liq_density in zip(temps, sim_liq_density)}
         # Vapor density
-        sim_vap_density = values_scaled_to_real(
-            values["sim_vap_density"], molecule.vap_density_bounds
-        )
-        expt_vap_density = values_scaled_to_real(
-            values["expt_vap_density"], molecule.vap_density_bounds
-        )
+        sim_vap_density = values_scaled_to_real(values["sim_vap_density"], molecule.vap_density_bounds)
+        expt_vap_density = values_scaled_to_real(values["expt_vap_density"], molecule.vap_density_bounds)
         mse_vap_density = np.mean((sim_vap_density - expt_vap_density) ** 2)
-        mape_vap_density = (
-            np.mean(
-                np.abs((sim_vap_density - expt_vap_density) / expt_vap_density)
-            )
-            * 100.0
-        )
-        properties.update(
-            {
-                f"sim_vap_density_{float(temp):.0f}K": float(vap_density)
-                for temp, vap_density in zip(temps, sim_vap_density)
-            }
-        )
-
+        mape_vap_density = (np.mean(np.abs((sim_vap_density - expt_vap_density) / expt_vap_density))*100.0)
+        properties.update({f"sim_vap_density_{float(temp):.0f}K": float(vap_density)
+                for temp, vap_density in zip(temps, sim_vap_density)})
         # Vapor pressure
-        sim_Pvap = values_scaled_to_real(
-            values["sim_Pvap"], molecule.Pvap_bounds
-        )
-        expt_Pvap = values_scaled_to_real(
-            values["expt_Pvap"], molecule.Pvap_bounds
-        )
+        sim_Pvap = values_scaled_to_real(values["sim_Pvap"], molecule.Pvap_bounds)
+        expt_Pvap = values_scaled_to_real(values["expt_Pvap"], molecule.Pvap_bounds)
         mse_Pvap = np.mean((sim_Pvap - expt_Pvap) ** 2)
         mape_Pvap = np.mean(np.abs((sim_Pvap - expt_Pvap) / expt_Pvap)) * 100.0
-        properties.update(
-            {
-                f"sim_Pvap_{float(temp):.0f}K": float(Pvap)
-                for temp, Pvap in zip(temps, sim_Pvap)
-            }
-        )
+        properties.update({f"sim_Pvap_{float(temp):.0f}K": float(Pvap)
+                for temp, Pvap in zip(temps, sim_Pvap)})
         # Enthalpy of vaporization
-        sim_Hvap = values_scaled_to_real(
-            values["sim_Hvap"], molecule.Hvap_bounds
-        )
-        expt_Hvap = values_scaled_to_real(
-            values["expt_Hvap"], molecule.Hvap_bounds
-        )
+        sim_Hvap = values_scaled_to_real(values["sim_Hvap"], molecule.Hvap_bounds)
+        expt_Hvap = values_scaled_to_real(values["expt_Hvap"], molecule.Hvap_bounds)
         mse_Hvap = np.mean((sim_Hvap - expt_Hvap) ** 2)
         mape_Hvap = np.mean(np.abs((sim_Hvap - expt_Hvap) / expt_Hvap)) * 100.0
-        properties.update(
-            {
-                f"sim_Hvap_{float(temp):.0f}K": float(Hvap)
-                for temp, Hvap in zip(temps, sim_Hvap)
-            }
-        )
-
+        properties.update({f"sim_Hvap_{float(temp):.0f}K": float(Hvap)
+                for temp, Hvap in zip(temps, sim_Hvap)})
         # Critical Point (Law of rectilinear diameters)
         slope1, intercept1, r_value1, p_value1, std_err1 = linregress(
-            temps.flatten(),
-            ((sim_liq_density + sim_vap_density) / 2.0).flatten(),
-        )
-
+            temps.flatten(),((sim_liq_density + sim_vap_density) / 2.0).flatten(),)
         slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
-            temps.flatten(),
-            ((sim_liq_density - sim_vap_density) ** (1 / 0.32)).flatten(),
-        )
-
+            temps.flatten(),((sim_liq_density - sim_vap_density) ** (1 / 0.32)).flatten(),)
         Tc = np.abs(intercept2 / slope2)
         mse_Tc = (Tc - molecule.expt_Tc) ** 2
-        mape_Tc = np.abs((Tc - molecule.expt_Tc) / molecule.expt_Tc) * 100.0
+        mape_Tc = np.abs((Tc - molecule.expt_Tc) / molecule.expt_Tc)*100.0
         properties.update({"sim_Tc": Tc})
-
         rhoc = intercept1 + slope1 * Tc
         mse_rhoc = (rhoc - molecule.expt_rhoc) ** 2
-        mape_rhoc = (
-            np.abs((rhoc - molecule.expt_rhoc) / molecule.expt_rhoc) * 100.0
-        )
+        mape_rhoc = (np.abs((rhoc - molecule.expt_rhoc) / molecule.expt_rhoc)*100.0)
         properties.update({"sim_rhoc": rhoc})
         new_quantities = {
             **properties,
@@ -203,6 +150,20 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
         ax2.scatter(rhoc,tc,
             c='gray',s=120,alpha=0.7,marker='s',)
 
+    #Plot NW Data if it exists
+    if df_nw is not None:
+        tc, rhoc = calc_critical(df_nw)
+        min_temp, max_temp = get_min_max(min_temp, max_temp, tc)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["liq_density"])
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["vap_density"])
+        print(tc,rhoc)
+        ax2.scatter(df_nw["liq_density"],df_nw["temperature"],
+            c='green',s=160,alpha=0.7,marker='o',label="Wang et al.",)
+        ax2.scatter(df_nw["vap_density"], df_nw["temperature"],
+            c='green',s=160,alpha=0.7,marker='o',)
+        ax2.scatter(rhoc,tc,
+            c='green',s=160,alpha=0.7,marker='o',)
+        
     #Plot Potoff Data if it exists
     if df_lit is not None:
         tc, rhoc = calc_critical(df_lit)
@@ -334,6 +295,13 @@ def plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = 
         axs[0].scatter(df_lit["temperature"],df_lit["Pvap"],
             c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
 
+    #Plot Nw pvap if it exists
+    if df_nw is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"])
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_nw["Pvap"])
+        axs[0].scatter(df_nw["temperature"],df_nw["Pvap"],
+            c='green',s=70,alpha=0.7,marker='^',label="Wang et al.",)
+        
     #Plot experimental pvap
     axs[0].scatter(mol_data.expt_Pvap.keys(),mol_data.expt_Pvap.values(),
         color="black",marker="x",label="Experiment",s=80,)
@@ -375,6 +343,13 @@ def plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = 
         axs[1].scatter(df_lit["temperature"],df_lit["Hvap"],
             c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
 
+    #Plot Wang Hvap if it exists
+    if df_nw is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"])
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_nw["Hvap"])
+        axs[1].scatter(df_nw["temperature"],df_nw["Hvap"],
+            c='green',s=70,alpha=0.7,marker='^',label="Wang et al.",)
+        
     #Plot experimental Hvap
     axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
         color="black",marker="x",label="Experiment",s=80,)
