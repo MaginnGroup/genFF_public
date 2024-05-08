@@ -61,6 +61,8 @@ else:
 csv_root = os.path.join("Results_MS", at_num_str, project_path)
 os.makedirs(csv_root, exist_ok=True)
 
+#Create a large df with just the molecule name and property predictions
+#Save intermediate (with param values) in the job workspace directory as supplemental data
 #Loop over all constants
 for molec in list(molec_dict.keys()):
     mol_data = molec_dict[molec]
