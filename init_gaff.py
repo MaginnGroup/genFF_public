@@ -58,18 +58,6 @@ def init_project():
         # Define temps (from constants files)
         temps = list(molec_data.expt_Pvap.keys())
 
-        at_class = atom_type.make_atom_type_class(at_number)
-
-        # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in project_gaff.py as needed)
-        # reference_data = [
-        # (290.0 * u.K, 206.18 * u.kilogram/(u.meter)**3, 206.18 * u.kilogram/(u.meter)**3, 35.159 * u.bar),
-        # (270.0 * u.K, 206.18 * u.kilogram/(u.meter)**3, 206.18 * u.kilogram/(u.meter)**3, 22.10 * u.bar),
-        # (250.0 * u.K, 206.18 * u.kilogram/(u.meter)**3, 206.18 * u.kilogram/(u.meter)**3, 13.008 * u.bar),
-        # (230.0 * u.K, 206.18 * u.kilogram/(u.meter)**3, 206.18 * u.kilogram/(u.meter)**3, 7.0018 * u.bar),
-        # (210.0 * u.K, 206.18 * u.kilogram/(u.meter)**3, 206.18 * u.kilogram/(u.meter)**3, 3.338 * u.bar),
-        # ]
-
-
         for temp in temps:
             # Define the state point
             state_point = {
