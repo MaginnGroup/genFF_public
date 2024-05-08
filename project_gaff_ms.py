@@ -165,8 +165,14 @@ def calc_boxl(job):
     ref = {}
     #What is the best way to automate this if exp data crashes simulation?
     for t in class_data.expt_Pvap.keys():
+        #Initialize rho_liq and rho_vap as the experimental values
         rho_liq = class_data.expt_liq_density[t]
         rho_vap = class_data.expt_vap_density[t]
+        #If the gemc simulation failed previously, use the critical values
+        if "gemc_failed" in job.doc:
+            if job.doc.gemc_failed == True:
+                rho_liq = class_data.expt_rhoc[t]
+                rho_vap = class_data.expt_rhoc[t]
         p_vap = class_data.expt_Pvap[t]
         # Create a tuple containing the values from each dictionary
         ref[t.in_units(u.K).to_value()] = (rho_liq, rho_vap, p_vap)
@@ -480,26 +486,28 @@ def GEMC(job):
 
     # Move into the job dir and start doing things
     with job:
+        try:
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_gemc_eq,
+                temperature=job.sp.T * u.K,
+                **custom_args_gemc
+            )
 
-        mc.run(
-            system=system,
-            moveset=moves,
-            run_type="equilibration",
-            run_length=job.sp.nsteps_gemc_eq,
-            temperature=job.sp.T * u.K,
-            **custom_args_gemc
-        )
+            custom_args_gemc["run_name"] = "gemc.prod"
+            #custom_args_gemc["restart_name"] = "gemc.eq"
 
-        custom_args_gemc["run_name"] = "gemc.prod"
-        #custom_args_gemc["restart_name"] = "gemc.eq"
-
-        mc.restart(
-            restart_from="gemc.eq",
-            run_type="production",
-            total_run_length=job.sp.job.nsteps_gemc_prod,
-        )
-
-
+            mc.restart(
+                restart_from="gemc.eq",
+                run_type="production",
+                total_run_length=job.sp.job.nsteps_gemc_prod,
+            )
+            job.doc.gemc_failed = False
+        except:
+            job.doc.gemc_failed = True
+            pass
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
 #@Project.post(lambda job: "vap_density_unc" in job.doc)
@@ -1079,12 +1087,12 @@ def _generate_r32_xml(job):
 </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C=job.sp.sigma_C,
-        sigma_F=job.sp.sigma_F,
-        sigma_H=job.sp.sigma_H,
-        epsilon_C=job.sp.epsilon_C,
-        epsilon_F=job.sp.epsilon_F,
-        epsilon_H=job.sp.epsilon_H,
+        sigma_C=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_H=float((2.293 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
     )
 
     return content
@@ -1123,16 +1131,16 @@ def _generate_r125_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_C2=job.sp.sigma_C2,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_F2=job.sp.sigma_F2,
-        sigma_H1=job.sp.sigma_H1,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_C2=job.sp.epsilon_C2,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_F2=job.sp.epsilon_F2,
-        epsilon_H1=job.sp.epsilon_H1,
+        sigma_C1=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_C2=float((3.400 * u.Angstrom).in_units(u.nm).value),
+        sigma_F1=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_F2=float((3.118 * u.Angstrom).in_units(u.nm).value),
+        sigma_H1=float((2.293 * u.Angstrom).in_units(u.nm).value),
+        epsilon_C1=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_C2=float(55.052 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F1=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_F2=float(30.696 * (u.K * u.kb).in_units("kJ/mol")),
+        epsilon_H1=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
     )
 
     return content
