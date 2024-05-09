@@ -166,14 +166,14 @@ def calc_boxl(job):
     #What is the best way to automate this if exp data crashes simulation?
     for t in class_data.expt_Pvap.keys():
         #Initialize rho_liq and rho_vap as the experimental values
-        rho_liq = class_data.expt_liq_density[t]
-        rho_vap = class_data.expt_vap_density[t]
+        rho_liq = class_data.expt_liq_density[t] * u.kilogram/(u.meter)**3
+        rho_vap = class_data.expt_vap_density[t] * u.kilogram/(u.meter)**3
         #If the gemc simulation failed previously, use the critical values
         if "gemc_failed" in job.doc:
             if job.doc.gemc_failed == True:
-                rho_liq = class_data.expt_rhoc[t]
-                rho_vap = class_data.expt_rhoc[t]
-        p_vap = class_data.expt_Pvap[t]
+                rho_liq = class_data.expt_rhoc[t] * u.kilogram/(u.meter)**3
+                rho_vap = class_data.expt_rhoc[t] * u.kilogram/(u.meter)**3
+        p_vap = class_data.expt_Pvap[t] * u.bar
         # Create a tuple containing the values from each dictionary
         ref[t.in_units(u.K).to_value()] = (rho_liq, rho_vap, p_vap)
 
@@ -360,7 +360,7 @@ def NPT_liqbox(job):
         # Loop over the keys of the dictionaries
         for t, pvap in class_data.expt_Pvap.items():
             if t == job.sp.T:
-                pressure = pvap
+                pressure = pvap * u.bar
 
         mc.run(
             system=system,
