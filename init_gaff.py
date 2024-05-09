@@ -4,8 +4,6 @@ import unyt as u
 import sys
 import pandas as pd
 
-sys.path.append("../../analysis/")
-from fffit.utils import values_scaled_to_real
 from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 from utils import atom_type, opt_atom_types
 
