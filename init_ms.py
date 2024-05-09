@@ -58,7 +58,7 @@ def unpack_molec_values(molec_name, at_class, sample, state_point):
     index_mapping = {elem: idx for idx, elem in enumerate(order)}
     #Add params based on the order they show up in given the mapping
     for param in param_names:
-        state_point[param] = sample[index_mapping[param]]
+        state_point[param] = sample[index_mapping[param]].item()
 
     return state_point
 
@@ -86,7 +86,7 @@ for molec_name, molec_data in molec_dict.items():
     # Convert to units of nm and kJ/mol
     param_matrix = at_class.get_transformation_matrix({molec_name:molec_data})
     all_best_real = setup.values_pref_to_real(full_opt_best.values)
-    #Parmaeters in units nm and kJ/mol
+    #Parameters in units nm and kJ/mol
     scaled_params = all_best_real.reshape(-1,1).T@param_matrix
 
     for temp in temps:
@@ -108,8 +108,6 @@ for molec_name, molec_data in molec_dict.items():
                 "nsteps_eq": 10000,
                 "nsteps_prod": 100000,
             }
-            state_point = unpack_molec_values(molec_name, at_class, sample, state_point)       
+            state_point = unpack_molec_values(molec_name, at_class, sample, state_point)      
             job = project.open_job(state_point)
             job.init()
-
-
