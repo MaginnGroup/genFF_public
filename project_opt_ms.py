@@ -175,7 +175,7 @@ def extract_final_liqbox(job):
 
     import subprocess
 
-    n_atoms = job.sp.N_liq * job.N_atoms
+    n_atoms = job.sp.N_liq * job.sp.N_atoms
     cmd = [
         "tail",
         "-n",
