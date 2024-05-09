@@ -62,13 +62,13 @@ def init_project():
             # Define the state point
             state_point = {
                 "mol_name": molec_name,
-                "mol_weight": molec_data.molecular_weight.in_units(u.amu).value,
+                "mol_weight": molec_data.molecular_weight, #amu
                 "smiles": molec_data.smiles_str,
                 "N_atoms": molec_data.n_atoms,
-                "T": float(temp.in_units(u.K).value),
+                "T": float(temp), #K
                 "N_vap": n_vap,
                 "N_liq": n_liq,
-                "expt_liq_density": molec_data.expt_liq_density[int(temp.in_units(u.K).value)],
+                "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
                 "nsteps_nvt": 2500000,
                 "nsteps_npt": 2000,
                 "nsteps_gemc_eq":10000000,
