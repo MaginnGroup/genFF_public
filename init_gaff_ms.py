@@ -44,34 +44,30 @@ molec_dict = {"R14": R14,
                 # "R134": R134,
                 "R116": R116}
 
+# Initialize project
+project = signac.init_project("gaff_ff_ms")
 
-#Base on parameters.py
-def init_project():
+#Loop over all molecules
+for molec_name, molec_data in molec_dict.items():
+    # Define temps (from constants files)
+    temps = list(molec_data.expt_Pvap.keys())
 
-    # Initialize project
-    project = signac.init_project("gaff_ff_ms")
+    for temp in temps:
+        # Define the state point
+        state_point = {
+            "mol_name": molec_name,
+            "mol_weight": molec_data.molecular_weight, #amu
+            "smiles": molec_data.smiles_str,
+            "N_atoms": molec_data.n_atoms,
+            "T": float(temp), #K
+            "N_vap": n_vap,
+            "N_liq": n_liq,
+            "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
+            "nsteps_nvt": 2500000,
+            "nsteps_npt": 2000,
+            "nsteps_gemc_eq":10000000,
+            "nsteps_gemc_prod": 25000000,
+        }            
 
-    #Loop over all molecules
-    for molec_name, molec_data in molec_dict.items():
-        # Define temps (from constants files)
-        temps = list(molec_data.expt_Pvap.keys())
-
-        for temp in temps:
-            # Define the state point
-            state_point = {
-                "mol_name": molec_name,
-                "mol_weight": molec_data.molecular_weight, #amu
-                "smiles": molec_data.smiles_str,
-                "N_atoms": molec_data.n_atoms,
-                "T": float(temp), #K
-                "N_vap": n_vap,
-                "N_liq": n_liq,
-                "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
-                "nsteps_nvt": 2500000,
-                "nsteps_npt": 2000,
-                "nsteps_gemc_eq":10000000,
-                "nsteps_gemc_prod": 25000000,
-            }            
-
-            job = project.open_job(state_point)
-            job.init()
+        job = project.open_job(state_point)
+        job.init()
