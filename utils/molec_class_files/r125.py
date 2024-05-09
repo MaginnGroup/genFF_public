@@ -65,13 +65,13 @@ class R125Constants:
         """Adjustable parameter names"""
 
         lit_param_set = {
-            "sigma_C1":3.028060089,
-            "sigma_C2": 3.899864477,
-            "sigma_F1":3.25471553,
+            "sigma_C1":3.028060089, #2Fs
+            "sigma_C2": 3.899864477, #3Fs
+            "sigma_F1":3.25471553,  
             "sigma_F2":2.621314823,
             "sigma_H1":2.290105259,
-            "epsilon_C1":53.68933957,
-            "epsilon_C2":58.45404839,
+            "epsilon_C1":53.68933957, #2Fs
+            "epsilon_C2":58.45404839, #3Fs
             "epsilon_F1":20.16442739,
             "epsilon_F2":22.40850153,
             "epsilon_H1":9.85642784,
