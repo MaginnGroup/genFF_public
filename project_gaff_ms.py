@@ -20,64 +20,8 @@ class Project(FlowProject):
 # This will run a total of 1000 sweeps 
 # (1 sweep = N steps, where N is the total number of molecules (job.sp.N_vap + job.sp.N_liq)
 
-# Define custom args
-# See page below for all options 
-# https://mosdef-cassandra.readthedocs.io/en/latest/guides/kwargs.html
-custom_args = {
-    "vdw_style": "lj",
-    "cutoff_style": "cut_tail",
-    "vdw_cutoff": 12.0 * u.angstrom,
-    "charge_style": "ewald",
-    "charge_cutoff": 12.0 * u.angstrom, 
-    "ewald_accuracy": 1.0e-5, 
-    "mixing_rule": "lb",
-    "units": "steps",
-    "coord_freq": 1000,
-    "prop_freq": 1000,
-}
-
-custom_args_gemc = copy.deepcopy(custom_args)
-custom_args_gemc["units"] = "steps"
-custom_args_gemc["coord_freq"] = 5000
-custom_args_gemc["prop_freq"] = 1000
-custom_args_gemc["vdw_cutoff_box1"] = custom_args["vdw_cutoff"] 
-custom_args_gemc["charge_cutoff_box1"] = custom_args["charge_cutoff"]
-
 from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 from utils import atom_type, opt_atom_types
-
-#Load class properies for each training and testing molecule
-R14 = r14.R14Constants()
-R32 = r32.R32Constants()
-R50 = r50.R50Constants()
-R125 = r125.R125Constants()
-R134a = r134a.R134aConstants()
-R143a = r143a.R143aConstants()
-R170 = r170.R170Constants()
-R41 = r41.R41Constants()
-R23 = r23.R23Constants()
-R161 = r161.R161Constants()
-R152a = r152a.R152aConstants()
-R152 = r152.R152Constants()
-R143 = r143.R143Constants()
-R134 = r134.R134Constants()
-R116 = r116.R116Constants()
-
-molec_dict = {"R14": R14,
-                "R32": R32,
-                "R50": R50,
-                "R125": R125,
-                "R134a": R134a,
-                "R143a": R143a,
-                "R170": R170,
-                "R41": R41,
-                "R23": R23,
-                "R161":R161,
-                "R152a":R152a,
-                # "R152": R152,
-                # "R143": R143,
-                # "R134": R134,
-                "R116": R116}
 
 vle = Project.make_group(name="vle")
 
@@ -240,6 +184,7 @@ def NVT_liqbox(job):
             "pressure"
             ]
 
+    custom_args, custom_args_gemc = _get_custom_args()
     custom_args["run_name"] = "nvt.eq"
     custom_args["properties"] = thermo_props
 
@@ -346,7 +291,7 @@ def NPT_liqbox(job):
     ]
 
     # Define custom args
-
+    custom_args, custom_args_gemc = _get_custom_args()
     custom_args["run_name"] = "npt.eq"
     custom_args["properties"] = thermo_props
 
@@ -477,7 +422,7 @@ def GEMC(job):
     ]
 
     # Define custom args
-
+    custom_args, custom_args_gemc = _get_custom_args()
     custom_args_gemc["run_name"] = "gemc.eq"
     custom_args_gemc["properties"] = thermo_props
 
@@ -857,7 +802,33 @@ def plot(job):
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
 #####################################################################
-def _get_class_from_molecule(molecule_name):
+def _get_custom_args():
+    # Define custom args
+    # See page below for all options 
+    # https://mosdef-cassandra.readthedocs.io/en/latest/guides/kwargs.html
+    custom_args = {
+        "vdw_style": "lj",
+        "cutoff_style": "cut_tail",
+        "vdw_cutoff": 12.0 * u.angstrom,
+        "charge_style": "ewald",
+        "charge_cutoff": 12.0 * u.angstrom, 
+        "ewald_accuracy": 1.0e-5, 
+        "mixing_rule": "lb",
+        "units": "steps",
+        "coord_freq": 1000,
+        "prop_freq": 1000,
+    }
+
+    custom_args_gemc = copy.deepcopy(custom_args)
+    custom_args_gemc["units"] = "steps"
+    custom_args_gemc["coord_freq"] = 5000
+    custom_args_gemc["prop_freq"] = 1000
+    custom_args_gemc["vdw_cutoff_box1"] = custom_args["vdw_cutoff"] 
+    custom_args_gemc["charge_cutoff_box1"] = custom_args["charge_cutoff"]
+
+    return custom_args, custom_args_gemc
+
+def _get_molec_dicts():
     #Load class properies for each training and testing molecule
     R14 = r14.R14Constants()
     R32 = r32.R32Constants()
@@ -890,7 +861,12 @@ def _get_class_from_molecule(molecule_name):
                     # "R143": R143,
                     # "R134": R134,
                     "R116": R116}
+    return molec_dict
+
+def _get_class_from_molecule(molecule_name):
+    molec_dict = _get_molec_dicts()
     return {molecule_name: molec_dict[molecule_name]}
+
 def _get_xml_from_molecule(molecule_name):
     if molecule_name == "r41":
         molec_xml_function = _generate_r41_xml
