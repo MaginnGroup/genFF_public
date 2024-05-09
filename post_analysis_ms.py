@@ -71,20 +71,25 @@ for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
     ]
 
     #Get data from molecular simulations. Group by molecule name
-    df_molec = save_signac_results(project, "mol_name", property_names)
-    #Prepare data with correct value names and units
-    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root)
-    #Calculate MAPD and MSE for each T point
-    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root)
+    df_molec = save_signac_results(project, "mol_name", property_names, csv_name=csv_root)
+    
+#Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
 
-    #Get csvs for NW, Trappe, GAFF, Potoff, and our results (opt) for each molecule if the file exists
-    #Use prepare_df_vle to get the dataframes into correct units and such
+# #For each FF
+#Use prepare_df_vle to get the data in the correct format and save the data
+df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root)
+#Calculate MAPD and MSE for each T point
+df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root)
 
-    #Plot Pvap and Hvap vs T and compare to GAFF, exp, our old results, and literature
-    molecules = df_paramsets['molecule'].unique().tolist()
-    for molec in molecules:
-        one_molec_dict = {molec: molec_dict[molec]}
-        df_molec = copy.copy(df_all[df_all['molecule'] == molec])
-        plot_vle_envelopes(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
-        plot_pvap_hvap(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+#For each molecule
+molecules = df_paramsets['molecule'].unique().tolist()
+for molec in molecules:
+    #Get the data for the molecule from each FF if it exists
+
+    #Use prepare_df_vle to get the data in the correct format
+    one_molec_dict = {molec: molec_dict[molec]}
+    df_molec = copy.copy(df_all[df_all['molecule'] == molec])
+    #Plot Pvap and Hvap vs T and compare the 5 FF predictions
+    plot_vle_envelopes(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+    plot_pvap_hvap(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
     

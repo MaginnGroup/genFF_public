@@ -4,7 +4,7 @@ import pandas as pd
 import os
 
 
-def save_signac_results(project, param_names, property_names):
+def save_signac_results(project, param_names, property_names, csv_name = None):
     """Save the signac results to a CSV file.
 
     Parameters
@@ -59,6 +59,12 @@ def save_signac_results(project, param_names, property_names):
 
     # Save to csv file for record-keeping
     df = pd.DataFrame(data)
+
+    #sort by molecule and temperature -- added by Ning Wang
+    df.sort_values(by=["molecule", "temperature"], ignore_index=True, inplace=True)
     
+    if csv_name != None:
+        path = os.path.join(csv_name,"ms_data_simple.csv")
+        df.to_csv(path)
 
     return df
