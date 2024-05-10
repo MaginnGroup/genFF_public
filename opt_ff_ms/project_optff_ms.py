@@ -241,13 +241,16 @@ def run_gemc(job):
     ff = foyer.Forcefield(job.fn("ff.xml"))
 
     # Load the compound and apply the ff
-    compound = mbuild.load(job.smiles, smiles=True)
+    compound = mbuild.load(job.sp.smiles, smiles=True)
     compound_ff = ff.apply(compound)
 
     # Create box list and species list
     boxl = job.doc.liqbox_final_dim  # saved in nm
     liq_box = mbuild.load(job.fn("liqbox.xyz"))
-    liq_box.periodicity = [boxl, boxl, boxl]
+
+    liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90., 90., 90.])
+    liq_box.periodicity = [True, True, True]
+
     boxl = job.doc.vapboxl  # nm
     vap_box = mbuild.Box(lengths=[boxl, boxl, boxl])
 
