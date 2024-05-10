@@ -74,6 +74,8 @@ for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
     df_molec = save_signac_results(project, "mol_name", property_names, csv_name=csv_root)
     
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
+#Check that files all exist and load them if they do
+# df_Potoff = open("Results_MS").read() if os.path.exists(file_path) else None
 
 # #For each FF
 #Use prepare_df_vle to get the data in the correct format and save the data
