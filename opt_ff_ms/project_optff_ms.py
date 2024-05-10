@@ -434,13 +434,13 @@ def calculate_props(job):
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
 #####################################################################
 def _get_xml_from_molecule(molecule_name):
-    if molecule_name == "r41":
+    if molecule_name == "R41":
         molec_xml_function = _generate_r41_xml
-    elif molecule_name == "r116":
+    elif molecule_name == "R116":
         molec_xml_function = _generate_r116_xml
-    elif molecule_name == "r23":
+    elif molecule_name == "R23":
         molec_xml_function = _generate_r23_xml
-    elif molecule_name == "r152a":
+    elif molecule_name == "R152a":
         molec_xml_function = _generate_r152a_xml
     # elif molecule_name == "r152":
     #     molec_xml_function = _generate_r152_xml
@@ -448,21 +448,21 @@ def _get_xml_from_molecule(molecule_name):
     #     molec_xml_function = _generate_r143_xml
     # elif molecule_name == "r134":
     #     molec_xml_function = _generate_r134_xml
-    elif molecule_name == "r161":
+    elif molecule_name == "R161":
         molec_xml_function = _generate_r161_xml
-    elif molecule_name == "r14":
+    elif molecule_name == "R14":
         molec_xml_function = _generate_r14_xml
-    elif molecule_name == "r32":
+    elif molecule_name == "R32":
         molec_xml_function = _generate_r32_xml
-    elif molecule_name == "r50":
+    elif molecule_name == "R50":
         molec_xml_function = _generate_r50_xml
-    elif molecule_name == "r125":
+    elif molecule_name == "R125":
         molec_xml_function = _generate_r125_xml
-    elif molecule_name == "r143a":
+    elif molecule_name == "R143a":
         molec_xml_function = _generate_r143a_xml
-    elif molecule_name == "r170":
+    elif molecule_name == "R170":
         molec_xml_function = _generate_r170_xml
-    elif molecule_name == "r134a":
+    elif molecule_name == "R134a":
         molec_xml_function = _generate_r134a_xml
     else:
         raise ValueError("Molecule name not recognized")
