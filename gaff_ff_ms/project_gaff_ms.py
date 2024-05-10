@@ -8,22 +8,20 @@ import unyt as u
 import copy
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-
 class Project(FlowProject):
     def __init__(self):
         super().__init__()
         current_path = Path(os.getcwd()).absolute()
 
+vle = Project.make_group(name="vle")
 # simulation_length must be consistent with the "units" field in custom args below
 # For instance, if the "units" field is "sweeps" and simulation_length = 1000, 
 # This will run a total of 1000 sweeps 
 # (1 sweep = N steps, where N is the total number of molecules (job.sp.N_vap + job.sp.N_liq)
 
+sys.path.append("..")
 from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 from utils import atom_type, opt_atom_types
-
-vle = Project.make_group(name="vle")
 
 @vle
 @Project.post.isfile("ff.xml")
@@ -93,9 +91,9 @@ def gemc_finished(job):
     return completed
 
 @vle
-@Project.operation
 @Project.post(lambda job: "vapboxl" in job.doc)
 @Project.post(lambda job: "liqboxl" in job.doc)
+@Project.operation
 def calc_boxl(job):
     "Calculate the initial box length of the boxes"
 
@@ -119,7 +117,7 @@ def calc_boxl(job):
                 rho_vap = class_data.expt_rhoc[t] * u.kilogram/(u.meter)**3
         p_vap = class_data.expt_Pvap[t] * u.bar
         # Create a tuple containing the values from each dictionary
-        ref[t.in_units(u.K).to_value()] = (rho_liq, rho_vap, p_vap)
+        ref[int(t)] = (rho_liq, rho_vap, p_vap)
 
     vap_density = ref[job.sp.T][1]
     mol_density = vap_density / (job.sp.mol_weight * u.amu)
@@ -144,10 +142,9 @@ def calc_boxl(job):
     job.doc.liqboxl = liqboxl  # nm, compatible with mbuild
 
 @vle
-@Project.operation
 @Project.pre.after(calc_boxl)
 @Project.post(nvt_finished)
-@directives(omp_num_threads=12)
+@Project.operation(directives={"omp_num_threads": 12})
 def NVT_liqbox(job):
     "Equilibrate the liquid box using NVT simulation"
 
@@ -203,10 +200,10 @@ def NVT_liqbox(job):
 
 
 @vle
-@Project.operation
 @Project.pre.after(NVT_liqbox)
 @Project.post.isfile("nvt.final.xyz")
 @Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc)
+@Project.operation
 def extract_final_NVT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
 
@@ -234,10 +231,9 @@ def extract_final_NVT_config(job):
 
 
 @vle
-@Project.operation
 @Project.pre.after(extract_final_NVT_config)
 @Project.post(npt_finished)
-@directives(omp_num_threads=12)
+@Project.operation(directives={"omp_num_threads": 12})
 def NPT_liqbox(job):
     "Equilibrate the liquid box"
 
@@ -318,10 +314,10 @@ def NPT_liqbox(job):
         )
 
 @vle
-@Project.operation
 @Project.pre.after(NPT_liqbox)
 @Project.post.isfile("npt.final.xyz")
 @Project.post(lambda job: "npt_liqbox_final_dim" in job.doc)
+@Project.operation
 def extract_final_NPT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
 
@@ -349,10 +345,9 @@ def extract_final_NPT_config(job):
 
 
 @vle
-@Project.operation
 @Project.pre.after(extract_final_NPT_config)
 @Project.post(gemc_finished)
-@directives(omp_num_threads=12)
+@Project.operation(directives={"omp_num_threads": 12})
 def GEMC(job):
     "Equilibrate GEMC"
 
@@ -462,7 +457,6 @@ def GEMC(job):
 #@Project.post(lambda job: "vap_enthalpy_unc" in job.doc)
 
 @vle
-@Project.operation
 @Project.pre.after(GEMC)
 @Project.post(lambda job: "liq_density" in job.doc)
 @Project.post(lambda job: "vap_density" in job.doc)
@@ -472,6 +466,7 @@ def GEMC(job):
 @Project.post(lambda job: "vap_enthalpy" in job.doc)
 @Project.post(lambda job: "nmols_liq" in job.doc)
 @Project.post(lambda job: "nmols_vap" in job.doc)
+@Project.operation
 def calculate_props(job):
     """Calculate the density"""
 
@@ -592,8 +587,8 @@ def calculate_props(job):
         job.doc[name + "_unc"] = np.max(np.sqrt(vars_est))
 
 @vle
-@Project.operation
 @Project.pre.after(GEMC)
+@Project.operation
 def plot(job):
 
     import pandas as pd
