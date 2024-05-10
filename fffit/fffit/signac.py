@@ -64,7 +64,6 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
     df.sort_values(by=["molecule", "temperature"], ignore_index=True, inplace=True)
     
     if csv_name != None:
-        path = os.path.join(csv_name,"ms_data_simple.csv")
-        df.to_csv(path)
+        df.to_csv(csv_name)
 
     return df
