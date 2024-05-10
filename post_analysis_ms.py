@@ -6,6 +6,7 @@ import unyt as u
 import pandas as pd
 import os
 import copy
+from matplotlib.backends.backend_pdf import PdfPages
 import scipy 
 from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes, plot_pvap_hvap
 
@@ -50,14 +51,16 @@ molec_dict = {"R14": R14,
                 "R116": R116}
 
 at_number = 11
+ff_list = []
 for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
     project = signac.get_project(project_path)
     if project_path == "opt_ff_ms":
         project = project.find_jobs({"atom_type": at_number})
-        at_num_str = str(at_number)
+        at_num_str = "at_" + str(at_number)
     else:
         at_num_str = ""
-    csv_root = os.path.join("Results_MS", at_num_str, project_path)
+    csv_root = os.path.join("Results_MS","unprocessed_csv", at_num_str, project_path)
+    csv_root_final = os.path.join("Results_MS", at_num_str, project_path)
     os.makedirs(csv_root, exist_ok=True)
 
     #Create a large df with just the molecule name and property predictions (param values calculated in Results)
@@ -70,28 +73,55 @@ for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
         "vap_enthalpy",
     ]
 
-    #Get data from molecular simulations. Group by molecule name
-    df_molec = save_signac_results(project, "mol_name", property_names, csv_name=csv_root)
+    #Get data from molecular simulations. Group by molecule name and save
+    df_molec = save_signac_results(project, "mol_name", property_names, csv_name=csv_root + ".csv")
+    #process data and save
+    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root_final + ".csv")
+    ff_list.append(df_all)
+    #Calculate MAPD and MSE for each T point
+    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root_final + "err.csv")
     
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
-#Check that files all exist and load them if they do
-# df_Potoff = open("Results_MS").read() if os.path.exists(file_path) else None
 
-# #For each FF
-#Use prepare_df_vle to get the data in the correct format and save the data
-df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root)
-#Calculate MAPD and MSE for each T point
-df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root)
 
+ff_names = ["Potoff", "TraPPE", "Wang_FFO"]
+for ff_name in ff_names:
+    #Check that files all exist and load them if they do
+    read_path = os.path.join("Results_MS/unprocessed_csv", ff_name + ".csv")
+    df_simple = pd.read_csv(read_path) if os.path.exists(read_path) else None
+    #Use prepare_df_vle to get the data in the correct format and save the data
+    csv_path_final = os.path.join("Results_MS", ff_name + ".csv")
+    df_ff_final = prepare_df_vle(df_molec, molec_dict, csv_name=csv_path_final)
+    ff_list.append(df_ff_final)
+    #Calculate MAPD and MSE for each T point
+    csv_err_path = os.path.join("Results_MS", ff_name + "err.csv")
+    df_ff_err = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_err_path)
+    
+#Work on combining into 1 PDF
+pdf_vle = PdfPages(os.path.join("Results_MS", "at_" + str(at_number) ,"vle.csv"))
+pdf_hpvap = PdfPages(os.path.join("Results_MS", "at_" + str(at_number) ,"h_p_vap.csv"))
 #For each molecule
 molecules = df_paramsets['molecule'].unique().tolist()
 for molec in molecules:
     #Get the data for the molecule from each FF if it exists
-
-    #Use prepare_df_vle to get the data in the correct format
     one_molec_dict = {molec: molec_dict[molec]}
-    df_molec = copy.copy(df_all[df_all['molecule'] == molec])
-    #Plot Pvap and Hvap vs T and compare the 5 FF predictions
-    plot_vle_envelopes(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
-    plot_pvap_hvap(df_molec, df_all, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None)
+    ff_molec_list = []
+    for df_ff in ff_list:
+        df_molec = copy.copy(df_all[df_all['molecule'] == molec])
+        if df_molec.empty:
+            df_molec = None
+        else:
+            ff_molec_list.append(df_molec)
+    df_optff, df_gaff, df_pot, df_trappe, df_wang = ff_molec_list
+
+    #Plot Vle, Hvap, and Pvap and save to different pdfs
+    pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, df_optff, 
+                                   df_pot, df_wang, df_trappe, df_gaff))
+    pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, df_optff, 
+                                   df_pot, df_wang, df_trappe, df_gaff))
+#Close figures    
+pdf_vle.close()
+pdf_hpvap.close()
+    
+    
     

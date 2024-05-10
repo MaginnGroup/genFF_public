@@ -102,8 +102,7 @@ def prepare_df_vle(df_csv, molec_dict, convert_Hvap = False, csv_name = None):
     df_csv["sim_rhoc"] = rhoc
 
     if csv_name != None:
-        path = os.path.join(csv_name,"ms_data.csv")
-        df_csv.to_csv(path)
+        df_csv.to_csv(csv_name)
            
     return df_csv
 
@@ -194,8 +193,7 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     new_df = pd.DataFrame(new_data, columns=columns)
 
     if csv_name != None:
-        path = os.path.join(csv_name,"ms_err_data.csv")
-        new_df.to_csv(path)
+        new_df.to_csv(csv_name)
 
     return new_df
 
@@ -309,9 +307,11 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
     ax2.text(0.7,  0.82, molec, fontsize=30, transform=ax2.transAxes)
     fig.subplots_adjust(bottom=0.2, top=0.75, left=0.15, right=0.95, wspace=0.55)
 
-    if save_name is not None:
-        path = os.path.join(save_name, "vle_plt.png")
-        fig.savefig(path,dpi=300)
+    return fig
+
+    # if save_name is not None:
+    #     path = os.path.join(save_name, "vle_plt.png")
+    #     fig.savefig(path,dpi=300)
 
 
 def calc_critical(df):
@@ -455,6 +455,8 @@ def plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = 
     axs[0].legend(loc="lower left", bbox_to_anchor=(0.35, 1.05), ncol=3, fontsize=16, handletextpad=0.1, markerscale=0.8, edgecolor="dimgrey")
 
     fig.subplots_adjust(bottom=0.15, top=0.85, left=0.15, right=0.85, wspace=0.55, hspace=0.5)
-    if save_name is not None:
-        path = os.path.join(save_name, "h_p_vap_plt.png")
-        fig.savefig(path,dpi=300)
+
+    return fig
+    # if save_name is not None:
+    #     path = os.path.join(save_name, "h_p_vap_plt.png")
+    #     fig.savefig(path,dpi=300)
