@@ -44,20 +44,15 @@ molec_dict = {"R14": R14,
                 # "R134": R134,
                 "R116": R116}
 
-def prepare_df_vle(df_csv, molec_dict, csv_name = None):
+def prepare_df_vle(df_csv, molec_dict, convert_Hvap = False, csv_name = None):
     """Prepare a pandas dataframe for fitting a GP model to density data
 
     Performs the following actions:
-       - Renames "liq_density" to "sim_liq_density"
-       - Renames "vap_density" to "sim_vap_density"
-       - Renames "Pvap" to "sim_Pvap"
-       - Removes "liq_enthalpy" and "vap_enthalpy" and adds "sim_Hvap"
-       - Adds "expt_liq_density"
-       - Adds "expt_vap_density"
-       - Adds "expt_Pvap"
-       - Adds "expt_Hvap"
-       - Adds "is_liquid"
-       - Converts all values from physical values to scaled values
+       - Renames "liq_density" to "sim_liq_density" (units kg/m3 assumed)
+       - Renames "vap_density" to "sim_vap_density" (units kg/m3 assumed)
+       - Renames "Pvap" to "sim_Pvap" (units bar assumed)
+       - Removes "liq_enthalpy" and "vap_enthalpy" and adds "sim_Hvap" (units kJ/kg returned)
+            - Units kJ/mol assumed for Hvap and kJ/kg for Hvap kJ/kg
 
     Parameters
     ----------
@@ -73,46 +68,44 @@ def prepare_df_vle(df_csv, molec_dict, csv_name = None):
     df_all : pd.DataFrame
         The dataframe with scaled parameters and MD/expt. properties
     """
-    if "liq_density" not in df_csv.columns:
-        raise ValueError("df_csv must contain column 'liq_density'")
-    if "vap_density" not in df_csv.columns:
-        raise ValueError("df_csv must contain column 'vap_density'")
-    if "Pvap" not in df_csv.columns:
-        raise ValueError("df_csv must contain column 'Pvap'")
-    if "Hvap" not in df_csv.columns:
-        raise ValueError("df_csv must contain column 'Hvap'")
-    #if "liq_enthalpy" not in df_csv.columns:
-    #    raise ValueError("df_csv must contain column 'liq_enthalpy'")
-    #if "vap_enthalpy" not in df_csv.columns:
-    #    raise ValueError("df_csv must contain column 'vap_enthalpy'")
-    if "temperature" not in df_csv.columns:
-        raise ValueError("df_csv must contain column 'temperature'")
 
-    # Rename properties to MD, calculate Hvap, add expt properties
-    df_all = df_csv.rename(columns={"liq_density": "sim_liq_density"})
-    df_all = df_all.rename(columns={"vap_density": "sim_vap_density"})
-    df_all = df_all.rename(columns={"Pvap": "sim_Pvap"})
-    df_all = df_all.rename(columns={"Hvap": "sim_Hvap"})
-        #df_all.drop(columns="vap_enthalpy", inplace=True)
-        #df_all.drop(columns="liq_enthalpy", inplace=True)
-        
-    # Convert Hvap to kJ/kg
-    df_all["sim_Hvap"] = df_all["sim_Hvap"]/df_all["molecule"].apply(
-        lambda molec: molec_dict[molec].molecular_weight*1000.0)
+    def rename_col(df, property_name, units):
+        prop_units = property_name + " " + units
+        if property_name in df.columns:
+            df.rename(columns={property_name: "sim_" + property_name}, inplace=True)
+        elif prop_units in df.columns:
+            df.rename(columns={prop_units: "sim_" + property_name}, inplace=True)
+        else:
+            raise ValueError(f"df must contain either {property_name} or {prop_units}")
+        return df
     
+    # Convert Hvap to kJ/kg if in kJ/mol
+    if "Hvap kJ/kg" in df_csv.columns:
+        #Add Hvap in kJ/mol
+        df_csv["Hvap"] = df_csv["Hvap"]/df_csv["molecule"].apply(
+            lambda molec: molec_dict[molec].molecular_weight*1000.0)
+        #And drop kJ/kg column
+        df_csv.drop("Hvap kJ/kg", axis=1)
+    
+    # Rename properties to MD
+    props = ["liq_density", "vap_density", "Pvap", "Hvap"]
+    units = ["kg/m3", "kg/m3", "bar", "kJ/kg"]
+    for prop, unit in zip(props, units):
+        rename_col(df_csv, prop, unit)
+        
     #sort by molecule and temperature -- added by Ning Wang
-    df_all=df_all.sort_values(by=["molecule", "temperature"])
+    df_csv.sort_values(by=["molecule", "temperature"], inplace=True)
 
     #Add Tc and Rhoc predictions
-    Tc, rhoc = calc_critical(df_all)
-    df_all["sim_Tc"] = Tc
-    df_all["sim_rhoc"] = rhoc
+    Tc, rhoc = calc_critical(df_csv)
+    df_csv["sim_Tc"] = Tc
+    df_csv["sim_rhoc"] = rhoc
 
     if csv_name != None:
         path = os.path.join(csv_name,"ms_data.csv")
-        df_all.to_csv(path)
+        df_csv.to_csv(path)
            
-    return df_all
+    return df_csv
 
 def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     """Create a dataframe with mean square error (mse) and mean absolute
