@@ -442,7 +442,7 @@ def GEMC(job):
             mc.restart(
                 restart_from="gemc.eq",
                 run_type="production",
-                total_run_length=job.sp.job.nsteps_gemc_prod,
+                total_run_length=job.sp.nsteps_gemc_prod,
             )
             job.doc.gemc_failed = False
         except:
@@ -462,7 +462,7 @@ def GEMC(job):
             mc.restart(
                 restart_from="gemc.eq",
                 run_type="production",
-                total_run_length=job.sp.job.nsteps_gemc_prod,
+                total_run_length=job.sp.nsteps_gemc_prod,
             )
             pass
 
