@@ -81,9 +81,9 @@ def gemc_finished(job):
     with job:
         try:
             thermo_data = np.genfromtxt(
-                "gemc.eq.rst.001.out.box1.prp", skip_header=3
+                "gemc.eq.out.box1.prp", skip_header=3
             )
-            completed = int(thermo_data[-1][0]) == job.sp.job.nsteps_gemc_prod #job.sp.nsteps_liqeq
+            completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod #job.sp.nsteps_liqeq
         except:
             completed = False
             pass
@@ -447,6 +447,23 @@ def GEMC(job):
             job.doc.gemc_failed = False
         except:
             job.doc.gemc_failed = True
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_gemc_eq,
+                temperature=job.sp.T * u.K,
+                **custom_args_gemc
+            )
+
+            custom_args_gemc["run_name"] = "gemc.prod"
+            #custom_args_gemc["restart_name"] = "gemc.eq"
+
+            mc.restart(
+                restart_from="gemc.eq",
+                run_type="production",
+                total_run_length=job.sp.job.nsteps_gemc_prod,
+            )
             pass
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
@@ -483,8 +500,8 @@ def calculate_props(job):
     ]
 
     with job:
-        df_box1 = np.genfromtxt("gemc.eq.rst.001.out.box1.prp")
-        df_box2 = np.genfromtxt("gemc.eq.rst.001.out.box2.prp")
+        df_box1 = np.genfromtxt("gemc.eq.out.box1.prp")
+        df_box2 = np.genfromtxt("gemc.eq.out.box2.prp")
 
     energy_col = 1
     density_col = 5
@@ -586,11 +603,11 @@ def calculate_props(job):
 
         job.doc[name + "_unc"] = np.max(np.sqrt(vars_est))
 
+#Having trouble getting this to output the plots anywhere. 
 @vle
 @Project.pre.after(GEMC)
 @Project.operation
 def plot(job):
-
     import pandas as pd
     import pylab as plt
 
@@ -600,8 +617,8 @@ def plot(job):
         npt_box1 = pd.read_table("npt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure", "density"], skiprows=3)
         gemc_eq_box1 = pd.read_table("gemc.eq.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
         gemc_eq_box2 = pd.read_table("gemc.eq.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_prod_box1 = pd.read_table("gemc.eq.rst.001.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_prod_box2 = pd.read_table("gemc.eq.rst.001.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+        gemc_prod_box1 = pd.read_table("gemc.eq.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+        gemc_prod_box2 = pd.read_table("gemc.eq.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
 
     plt.rcParams['font.family'] = "DIN Alternate"
     
