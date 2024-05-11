@@ -81,7 +81,7 @@ def gemc_finished(job):
     with job:
         try:
             thermo_data = np.genfromtxt(
-                "gemc.eq.out.box1.prp", skip_header=3
+                "gemc.eq.rst.001.out.box1.prp", skip_header=3
             )
             completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod #job.sp.nsteps_liqeq
         except:
@@ -475,6 +475,7 @@ def GEMC(job):
 
 @vle
 @Project.pre.after(GEMC)
+@Project.post.isfile("energy.png")
 @Project.post(lambda job: "liq_density" in job.doc)
 @Project.post(lambda job: "vap_density" in job.doc)
 @Project.post(lambda job: "Pvap" in job.doc)
@@ -489,7 +490,7 @@ def calculate_props(job):
 
     import numpy as np
     import pylab as plt
-    from block_average import block_average
+    from utils.analyze_ms import block_average
     thermo_props = [
         "energy_total",
         "pressure",
@@ -500,8 +501,8 @@ def calculate_props(job):
     ]
 
     with job:
-        df_box1 = np.genfromtxt("gemc.eq.out.box1.prp")
-        df_box2 = np.genfromtxt("gemc.eq.out.box2.prp")
+        df_box1 = np.genfromtxt("gemc.eq.rst.001.out.box1.prp")
+        df_box2 = np.genfromtxt("gemc.eq.rst.001.out.box2.prp")
 
     energy_col = 1
     density_col = 5
@@ -552,9 +553,7 @@ def calculate_props(job):
     job.doc.nmols_liq = nmols_liq_ave
     job.doc.nmols_vap = nmols_vap_ave
 
-    plt.rcParams['font.family'] = "DIN Alternate"
-    font = {'family' : 'DIN Alternate',
-            'weight' : 'normal',
+    font = {'weight' : 'normal',
                     'size'   : 12}
     
     fig, ax = plt.subplots(1, 1)
@@ -574,7 +573,8 @@ def calculate_props(job):
     ax.plot(steps, vap_energy, label='Vapor Energy')
     ax.legend(loc="best")
 
-    plt.savefig("energy.png")
+    with job:
+        plt.savefig("energy.png")
 
     Props = {
         "liq_density": liq_density,
@@ -615,15 +615,12 @@ def plot(job):
 
         nvt_box1 = pd.read_table("nvt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure"], skiprows=3)
         npt_box1 = pd.read_table("npt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure", "density"], skiprows=3)
-        gemc_eq_box1 = pd.read_table("gemc.eq.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_eq_box2 = pd.read_table("gemc.eq.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_prod_box1 = pd.read_table("gemc.eq.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_prod_box2 = pd.read_table("gemc.eq.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-
-    plt.rcParams['font.family'] = "DIN Alternate"
-    
-    font = {'family' : 'DIN Alternate',
-            'weight' : 'normal',
+        gemc_eq_box1 = pd.read_table("gemc.eq.rst.001.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+        gemc_eq_box2 = pd.read_table("gemc.eq.rst.001.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+        gemc_prod_box1 = pd.read_table("gemc.eq.rst.001.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+        gemc_prod_box2 = pd.read_table("gemc.eq.rst.001.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+   
+    font = {'weight' : 'normal',
                     'size'   : 12}
   
 
@@ -648,7 +645,8 @@ def plot(job):
     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["pressure"], label='GEMC-prod', color='indianred')
 
     ax.legend(loc="best")
-    plt.savefig(f"gemc-pvap-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"gemc-pvap-{job.sp.T}.png")
 
     #####################
     # GEMC nmols
@@ -673,7 +671,8 @@ def plot(job):
     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["nmols"], label='GEMC-prod-box2', color='indianred')
 
     ax.legend(loc="best")
-    plt.savefig(f"gemc-nmols-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"gemc-nmols-{job.sp.T}.png")
 
     #####################
     # GEMC volume
@@ -698,7 +697,8 @@ def plot(job):
     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["volume"], label='GEMC-prod-box2', color='indianred')
 
     ax.legend(loc="best")
-    plt.savefig(f"gemc-volume-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"gemc-volume-{job.sp.T}.png")
 
     #####################
     # GEMC density
@@ -723,7 +723,8 @@ def plot(job):
     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["density"], label='GEMC-prod-box2', color='indianred')
 
     ax.legend(loc="best")
-    plt.savefig(f"gemc-density-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"gemc-density-{job.sp.T}.png")
 
     #####################
     # GEMC enthalpy 
@@ -748,7 +749,8 @@ def plot(job):
     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["enthalpy"], label='GEMC-prod-box2', color='indianred')
 
     ax.legend(loc="best")
-    plt.savefig(f"gemc-enthalpy-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"gemc-enthalpy-{job.sp.T}.png")
 
 
     #############
@@ -771,7 +773,8 @@ def plot(job):
     ax.plot(npt_box1["step"], npt_box1["density"], label='NpT')
 
     ax.legend(loc="best")
-    plt.savefig(f"npt-density-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"npt-density-{job.sp.T}.png")
 
 
     # Shift steps so that we get an overall plot of energy across 
@@ -809,7 +812,8 @@ def plot(job):
     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["energy"], label='GEMC-prod-box2', color="indianred")
 
     ax.legend(loc="best")
-    plt.savefig(f"all-energy-{job.sp.T}.png")
+    with job:
+        plt.savefig(f"all-energy-{job.sp.T}.png")
 
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
