@@ -608,9 +608,23 @@ def calculate_props_gaff(job):
 
         job.doc[name + "_unc"] = np.max(np.sqrt(vars_est))
 
-#Having trouble getting this to output the plots anywhere. 
+@ProjectGAFF.label
+def plot_finished(job):
+    "Confirm plots have been made"
+    import numpy as np
+    import os 
+
+    last_plot = job.fn(f"all-energy-{job.sp.T}.png")
+    if os.path.exists(last_plot):
+        completed = True
+    else:
+        completed = False
+
+    return completed
+
 @vle
 @ProjectGAFF.pre.after(GEMC)
+@ProjectGAFF.post(plot_finished)
 @ProjectGAFF.operation
 def plot(job):
     import pandas as pd
