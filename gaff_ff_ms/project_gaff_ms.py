@@ -7,28 +7,30 @@ import sys
 import unyt as u
 import copy
 
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-class Project(FlowProject):
-    def __init__(self):
-        super().__init__()
-        current_path = Path(os.getcwd()).absolute()
-
-vle = Project.make_group(name="vle")
 # simulation_length must be consistent with the "units" field in custom args below
 # For instance, if the "units" field is "sweeps" and simulation_length = 1000, 
 # This will run a total of 1000 sweeps 
 # (1 sweep = N steps, where N is the total number of molecules (job.sp.N_vap + job.sp.N_liq)
-
 sys.path.append("..")
 from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
-from utils import atom_type, opt_atom_types
+sys.path.remove("..")
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+#Note - Must define Project class with a different name that other project.py files
+class ProjectGAFF(FlowProject):
+    def __init__(self):
+        current_path = Path(os.getcwd()).absolute()
+        #Set Project Path to be that of the current working directory
+        super().__init__(path = current_path)
+        
+vle = ProjectGAFF.make_group(name="vle")
 
 @vle
-@Project.post.isfile("ff.xml")
-@Project.operation
-def create_forcefield(job):
+@ProjectGAFF.post.isfile("ff.xml")
+@ProjectGAFF.operation
+def create_gaff_forcefield(job):
     """Create the forcefield .xml file for the job"""
-
     #Generate content based on job sp molecule name
     molec_xml_function = _get_xml_from_molecule(job.sp.mol_name)       
     content = molec_xml_function(job)
@@ -36,7 +38,7 @@ def create_forcefield(job):
     with open(job.fn("ff.xml"), "w") as ff:
         ff.write(content)
         
-@Project.label
+@ProjectGAFF.label
 def nvt_finished(job):
     "Confirm a given simulation is completed"
     import numpy as np
@@ -54,7 +56,7 @@ def nvt_finished(job):
 
     return completed
 
-@Project.label
+@ProjectGAFF.label
 def npt_finished(job):
     "Confirm a given simulation is completed"
     import numpy as np
@@ -72,7 +74,7 @@ def npt_finished(job):
 
     return completed
 
-@Project.label
+@ProjectGAFF.label
 def gemc_finished(job):
     "Confirm a given simulation is completed"
     import numpy as np
@@ -91,9 +93,9 @@ def gemc_finished(job):
     return completed
 
 @vle
-@Project.post(lambda job: "vapboxl" in job.doc)
-@Project.post(lambda job: "liqboxl" in job.doc)
-@Project.operation
+@ProjectGAFF.post(lambda job: "vapboxl" in job.doc)
+@ProjectGAFF.post(lambda job: "liqboxl" in job.doc)
+@ProjectGAFF.operation
 def calc_boxl(job):
     "Calculate the initial box length of the boxes"
 
@@ -102,7 +104,7 @@ def calc_boxl(job):
     #Load class properies for each training and testing molecule
     class_dict = _get_class_from_molecule(job.sp.mol_name)
     class_data = class_dict[job.sp.mol_name]
-    # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in project_gaff.py as needed)
+    # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in ProjectGAFF_gaff.py as needed)
     # Loop over the keys of the dictionaries
     ref = {}
     #What is the best way to automate this if exp data crashes simulation?
@@ -142,9 +144,9 @@ def calc_boxl(job):
     job.doc.liqboxl = liqboxl  # nm, compatible with mbuild
 
 @vle
-@Project.pre.after(calc_boxl)
-@Project.post(nvt_finished)
-@Project.operation(directives={"omp_num_threads": 12})
+@ProjectGAFF.pre.after(calc_boxl)
+@ProjectGAFF.post(nvt_finished)
+@ProjectGAFF.operation(directives={"omp_num_threads": 12})
 def NVT_liqbox(job):
     "Equilibrate the liquid box using NVT simulation"
 
@@ -200,10 +202,10 @@ def NVT_liqbox(job):
 
 
 @vle
-@Project.pre.after(NVT_liqbox)
-@Project.post.isfile("nvt.final.xyz")
-@Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc)
-@Project.operation
+@ProjectGAFF.pre.after(NVT_liqbox)
+@ProjectGAFF.post.isfile("nvt.final.xyz")
+@ProjectGAFF.post(lambda job: "nvt_liqbox_final_dim" in job.doc)
+@ProjectGAFF.operation
 def extract_final_NVT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
 
@@ -231,9 +233,9 @@ def extract_final_NVT_config(job):
 
 
 @vle
-@Project.pre.after(extract_final_NVT_config)
-@Project.post(npt_finished)
-@Project.operation(directives={"omp_num_threads": 12})
+@ProjectGAFF.pre.after(extract_final_NVT_config)
+@ProjectGAFF.post(npt_finished)
+@ProjectGAFF.operation(directives={"omp_num_threads": 12})
 def NPT_liqbox(job):
     "Equilibrate the liquid box"
 
@@ -314,10 +316,10 @@ def NPT_liqbox(job):
         )
 
 @vle
-@Project.pre.after(NPT_liqbox)
-@Project.post.isfile("npt.final.xyz")
-@Project.post(lambda job: "npt_liqbox_final_dim" in job.doc)
-@Project.operation
+@ProjectGAFF.pre.after(NPT_liqbox)
+@ProjectGAFF.post.isfile("npt.final.xyz")
+@ProjectGAFF.post(lambda job: "npt_liqbox_final_dim" in job.doc)
+@ProjectGAFF.operation
 def extract_final_NPT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
 
@@ -345,9 +347,9 @@ def extract_final_NPT_config(job):
 
 
 @vle
-@Project.pre.after(extract_final_NPT_config)
-@Project.post(gemc_finished)
-@Project.operation(directives={"omp_num_threads": 12})
+@ProjectGAFF.pre.after(extract_final_NPT_config)
+@ProjectGAFF.post(gemc_finished)
+@ProjectGAFF.operation(directives={"omp_num_threads": 12})
 def GEMC(job):
     "Equilibrate GEMC"
 
@@ -474,23 +476,26 @@ def GEMC(job):
 #@Project.post(lambda job: "vap_enthalpy_unc" in job.doc)
 
 @vle
-@Project.pre.after(GEMC)
-@Project.post.isfile("energy.png")
-@Project.post(lambda job: "liq_density" in job.doc)
-@Project.post(lambda job: "vap_density" in job.doc)
-@Project.post(lambda job: "Pvap" in job.doc)
-@Project.post(lambda job: "Hvap" in job.doc)
-@Project.post(lambda job: "liq_enthalpy" in job.doc)
-@Project.post(lambda job: "vap_enthalpy" in job.doc)
-@Project.post(lambda job: "nmols_liq" in job.doc)
-@Project.post(lambda job: "nmols_vap" in job.doc)
-@Project.operation
-def calculate_props(job):
+@ProjectGAFF.pre.after(GEMC)
+@ProjectGAFF.post.isfile("energy.png")
+@ProjectGAFF.post(lambda job: "liq_density" in job.doc)
+@ProjectGAFF.post(lambda job: "vap_density" in job.doc)
+@ProjectGAFF.post(lambda job: "Pvap" in job.doc)
+@ProjectGAFF.post(lambda job: "Hvap" in job.doc)
+@ProjectGAFF.post(lambda job: "liq_enthalpy" in job.doc)
+@ProjectGAFF.post(lambda job: "vap_enthalpy" in job.doc)
+@ProjectGAFF.post(lambda job: "nmols_liq" in job.doc)
+@ProjectGAFF.post(lambda job: "nmols_vap" in job.doc)
+@ProjectGAFF.operation
+def calculate_props_gaff(job):
     """Calculate the density"""
 
     import numpy as np
     import pylab as plt
+    sys.path.append("..")
     from utils.analyze_ms import block_average
+    sys.path.remove("..")
+    
     thermo_props = [
         "energy_total",
         "pressure",
@@ -605,8 +610,8 @@ def calculate_props(job):
 
 #Having trouble getting this to output the plots anywhere. 
 @vle
-@Project.pre.after(GEMC)
-@Project.operation
+@ProjectGAFF.pre.after(GEMC)
+@ProjectGAFF.operation
 def plot(job):
     import pandas as pd
     import pylab as plt
@@ -1345,4 +1350,4 @@ def _generate_r161_xml(job):
     return content
 
 if __name__ == "__main__":
-    Project().main()
+    ProjectGAFF().main()

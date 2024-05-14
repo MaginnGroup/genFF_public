@@ -7,4 +7,4 @@
 */.signac*
 Project-*.o*
 signac_project_document.json
-opt_at_params*
+Project*-bundle-*

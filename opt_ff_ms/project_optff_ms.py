@@ -3,15 +3,17 @@ import templates.ndcrc
 import warnings
 from pathlib import Path
 import os
+import sys
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class Project(FlowProject):
     def __init__(self):
-        super().__init__()
+        #Set Project Path to be that of the current working directory
         current_path = Path(os.getcwd()).absolute()
-
+        super().__init__(path = current_path)
+        
 
 @Project.post.isfile("ff.xml")
 @Project.operation
@@ -359,7 +361,9 @@ def calculate_props(job):
     """Calculate the density"""
 
     import numpy as np
-    from block_average import block_average
+    sys.path.append("..")
+    from utils.analyze_ms import block_average
+    sys.path.remove("..")
 
     # Load the thermo data
     df_box1 = np.genfromtxt(job.fn("prod.out.box1.prp"))

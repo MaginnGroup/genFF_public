@@ -30,18 +30,18 @@ from warnings import simplefilter
 from sklearn.exceptions import ConvergenceWarning
 simplefilter("ignore", category=ConvergenceWarning)
 
-class Project(FlowProject):
+class ProjectOPT(FlowProject):
     def __init__(self):
         super().__init__()
         current_path = Path(os.getcwd()).absolute()
 
-@Project.label
+@ProjectOPT.label
 def results_computed(job):
     #Write script that checks whether the intermediate job files are there
     return job.isfile("opt_at_results.csv") and job.isfile("sorted_at_res.csv")
 
-@Project.post(results_computed)
-@Project.operation()
+@ProjectOPT.post(results_computed)
+@ProjectOPT.operation()
 def run_obj_alg(job):
     #Define method, ep_enum classes, indecies to consider, and kernel
     training_molecules = job.sp.training_molecules
@@ -113,4 +113,4 @@ def run_obj_alg(job):
     sort_ls_res.to_csv(save_path2, index = False)
 
 if __name__ == "__main__":
-    Project().main()
+    ProjectOPT().main()
