@@ -666,6 +666,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-pvap-{job.sp.T}.png")
+        plt.close()
 
     #####################
     # GEMC nmols
@@ -692,6 +693,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-nmols-{job.sp.T}.png")
+        plt.close()
 
     #####################
     # GEMC volume
@@ -718,6 +720,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-volume-{job.sp.T}.png")
+        plt.close()
 
     #####################
     # GEMC density
@@ -744,6 +747,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-density-{job.sp.T}.png")
+        plt.close()
 
     #####################
     # GEMC enthalpy 
@@ -770,6 +774,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-enthalpy-{job.sp.T}.png")
+        plt.close()
 
 
     #############
@@ -794,7 +799,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"npt-density-{job.sp.T}.png")
-
+        plt.close()
 
     # Shift steps so that we get an overall plot of energy across 
     # different workflow steps
@@ -833,6 +838,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"all-energy-{job.sp.T}.png")
+        plt.close()
 
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
