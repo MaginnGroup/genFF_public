@@ -205,6 +205,7 @@ def NVT_liqbox(job):
             )
             
         except:
+            job.doc.gemc_failed == True
             #Note this overwrites liquid and vapor box lengths in job.doc
             liqbox, vapbox = calc_boxl_helper(job)
             # Create system with box lengths based on critical points
@@ -222,6 +223,7 @@ def NVT_liqbox(job):
                 temperature=job.sp.T * u.K,
                 **custom_args
             )
+            job.doc.gemc_failed == False
 
 @vle
 @ProjectGAFF.pre.after(NVT_liqbox)
