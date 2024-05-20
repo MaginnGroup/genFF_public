@@ -79,7 +79,7 @@ for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
     df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root_final + ".csv")
     ff_list.append(df_all)
     #Calculate MAPD and MSE for each T point
-    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root_final + "err.csv")
+    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root_final + "_err.csv")
     
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
 
