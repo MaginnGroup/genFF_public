@@ -92,11 +92,7 @@ def gemc_finished(job):
 
     return completed
 
-@vle
-@ProjectGAFF.post(lambda job: "vapboxl" in job.doc)
-@ProjectGAFF.post(lambda job: "liqboxl" in job.doc)
-@ProjectGAFF.operation
-def calc_boxl(job):
+def calc_boxl_helper(job):
     "Calculate the initial box length of the boxes"
 
     import unyt as u
@@ -143,6 +139,16 @@ def calc_boxl(job):
     # Save to job document file
     job.doc.liqboxl = liqboxl  # nm, compatible with mbuild
 
+    return job.doc.liqboxl, job.doc.vapboxl
+
+@vle
+@ProjectGAFF.post(lambda job: "vapboxl" in job.doc)
+@ProjectGAFF.post(lambda job: "liqboxl" in job.doc)
+@ProjectGAFF.operation
+def calc_boxl(job):
+    "Calculate the initial box length of the boxes"
+    liqbox, vapbox = calc_boxl_helper(job)
+
 @vle
 @ProjectGAFF.pre.after(calc_boxl)
 @ProjectGAFF.post(nvt_finished)
@@ -163,18 +169,8 @@ def NVT_liqbox(job):
     compound = mbuild.load(job.sp.smiles, smiles=True)
     compound_ff = ff.apply(compound)
 
-    # Create box list and species list
-    boxl = job.doc.liqboxl
-    box = mbuild.Box(lengths=[boxl, boxl, boxl])
-
-    box_list = [box]
+    # Create a new moves object and species list
     species_list = [compound_ff]
-
-    mols_to_add = [[job.sp.N_liq]]
-
-    system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
-
-    # Create a new moves object
     moves = mc.MoveSet("nvt", species_list)
 
     # Property outputs relevant for NPT simulations
@@ -186,20 +182,46 @@ def NVT_liqbox(job):
     custom_args, custom_args_gemc = _get_custom_args()
     custom_args["run_name"] = "nvt.eq"
     custom_args["properties"] = thermo_props
+    mols_to_add = [[job.sp.N_liq]]
+
+    # Create box list 
+    boxl = job.doc.liqboxl
+    box = mbuild.Box(lengths=[boxl, boxl, boxl])
+    box_list = [box]
+    system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
+
 
     # Move into the job dir and start doing things
     with job:
+        try:
+            # Run equilibration
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_nvt,
+                temperature=job.sp.T * u.K,
+                **custom_args
+            )
+            
+        except:
+            #Note this overwrites liquid and vapor box lengths in job.doc
+            liqbox, vapbox = calc_boxl_helper(job)
+            # Create system with box lengths based on critical points
+            boxl = job.doc.liqboxl
+            box = mbuild.Box(lengths=[boxl, boxl, boxl])
+            box_list = [box]
+            system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
 
-        # Run equilibration
-        mc.run(
-            system=system,
-            moveset=moves,
-            run_type="equilibration",
-            run_length=job.sp.nsteps_nvt,
-            temperature=job.sp.T * u.K,
-            **custom_args
-        )
-
+            # Run equilibration
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_nvt,
+                temperature=job.sp.T * u.K,
+                **custom_args
+            )
 
 @vle
 @ProjectGAFF.pre.after(NVT_liqbox)
