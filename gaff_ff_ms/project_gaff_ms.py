@@ -192,8 +192,8 @@ def NVT_liqbox(job):
 
 
     # Move into the job dir and start doing things
-    with job:
-        try:
+    try:
+        with job:
             # Run equilibration
             mc.run(
                 system=system,
@@ -204,16 +204,17 @@ def NVT_liqbox(job):
                 **custom_args
             )
             
-        except:
-            job.doc.gemc_failed == True
-            #Note this overwrites liquid and vapor box lengths in job.doc
-            liqbox, vapbox = calc_boxl_helper(job)
-            # Create system with box lengths based on critical points
-            boxl = job.doc.liqboxl
-            box = mbuild.Box(lengths=[boxl, boxl, boxl])
-            box_list = [box]
-            system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
-
+    except:
+        job.doc.gemc_failed == True
+        #Note this overwrites liquid and vapor box lengths in job.doc
+        liqbox, vapbox = calc_boxl_helper(job)
+        # Create system with box lengths based on critical points
+        boxl = job.doc.liqboxl
+        box = mbuild.Box(lengths=[boxl, boxl, boxl])
+        box_list = [box]
+        system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
+        
+        with job:
             # Run equilibration
             mc.run(
                 system=system,
@@ -1065,7 +1066,7 @@ def _generate_r134a_xml(job):
 
 def _generate_r143a_xml(job):
 
-    content = """<ForceField name="HFC-143a GAFF", version="1.0">
+    content = """<ForceField name="HFC-143a GAFF" version="1.0">
  <AtomTypes>
   <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(F)(F)" desc="carbon bonded to 3 Fs and another carbon"/>
   <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
