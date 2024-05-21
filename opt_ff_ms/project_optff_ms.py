@@ -842,11 +842,11 @@ def _generate_r152a_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
-  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(H)(F)" desc="carbon bonded to 2 Fs and another carbon"/>
-  <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="[C;X4](F)(F)" desc="carbon bonded to 2 Fs and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="[C;X4](C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
   <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
-  <Type name="H1" class="h2" element="H" mass="1.008" def="H(C)(F)(F)" desc="H bonded to C1"/>
-  <Type name="H2" class="hc" element="H" mass="1.008" def="H(C)(H)(H)" desc="H bonded to C2"/>
+  <Type name="H1" class="h2" element="H" mass="1.008" def="H[C;%C1]" desc="H bonded to C1"/>
+  <Type name="H2" class="hc" element="H" mass="1.008" def="H[C;%C2]" desc="H bonded to C2"/>
  </AtomTypes>
  <HarmonicBondForce>
   <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
@@ -895,11 +895,11 @@ def _generate_r161_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
-  <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(H)(H)" desc="carbon bonded to 2 Fs and another carbon"/>
-  <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="[C;X4](F)" desc="carbon bonded to 1 F and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="[C;X4](C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
   <Type name="F1" class="f" element="F" mass="19.000" def="F" desc="F bonded to C1"/>
-  <Type name="H1" class="h1" element="H" mass="1.008" def="H(C)(F)(H)" desc="H bonded to C1"/>
-  <Type name="H2" class="hc" element="H" mass="1.008" def="H(C)(H)(H)" desc="H bonded to C2"/>
+  <Type name="H1" class="h1" element="H" mass="1.008" def="H[C;%C1]" desc="H bonded to C1"/>
+  <Type name="H2" class="hc" element="H" mass="1.008" def="H[C;%C2]" desc="H bonded to C2"/>
  </AtomTypes>
  <HarmonicBondForce>
   <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
