@@ -452,8 +452,9 @@ def GEMC(job):
     custom_args_gemc["vdw_cutoff_box2"] = 0.4 * (boxl_vap * u.nanometer).to("angstrom")
 
     # Move into the job dir and start doing things
-    with job:
-        try:
+    
+    try:
+        with job:
             mc.run(
                 system=system,
                 moveset=moves,
@@ -472,18 +473,17 @@ def GEMC(job):
                 total_run_length=job.sp.nsteps_gemc_prod,
             )
             job.doc.gemc_failed = False
-        except:
-            #If GEMC fails, remove files in post conditions of previous operations
-            #Question: Do I need to delete other output files or will they just be overwritten?
-            del job.doc["vapboxl"] #calc_boxl
-            del job.doc["liqboxl"] #calc_boxl
+    except:
+        #If GEMC fails, remove files in post conditions of previous operations
+        #Question: Do I need to delete other output files or will they just be overwritten?
+        job.doc.gemc_failed = True
+        del job.doc["vapboxl"] #calc_boxl
+        del job.doc["liqboxl"] #calc_boxl
+        with job:
             os.remove("nvt.eq.out.prp") #NVT_liqbox
             os.remove("npt.eq.out.prp") #NPT_liqbox
             os.remove("nvt.final.xyz") #extract_final_NVT_config
             os.remove("npt.final.xyz") #extract_final_NPT_config
-            job.doc.gemc_failed = True
-
-            pass
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
 #@Project.post(lambda job: "vap_density_unc" in job.doc)
