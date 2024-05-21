@@ -14,17 +14,17 @@ class R143Constants:
     @property
     def molecular_weight(self):
         """Molecular weight of the molecule in g/mol"""
-        return None
+        return 84.04
 
     @property
     def expt_Tc(self):
         """Critical temperature in K"""
-        return None
+        return 429.8
 
     @property
     def expt_rhoc(self):
         """Critical density in kg/m^3"""
-        return None
+        return 469
 
     @property
     def n_atoms(self):
@@ -113,9 +113,15 @@ class R143Constants:
 
         Temperature units K
         Density units kg/m**3
+        C.D. Holcomb, L.J. Van Poolen, Fluid Phase Equilibria (1994) https://doi.org/10.1016/0378-3812(94)80011-1.
         """
 
         expt_liq_density = {
+            317: 1167.442,
+            337: 1112.436,
+            357: 1051.133,
+            377: 980.341,
+            397: 893.012,
         }
 
         return expt_liq_density
@@ -126,9 +132,15 @@ class R143Constants:
 
         Temperature units K
         Density units kg/m**3
+        C.D. Holcomb, L.J. Van Poolen, Fluid Phase Equilibria (1994) https://doi.org/10.1016/0378-3812(94)80011-1.
         """
 
         expt_vap_density = {
+            317: 15.950,
+            337: 27.281,
+            357: 44.924,
+            377: 72.080,
+            397: 115.812,
         }
 
         return expt_vap_density
@@ -139,9 +151,15 @@ class R143Constants:
 
         Temperature units K
         Vapor pressure units bar
+        C.D. Holcomb, L.J. Van Poolen, Fluid Phase Equilibria (1994) https://doi.org/10.1016/0378-3812(94)80011-1.
         """
 
         expt_Pvap = {
+            317: (429.027 * u.kPa).to_value(u.bar),
+            337: (760.854 * u.kPa).to_value(u.bar),
+            357: (1257.815 * u.kPa).to_value(u.bar),
+            377: (1965.942 * u.kPa).to_value(u.bar),
+            397: (2935.715 * u.kPa).to_value(u.bar),
         }
 
         return expt_Pvap
@@ -166,9 +184,9 @@ class R143Constants:
         Use 2% as default when no data available
         """
         uncertainty = {
-            "expt_liq_density": 0.02,
-            "expt_vap_density": 0.02,
-            "expt_Pvap": 0.02,
+            "expt_liq_density": 0.0041,
+            "expt_vap_density": 0.0041,
+            "expt_Pvap": 0.0007,
             "expt_Hvap": 0.02
         }
         return uncertainty
