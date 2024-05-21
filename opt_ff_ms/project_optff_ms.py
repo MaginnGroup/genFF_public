@@ -864,14 +864,14 @@ def _generate_r152a_xml(job):
  </HarmonicAngleForce>
  <PeriodicTorsionForce>
   <Proper class1="f" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.79494566" phase2="0"/>
-  <Proper class1="h2" class2="c3" class3="c3" class4="h1" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+  <Proper class1="h2" class2="c3" class3="c3" class4="hc" periodicity1="3" k1="0.65268523" phase1="0.0"/>
  </PeriodicTorsionForce>
  <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
   <Atom type="C1" charge="0.613473"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
   <Atom type="C2" charge="-0.502181"  sigma="{sigma_C2:0.6f}" epsilon="{epsilon_C2:0.6f}"/>
   <Atom type="F1" charge="-0.293648" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
   <Atom type="H1" charge="0.021315"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
-  <Atom type="H2" charge="0.151563"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+  <Atom type="H2" charge="0.151563"  sigma="{sigma_H2:0.6f}" epsilon="{epsilon_H2:0.6f}"/>
  </NonbondedForce>
 </ForceField>
 """.format(
@@ -897,7 +897,7 @@ def _generate_r161_xml(job):
  <AtomTypes>
   <Type name="C1" class="c3" element="C" mass="12.010" def="C(C)(F)(H)(H)" desc="carbon bonded to 2 Fs and another carbon"/>
   <Type name="C2" class="c3" element="C" mass="12.010" def="C(C)(H)(H)(H)" desc="carbon bonded to 3 Hs and another carbon"/>
-  <Type name="F1" class="f" element="F" mass="19.000" def="F(C)" desc="F bonded to C1"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F" desc="F bonded to C1"/>
   <Type name="H1" class="h1" element="H" mass="1.008" def="H(C)(F)(H)" desc="H bonded to C1"/>
   <Type name="H2" class="hc" element="H" mass="1.008" def="H(C)(H)(H)" desc="H bonded to C2"/>
  </AtomTypes>
@@ -924,7 +924,7 @@ def _generate_r161_xml(job):
   <Atom type="C2" charge="-0.304621"  sigma="{sigma_C2:0.6f}" epsilon="{epsilon_C2:0.6f}"/>
   <Atom type="F1" charge="-0.334359" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
   <Atom type="H1" charge="-0.028030"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
-  <Atom type="H2" charge="0.083447"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+  <Atom type="H2" charge="0.083447"  sigma="{sigma_H2:0.6f}" epsilon="{epsilon_H2:0.6f}"/>
  </NonbondedForce>
 </ForceField>
 """.format(
