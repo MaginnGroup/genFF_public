@@ -14,22 +14,33 @@ class R152Constants:
     @property
     def molecular_weight(self):
         """Molecular weight of the molecule in g/mol"""
-        return None
+        return 66.051
 
     @property
     def expt_Tc(self):
-        """Critical temperature in K"""
-        return None
+        """
+        Critical temperature in K
+        #Note: Using experimental properties of R152a since data for R152 is not available. These values will only be used as an initial guess for GEMC simulations.
+        """
+        return 386.41
 
     @property
     def expt_rhoc(self):
-        """Critical density in kg/m^3"""
-        return None
+        """
+        Critical density in kg/m^3
+        #Note: Using experimental properties of R152a since data for R152 is not available. These values will only be used as an initial guess for GEMC simulations.
+        """
+        return 368
 
     @property
     def n_atoms(self):
         """Number of atoms in molecule"""
         return 8
+    
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return None
         
     @property
     def n_params(self):
@@ -96,9 +107,15 @@ class R152Constants:
 
         Temperature units K
         Density units kg/m**3
+        #Note: Using experimental properties of R152a since data for R152 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_liq_density = {
+            260: 988.11,
+            280: 943.43,
+            300: 894.75,
+            320: 840.12,
+            340: 775.99,
         }
 
         return expt_liq_density
@@ -109,9 +126,15 @@ class R152Constants:
 
         Temperature units K
         Density units kg/m**3
+        #Note: Using experimental properties of R152a since data for R152 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_vap_density = {
+            260: 5.1996,
+            280: 10.519,
+            300: 19.497,
+            320: 34.064,
+            340: 57.642,
         }
 
         return expt_vap_density
@@ -122,9 +145,15 @@ class R152Constants:
 
         Temperature units K
         Vapor pressure units bar
+        #Note: Using experimental properties of R152a since data for R152 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_Pvap = {
+            260: (160.23 * u.kPa).to_value(u.bar),
+            280: (335.36 * u.kPa).to_value(u.bar),
+            300: (629.78 * u.kPa).to_value(u.bar),
+            320: (1087.3 * u.kPa).to_value(u.bar),
+            340: (1757.7 * u.kPa).to_value(u.bar),
         }
 
         return expt_Pvap

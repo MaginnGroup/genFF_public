@@ -30,6 +30,11 @@ class R143Constants:
     def n_atoms(self):
         """Number of atoms in molecule"""
         return 8
+    
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return None
         
     @property
     def n_params(self):

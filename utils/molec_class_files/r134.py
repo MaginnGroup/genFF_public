@@ -14,22 +14,33 @@ class R134Constants:
     @property
     def molecular_weight(self):
         """Molecular weight of the molecule in g/mol"""
-        return None
+        return 102.0309
 
     @property
     def expt_Tc(self):
-        """Critical temperature in K"""
-        return None
+        """
+        Critical temperature in K
+        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
+        """
+        return 374.21
 
     @property
     def expt_rhoc(self):
-        """Critical density in kg/m^3"""
-        return None
+        """
+        Critical density in kg/m^3
+        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
+        """
+        return 511.9
 
     @property
     def n_atoms(self):
         """Number of atoms in molecule"""
         return 8
+    
+    @property
+    def smiles_str(self):
+        """Smiles string representation"""
+        return None
         
     @property
     def n_params(self):
@@ -92,9 +103,15 @@ class R134Constants:
 
         Temperature units K
         Density units kg/m**3
+        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_liq_density = {
+            240: 1397.7,
+            260: 1337.1,
+            280: 1271.8,
+            300: 1199.7,
+            320: 1116.8,
         }
 
         return expt_liq_density
@@ -105,9 +122,15 @@ class R134Constants:
 
         Temperature units K
         Density units kg/m**3
+        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_vap_density = {
+            240: 3.8367,
+            260: 8.9052,
+            280: 18.228,
+            300: 34.193,
+            320: 60.715,
         }
 
         return expt_vap_density
@@ -118,9 +141,15 @@ class R134Constants:
 
         Temperature units K
         Vapor pressure units bar
+        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_Pvap = {
+            240: (72.481 * u.kPa).to_value(u.bar),
+            260: (176.84 * u.kPa).to_value(u.bar),
+            280: (372.71 * u.kPa).to_value(u.bar),
+            300: (702.82 * u.kPa).to_value(u.bar),
+            320: (1216.6 * u.kPa).to_value(u.bar),
         }
 
         return expt_Pvap
@@ -131,6 +160,7 @@ class R134Constants:
 
         Temperature units K
         Enthalpy of vaporization units kJ/kg
+        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
         """
 
         expt_Hvap = {
