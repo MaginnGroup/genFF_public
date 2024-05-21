@@ -449,12 +449,12 @@ def _get_xml_from_molecule(molecule_name):
         molec_xml_function = _generate_r23_xml
     elif molecule_name == "R152a":
         molec_xml_function = _generate_r152a_xml
-    # elif molecule_name == "r152":
-    #     molec_xml_function = _generate_r152_xml
-    # elif molecule_name == "r143":
-    #     molec_xml_function = _generate_r143_xml
-    # elif molecule_name == "r134":
-    #     molec_xml_function = _generate_r134_xml
+    elif molecule_name == "r152":
+        molec_xml_function = _generate_r152_xml
+    elif molecule_name == "r143":
+        molec_xml_function = _generate_r143_xml
+    elif molecule_name == "r134":
+        molec_xml_function = _generate_r134_xml
     elif molecule_name == "R161":
         molec_xml_function = _generate_r161_xml
     elif molecule_name == "R14":
@@ -943,6 +943,146 @@ def _generate_r161_xml(job):
 
 
     return content
+
+def _generate_r152_xml(job): 
+
+    content = """<ForceField name="R152 GAFF" version="1.0">
+<AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C" desc="carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F" desc="F"/>
+  <Type name="H1" class="h1" element="H" mass="1.008" def="H" desc="H"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+  <Bond class1="c3" class2="h1" length="0.1093" k="281080.35"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="h1" angle="1.92108391" k="387.93614322"/>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956473" k="554.12559906"/>
+  <Angle class1="f" class2="c3" class3="h1" angle="1.8823376" k="431.53717916"/>
+  <Angle class1="h1" class2="c3" class3="h1" angle="1.9120082" k="327.85584464"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="h1" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.79494566" phase2="0"/>
+  <Proper class1="f" class2="c3" class3="c3" class4="f" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="5.0207707" phase2="3.14159265"/>
+  <Proper class1="h1" class2="c3" class3="c3" class4="h1" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.154155"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="F1" charge="-0.295997" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="H1" charge="0.070921"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
+        
+    )
+
+    return content
+
+def _generate_r134_xml(job): 
+
+    content = """<ForceField name="R134 GAFF" version="1.0">
+<AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="C" desc="carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F" desc="F"/>
+  <Type name="H1" class="h2" element="H" mass="1.008" def="H" desc="H"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+  <Bond class1="c3" class2="h2" length="0.11" k="273131.72"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="h2" angle="1.94761291" k="385.0925974"/>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956473" k="554.12559906"/>
+  <Angle class1="f" class2="c3" class3="h2" angle="1.89211144" k="429.77451333"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029483" k="596.29654763"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="h2" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+  <Proper class1="f" class2="c3" class3="c3" class4="f" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="5.0207707" phase2="3.14159265"/>
+  <Proper class1="h2" class2="c3" class3="c3" class4="h2" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.293941"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="F1" charge="-0.192377" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="H1" charge="0.090813"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
+        
+    )
+
+    return content
+
+def _generate_r143_xml(job): 
+
+    content = """<ForceField name="R134 GAFF" version="1.0">
+<AtomTypes>
+  <Type name="C1" class="c3" element="C" mass="12.010" def="[C;X4](F)(F)" desc="carbon bonded to 2 Fs and another carbon"/>
+  <Type name="C2" class="c3" element="C" mass="12.010" def="[C;X4](C)(F)(H)(H)" desc="carbon bonded to 2 Hs and another carbon"/>
+  <Type name="F1" class="f" element="F" mass="19.000" def="F[C;%C1]" desc="F bonded to C1"/>
+  <Type name="F2" class="f" element="F" mass="19.000" def="F[C;%C2]" desc="F bonded to C2"/>
+  <Type name="H1" class="h2" element="H" mass="1.008" def="H[C;%C1]" desc="H bonded to C1"/>
+  <Type name="H2" class="h1" element="H" mass="1.008" def="H[C;%C2]" desc="H bonded to C2"/>
+ </AtomTypes>
+ <HarmonicBondForce>
+  <Bond class1="c3" class2="c3" length="0.1535" k="253634.31"/>
+  <Bond class1="c3" class2="f" length="0.1344" k="304427.36"/>
+  <Bond class1="c3" class2="h2" length="0.11" k="273131.72"/>
+  <Bond class1="c3" class2="h1" length="0.1093" k="281080.35"/>
+ </HarmonicBondForce>
+ <HarmonicAngleForce>
+  <Angle class1="c3" class2="c3" class3="f" angle="1.90956473" k="554.12559906"/>
+  <Angle class1="c3" class2="c3" class3="h1" angle="1.92108391" k="387.93614322"/>
+  <Angle class1="c3" class2="c3" class3="h2" angle="1.94761291" k="385.0925974"/>
+  <Angle class1="f" class2="c3" class3="f" angle="1.87029483" k="596.29654763"/>
+  <Angle class1="f" class2="c3" class3="h2" angle="1.89211144" k="429.77451333"/>
+  <Angle class1="f" class2="c3" class3="h1" angle="1.8823376" k="431.53717916"/>
+  <Angle class1="h1" class2="c3" class3="h1" angle="1.9120082" k="327.85584464"/>
+ </HarmonicAngleForce>
+ <PeriodicTorsionForce>
+  <Proper class1="f" class2="c3" class3="c3" class4="f" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="5.0207707" phase2="3.14159265"/>
+  <Proper class1="f" class2="c3" class3="c3" class4="h1" periodicity1="3" k1="0.0" phase1="0.0" periodicity2="1" k2="0.79494566" phase2="0"/>
+  <Proper class1="f" class2="c3" class3="c3" class4="h2" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+  <Proper class1="h1" class2="c3" class3="c3" class4="h2" periodicity1="3" k1="0.65268523" phase1="0.0"/>
+ </PeriodicTorsionForce>
+ <NonbondedForce coulomb14scale="0.833333" lj14scale="0.5">
+  <Atom type="C1" charge="0.402256"  sigma="{sigma_C1:0.6f}" epsilon="{epsilon_C1:0.6f}"/>
+  <Atom type="C2" charge="0.016261"  sigma="{sigma_C2:0.6f}" epsilon="{epsilon_C2:0.6f}"/>
+  <Atom type="F1" charge="-0.228238" sigma="{sigma_F1:0.6f}" epsilon="{epsilon_F1:0.6f}"/>
+  <Atom type="F2" charge="-0.204996" sigma="{sigma_F2:0.6f}" epsilon="{epsilon_F2:0.6f}"/>
+  <Atom type="H1" charge="0.052577"  sigma="{sigma_H1:0.6f}" epsilon="{epsilon_H1:0.6f}"/>
+  <Atom type="H2" charge="0.095189"  sigma="{sigma_H2:0.6f}" epsilon="{epsilon_H2:0.6f}"/>
+ </NonbondedForce>
+</ForceField>
+""".format(
+        sigma_C1=job.sp.sigma_C1,
+        sigma_C2=job.sp.sigma_C2,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_F2=job.sp.sigma_F2,
+        sigma_H1=job.sp.sigma_H1,
+        sigma_H2=job.sp.sigma_H2,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_C2=job.sp.epsilon_C2,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_F2=job.sp.epsilon_F2,
+        epsilon_H1=job.sp.epsilon_H1,
+        epsilon_H2=job.sp.epsilon_H2,
+    )
 
 if __name__ == "__main__":
     Project().main()
