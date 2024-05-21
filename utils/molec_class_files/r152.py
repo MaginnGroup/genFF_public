@@ -40,7 +40,7 @@ class R152Constants:
     @property
     def smiles_str(self):
         """Smiles string representation"""
-        return None
+        return "C(CF)F"
         
     @property
     def n_params(self):
