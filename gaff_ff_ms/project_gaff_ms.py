@@ -111,8 +111,8 @@ def calc_boxl_helper(job):
         #If the gemc simulation failed previously, use the critical values
         if "gemc_failed" in job.doc:
             if job.doc.gemc_failed == True:
-                rho_liq = class_data.expt_rhoc[t] * u.kilogram/(u.meter)**3
-                rho_vap = class_data.expt_rhoc[t] * u.kilogram/(u.meter)**3
+                rho_liq = class_data.expt_rhoc * u.kilogram/(u.meter)**3
+                rho_vap = class_data.expt_rhoc * u.kilogram/(u.meter)**3
         p_vap = class_data.expt_Pvap[t] * u.bar
         # Create a tuple containing the values from each dictionary
         ref[int(t)] = (rho_liq, rho_vap, p_vap)
