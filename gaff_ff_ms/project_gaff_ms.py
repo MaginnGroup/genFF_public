@@ -934,11 +934,11 @@ def _get_xml_from_molecule(molecule_name):
         molec_xml_function = _generate_r23_xml
     elif molecule_name == "R152a":
         molec_xml_function = _generate_r152a_xml
-    elif molecule_name == "r152":
+    elif molecule_name == "R152":
         molec_xml_function = _generate_r152_xml
-    elif molecule_name == "r143":
+    elif molecule_name == "R143":
         molec_xml_function = _generate_r143_xml
-    elif molecule_name == "r134":
+    elif molecule_name == "R134":
         molec_xml_function = _generate_r134_xml
     elif molecule_name == "R161":
         molec_xml_function = _generate_r161_xml
