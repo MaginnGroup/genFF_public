@@ -476,14 +476,17 @@ def GEMC(job):
     except:
         #If GEMC fails, remove files in post conditions of previous operations
         #Question: Do I need to delete other output files or will they just be overwritten?
-        job.doc.gemc_failed = True
-        del job.doc["vapboxl"] #calc_boxl
-        del job.doc["liqboxl"] #calc_boxl
-        with job:
-            os.remove("nvt.eq.out.prp") #NVT_liqbox
-            os.remove("npt.eq.out.prp") #NPT_liqbox
-            os.remove("nvt.final.xyz") #extract_final_NVT_config
-            os.remove("npt.final.xyz") #extract_final_NPT_config
+        if "gemc_failed" in job.doc and job.doc.gemc_failed == True:
+            raise Exception("GEMC failed twice and the molecule is " + job.sp.mol_name)
+        else:
+            job.doc.gemc_failed = True
+            del job.doc["vapboxl"] #calc_boxl
+            del job.doc["liqboxl"] #calc_boxl
+            with job:
+                os.remove("nvt.eq.out.prp") #NVT_liqbox
+                os.remove("npt.eq.out.prp") #NPT_liqbox
+                os.remove("nvt.final.xyz") #extract_final_NVT_config
+                os.remove("npt.final.xyz") #extract_final_NPT_config
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
 #@Project.post(lambda job: "vap_density_unc" in job.doc)
@@ -1525,6 +1528,8 @@ def _generate_r143_xml(job):
         epsilon_H1=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
         epsilon_H2=float(7.901 * (u.K * u.kb).in_units("kJ/mol")),
     )
+
+    return content
 
 if __name__ == "__main__":
     ProjectGAFF().main()

@@ -46,7 +46,6 @@ def calc_vapboxl(job):
     # Save to job document file
     job.doc.vapboxl = boxl  # nm, compatible with mbuild
 
-
 @Project.post(lambda job: "liqboxl" in job.doc)
 @Project.operation
 def calc_liqboxl(job):
@@ -975,12 +974,12 @@ def _generate_r152_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_H1=job.sp.sigma_H1,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_H1=job.sp.epsilon_H1,
+        sigma_C1=job.sp.sigma_C,
+        sigma_F1=job.sp.sigma_F,
+        sigma_H1=job.sp.sigma_H,
+        epsilon_C1=job.sp.epsilon_C,
+        epsilon_F1=job.sp.epsilon_F,
+        epsilon_H1=job.sp.epsilon_H,
         
     )
 
@@ -1017,12 +1016,12 @@ def _generate_r134_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C1,
-        sigma_F1=job.sp.sigma_F1,
-        sigma_H1=job.sp.sigma_H1,
-        epsilon_C1=job.sp.epsilon_C1,
-        epsilon_F1=job.sp.epsilon_F1,
-        epsilon_H1=job.sp.epsilon_H1,
+        sigma_C1=job.sp.sigma_C,
+        sigma_F1=job.sp.sigma_F,
+        sigma_H1=job.sp.sigma_H,
+        epsilon_C1=job.sp.epsilon_C,
+        epsilon_F1=job.sp.epsilon_F,
+        epsilon_H1=job.sp.epsilon_H,
         
     )
 
@@ -1083,6 +1082,8 @@ def _generate_r143_xml(job):
         epsilon_H1=job.sp.epsilon_H1,
         epsilon_H2=job.sp.epsilon_H2,
     )
+
+    return content
 
 if __name__ == "__main__":
     Project().main()
