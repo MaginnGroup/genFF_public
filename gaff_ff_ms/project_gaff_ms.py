@@ -109,10 +109,9 @@ def calc_boxl_helper(job):
         rho_liq = class_data.expt_liq_density[t] * u.kilogram/(u.meter)**3
         rho_vap = class_data.expt_vap_density[t] * u.kilogram/(u.meter)**3
         #If the gemc simulation failed previously, use the critical values
-        if "gemc_failed" in job.doc:
-            if job.doc.gemc_failed == True:
-                rho_liq = class_data.expt_rhoc * u.kilogram/(u.meter)**3
-                rho_vap = class_data.expt_rhoc * u.kilogram/(u.meter)**3
+        if "use_crit" in job.doc and job.doc.use_crit == True:
+            rho_liq = class_data.expt_rhoc * u.kilogram/(u.meter)**3
+            rho_vap = class_data.expt_rhoc * u.kilogram/(u.meter)**3
         p_vap = class_data.expt_Pvap[t] * u.bar
         # Create a tuple containing the values from each dictionary
         ref[int(t)] = (rho_liq, rho_vap, p_vap)
@@ -203,9 +202,9 @@ def NVT_liqbox(job):
                 temperature=job.sp.T * u.K,
                 **custom_args
             )
+            job.doc.use_crit == False
             
     except:
-        job.doc.gemc_failed == True
         #Note this overwrites liquid and vapor box lengths in job.doc
         liqbox, vapbox = calc_boxl_helper(job)
         # Create system with box lengths based on critical points
@@ -214,17 +213,21 @@ def NVT_liqbox(job):
         box_list = [box]
         system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
         
-        with job:
-            # Run equilibration
-            mc.run(
-                system=system,
-                moveset=moves,
-                run_type="equilibration",
-                run_length=job.sp.nsteps_nvt,
-                temperature=job.sp.T * u.K,
-                **custom_args
-            )
-            job.doc.gemc_failed == False
+        try:
+            with job:
+                # Run equilibration
+                mc.run(
+                    system=system,
+                    moveset=moves,
+                    run_type="equilibration",
+                    run_length=job.sp.nsteps_nvt,
+                    temperature=job.sp.T * u.K,
+                    **custom_args
+                )
+                job.doc.use_crit == True
+        except:
+            job.doc.nvt_failed == True
+            raise Exception("NVT failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
 
 @vle
 @ProjectGAFF.pre.after(NVT_liqbox)
@@ -472,21 +475,24 @@ def GEMC(job):
                 run_type="production",
                 total_run_length=job.sp.nsteps_gemc_prod,
             )
-            job.doc.gemc_failed = False
+            
     except:
-        #If GEMC fails, remove files in post conditions of previous operations
-        #Question: Do I need to delete other output files or will they just be overwritten?
-        if "gemc_failed" in job.doc and job.doc.gemc_failed == True:
-            raise Exception("GEMC failed twice and the molecule is " + job.sp.mol_name)
-        else:
+        #if GEMC failed with critical conditions as intial conditions, terminate with error
+        if "use_crit" in job.doc and job.doc.use_crit == True:
+            #If so, terminate with error and log failure in job document
             job.doc.gemc_failed = True
-            del job.doc["vapboxl"] #calc_boxl
-            del job.doc["liqboxl"] #calc_boxl
-            with job:
-                os.remove("nvt.eq.out.prp") #NVT_liqbox
-                os.remove("npt.eq.out.prp") #NPT_liqbox
-                os.remove("nvt.final.xyz") #extract_final_NVT_config
-                os.remove("npt.final.xyz") #extract_final_NPT_config
+            raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
+
+        #Otherwise, try with critical conditions
+        job.doc.use_crit = True
+        #If GEMC fails, remove files in post conditions of previous operations
+        del job.doc["vapboxl"] #calc_boxl
+        del job.doc["liqboxl"] #calc_boxl
+        with job:
+            os.remove("nvt.eq.out.prp") #NVT_liqbox
+            os.remove("npt.eq.out.prp") #NPT_liqbox
+            os.remove("nvt.final.xyz") #extract_final_NVT_config
+            os.remove("npt.final.xyz") #extract_final_NPT_config
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
 #@Project.post(lambda job: "vap_density_unc" in job.doc)
