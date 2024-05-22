@@ -34,7 +34,7 @@ class R143Constants:
     @property
     def smiles_str(self):
         """Smiles string representation"""
-        return "C(C(F)F)(F)F"
+        return "C(C(F)F)F"
         
     @property
     def n_params(self):
@@ -178,6 +178,11 @@ class R143Constants:
         """
 
         expt_Hvap = {
+            317: None,
+            337: None,
+            357: None,
+            377: None,
+            397: None,
         }
 
         return expt_Hvap

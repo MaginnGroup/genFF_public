@@ -167,6 +167,11 @@ class R152Constants:
         """
 
         expt_Hvap = {
+            260: None,
+            280: None,
+            300: None,
+            320: None,
+            340: None,
         }
 
         return expt_Hvap
