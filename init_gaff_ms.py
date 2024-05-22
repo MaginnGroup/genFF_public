@@ -39,9 +39,9 @@ molec_dict = {"R14": R14,
                 "R23": R23,
                 "R161":R161,
                 "R152a":R152a,
-                # "R152": R152,
-                # "R143": R143,
-                # "R134": R134,
+                "R152": R152,
+                "R143": R143,
+                "R134": R134,
                 "R116": R116}
 def init_project():
     # Initialize project

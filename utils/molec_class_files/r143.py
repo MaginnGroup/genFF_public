@@ -51,11 +51,13 @@ class R143Constants:
             "sigma_F1",
             "sigma_F2",
             "sigma_H1",
+            "sigma_H2",
             "epsilon_C1",
             "epsilon_C2",
             "epsilon_F1",
             "epsilon_F2",
             "epsilon_H1",
+            "epsilon_H2",
         )
 
         return param_names
@@ -82,6 +84,7 @@ class R143Constants:
                         [2.0, 4.0],  # F1
                         [2.0, 4.0],  # F2
                         [1.5, 3.0],  # H1
+                        [1.5, 3.0],  # H1
                     ]
                 )
                 * u.Angstrom
@@ -98,6 +101,7 @@ class R143Constants:
                         [10.0,75.0], #[20.0, 70.0],  # C2
                         [15.0,50.0], #[15.0, 40.0],  # F1
                         [15.0,50.0], #[15.0, 40.0],  # F2
+                        [2.0, 10.0],  # H1
                         [2.0, 10.0],  # H1
                     ]
                 )
