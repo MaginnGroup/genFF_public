@@ -475,7 +475,7 @@ def GEMC(job):
                 run_type="production",
                 total_run_length=job.sp.nsteps_gemc_prod,
             )
-            
+
     except:
         #if GEMC failed with critical conditions as intial conditions, terminate with error
         if "use_crit" in job.doc and job.doc.use_crit == True:
@@ -606,6 +606,7 @@ def calculate_props_gaff(job):
 
     with job:
         plt.savefig("energy.png")
+        plt.close(fig)
 
     Props = {
         "liq_density": liq_density,
@@ -692,7 +693,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-pvap-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
     #####################
     # GEMC nmols
@@ -719,7 +720,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-nmols-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
     #####################
     # GEMC volume
@@ -746,7 +747,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-volume-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
     #####################
     # GEMC density
@@ -773,7 +774,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-density-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
     #####################
     # GEMC enthalpy 
@@ -800,7 +801,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"gemc-enthalpy-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
 
     #############
@@ -825,7 +826,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"npt-density-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
     # Shift steps so that we get an overall plot of energy across 
     # different workflow steps
@@ -864,7 +865,7 @@ def plot(job):
     ax.legend(loc="best")
     with job:
         plt.savefig(f"all-energy-{job.sp.T}.png")
-        plt.close()
+        plt.close(fig)
 
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
