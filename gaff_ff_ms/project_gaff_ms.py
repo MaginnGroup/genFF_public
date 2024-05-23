@@ -202,7 +202,7 @@ def NVT_liqbox(job):
                 temperature=job.sp.T * u.K,
                 **custom_args
             )
-            job.doc.use_crit == False
+            job.doc.use_crit = False
             
     except:
         #Note this overwrites liquid and vapor box lengths in job.doc
@@ -224,7 +224,7 @@ def NVT_liqbox(job):
                     temperature=job.sp.T * u.K,
                     **custom_args
                 )
-                job.doc.use_crit == True
+                job.doc.use_crit = True
         except:
             job.doc.nvt_failed == True
             raise Exception("NVT failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
