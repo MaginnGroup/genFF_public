@@ -126,7 +126,7 @@ def block_average(data):
 
     return np.asarray(means), np.asarray(vars_est), np.asarray(vars_err)
 
-def prepare_df_vle(df_csv, molec_dict, convert_Hvap = False, csv_name = None):
+def prepare_df_vle(df_csv, molec_dict, csv_name = None):
     """Prepare a pandas dataframe for fitting a GP model to density data
 
     Performs the following actions:
@@ -153,29 +153,35 @@ def prepare_df_vle(df_csv, molec_dict, convert_Hvap = False, csv_name = None):
 
     def rename_col(df, property_name, units):
         prop_units = property_name + " " + units
-        if property_name in df.columns:
-            df.rename(columns={property_name: "sim_" + property_name}, inplace=True)
-        elif prop_units in df.columns:
-            df.rename(columns={prop_units: "sim_" + property_name}, inplace=True)
+        if property_name == "temperature":
+            sim_str = ""
+        else:
+            sim_str = "sim_"
+        if prop_units in df.columns:
+            df.rename(columns={prop_units: sim_str + property_name}, inplace=True)
+        elif property_name in df.columns:
+            df.rename(columns={property_name: sim_str + property_name}, inplace=True)
         else:
             raise ValueError(f"df must contain either {property_name} or {prop_units}")
+        
         return df
     
     # Convert Hvap to kJ/kg if in kJ/mol
-    if "Hvap kJ/kg" in df_csv.columns:
-        #Add Hvap in kJ/mol
-        df_csv["Hvap"] = df_csv["Hvap"]/df_csv["molecule"].apply(
-            lambda molec: molec_dict[molec].molecular_weight*1000.0)
-        #And drop kJ/kg column
-        df_csv.drop("Hvap kJ/kg", axis=1)
+    if "Hvap" in df_csv.columns:
+        #Add Hvap in kJ/kg
+        df_csv["Hvap kJ/kg"] = df_csv["Hvap"]*1000.0/df_csv["molecule"].apply(
+            lambda molec: molec_dict[molec].molecular_weight)
+        #And drop kJ/mol column
+        df_csv.drop("Hvap", axis=1)
     
     # Rename properties to MD
-    props = ["liq_density", "vap_density", "Pvap", "Hvap"]
-    units = ["kg/m3", "kg/m3", "bar", "kJ/kg"]
+    props = ["liq_density", "vap_density", "Pvap", "Hvap", "temperature"]
+    units = ["kg/m3", "kg/m3", "bar", "kJ/kg", "K"]
     for prop, unit in zip(props, units):
         rename_col(df_csv, prop, unit)
         
     #sort by molecule and temperature -- added by Ning Wang
+    df_csv.dropna(how = "any", inplace=True)
     df_csv.sort_values(by=["molecule", "temperature"], inplace=True)
 
     #Add Tc and Rhoc predictions
@@ -187,6 +193,37 @@ def prepare_df_vle(df_csv, molec_dict, convert_Hvap = False, csv_name = None):
         df_csv.to_csv(csv_name)
            
     return df_csv
+
+def calc_critical(df):
+    """Compute the critical temperature and density
+
+    Accepts a dataframe with "T_K", "rholiq_kgm3" and "rhovap_kgm3"
+    Returns the critical temperature (K) and density (kg/m3)
+
+    Computes the critical properties with the law of rectilinear diameters
+    """
+    Tc = []
+    rhoc = []
+    for group, values in df.groupby(['molecule']):    
+        #Need to group by molecule and do this for each molecule
+        temps = values["temperature"].values
+        liq_density = values["sim_liq_density"].values
+        vap_density = values["sim_vap_density"].values
+
+        # Critical Point (Law of rectilinear diameters)
+        slope1, intercept1, r_value1, p_value1, std_err1 = linregress(
+            temps,(liq_density + vap_density) / 2.0,)
+
+        slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
+            temps,abs((liq_density - vap_density))**(1/0.32),)
+
+        Tc_mol = np.abs(intercept2 / slope2)
+        rhoc_mol = intercept1 + slope1 * Tc_mol
+
+        Tc += list([Tc_mol])*len(temps)
+        rhoc += list([rhoc_mol])*len(temps)
+        # print(Tc)
+    return Tc, rhoc
 
 def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     """Create a dataframe with mean square error (mse) and mean absolute
@@ -204,7 +241,7 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     -------
     df_new : pandas.Dataframe
         dataframe with one row per parameter set and including
-        the MSE and MAPE for liq_density, vap_density, pvap, hvap,
+        the MSE and MAPD for liq_density, vap_density, pvap, hvap,
         critical temperature, critical density
     """
     new_data = []
@@ -212,66 +249,105 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     #sort by molecule and temperature -- added by Ning Wang
     df=df.sort_values(by=["molecule", "temperature"])
     molecules = df['molecule'].unique().tolist()
-    for group, values in df.groupby(molecules):
+    for group, values in df.groupby(['molecule']):
+
         #The molecule is listed as the first value in the group
         molecule = molec_dict[values["molecule"].values[0]]
+        if group[0] not in ["R134", "R152"]:
+            # Temperatures
+            temps = values["temperature"].values
 
-        # Temperatures
-        temps = values["temperature"].values
+            #Add experimental data (if not R134, 143 or R152)
+            values["expt_liq_density"] = values["temperature"].apply(
+                lambda temp: molecule.expt_liq_density[int(temp)])
+            values["expt_vap_density"] = values["temperature"].apply(
+                lambda temp: molecule.expt_vap_density[int(temp)] )
+            values["expt_Pvap"] = values["temperature"].apply(
+                lambda temp: molecule.expt_Pvap[int(temp)])
+            values["expt_Hvap"] = values["temperature"].apply(
+                lambda temp: molecule.expt_Hvap[int(temp)])
+            values["expt_Tc"] = molecule.expt_Tc
+            values["expt_rhoc"] = molecule.expt_rhoc
+        
+            # Liquid density
+            sim_liq_density = values["sim_liq_density"]
+            mse_liq_density = mean_squared_error(values["expt_liq_density"], sim_liq_density)
+            mapd_liq_density = mean_absolute_percentage_error(
+                values["expt_liq_density"], sim_liq_density) * 100.0
 
-        #Add experimental data (if not R134, 143 or R152)
-        values["expt_liq_density"] = values["temperature"].apply(
-            lambda temp: molecule.expt_liq_density[int(temp)])
-        values["expt_vap_density"] = values["temperature"].apply(
-            lambda temp: molecule.expt_vap_density[int(temp)] )
-        values["expt_Pvap"] = values["temperature"].apply(
-            lambda temp: molecule.expt_Pvap[int(temp)])
-        values["expt_Hvap"] = values["temperature"].apply(
-            lambda temp: molecule.expt_Hvap[int(temp)])
-        values["expt_Tc"] = molecule.expt_Tc
-        values["expt_rhoc"] = molecule.expt_rhoc
-    
-        # Liquid density
-        mse_liq_density = mean_squared_error(values["expt_liq_density"], values["sim_liq_density"])
-        mape_liq_density = mean_absolute_percentage_error(
-            values["expt_liq_density"], values["sim_liq_density"]) * 100.0
+            # Vapor density
+            sim_vap_density = values["sim_vap_density"]
+            mse_vap_density = mean_squared_error(values["expt_vap_density"],sim_vap_density)
+            mapd_vap_density = mean_absolute_percentage_error(
+                values["expt_vap_density"], sim_vap_density) * 100.0
+            
+            # Vapor pressure
+            sim_pvap = values["sim_Pvap"]
+            mse_Pvap = mean_squared_error(values["expt_Pvap"], sim_pvap)
+            mapd_Pvap = mean_absolute_percentage_error(
+                values["expt_Pvap"], sim_pvap) * 100.0
+        
+            if group[0] not in ["R143"]:
+                # Enthalpy of vaporization
+                sim_hvap = values["sim_Hvap"]
+                mse_Hvap = mean_squared_error(values["expt_Hvap"], sim_hvap)
+                mapd_Hvap = mean_absolute_percentage_error(values["expt_Hvap"], sim_hvap) * 100.0
 
-        # Vapor density
-        mse_vap_density = mean_squared_error(values["expt_vap_density"], values["sim_vap_density"])
-        mape_vap_density = mean_absolute_percentage_error(
-            values["expt_liq_density"], values["sim_liq_density"]) * 100.0
+            else:
+                mse_Hvap = np.nan
+                mapd_Hvap = np.nan
         
-        # Vapor pressure
-        mse_Pvap = mean_squared_error(values["expt_Pvap"], values["sim_Pvap"])
-        mape_Pvap = mean_absolute_percentage_error(
-            values["expt_Pvap"], values["sim_Pvap"]) * 100.0
+            # Critical Point (Law of rectilinear diameters)
+            expt_Tc_arr = np.array([molecule.expt_Tc])
+            sim_Tc_arr = np.array([values["sim_Tc"].values[0]])
+            expt_rhoc_arr = np.array([molecule.expt_rhoc])
+            sim_rhoc_arr = np.array([values["sim_rhoc"].values[0]])
+            if sim_Tc_arr is not np.nan:
+                mse_Tc = mean_squared_error(expt_Tc_arr, sim_Tc_arr)
+                mapd_Tc = mean_absolute_percentage_error(expt_Tc_arr, sim_Tc_arr) * 100.0
+            else:
+                mse_Tc = np.nan
+                mapd_Tc = np.nan
+            if sim_rhoc_arr is not np.nan:
+                mse_rhoc = mean_squared_error(expt_rhoc_arr, sim_rhoc_arr)
+                mapd_rhoc = mean_absolute_percentage_error(expt_rhoc_arr, sim_rhoc_arr) * 100.0
+            else:
+                mse_rhoc = np.nan
+                mapd_rhoc = np.nan
+            
+        else:
+            mse_liq_density = np.nan
+            mapd_liq_density = np.nan
+            mse_vap_density = np.nan
+            mapd_vap_density = np.nan
+            mse_Pvap = np.nan
+            mapd_Pvap = np.nan
+            mse_Hvap = np.nan
+            mapd_Hvap = np.nan
+            mse_Tc = np.nan
+            mapd_Tc = np.nan
+            mse_rhoc = np.nan
+            mapd_rhoc = np.nan
         
-        # Enthalpy of vaporization
-        mse_Hvap = mean_squared_error(values["expt_Hvap"], values["sim_Hvap"])
-        mape_Hvap = mean_absolute_percentage_error(values["expt_Hvap"], values["sim_Hvap"]) * 100.0
-        
-        # Critical Point (Law of rectilinear diameters)
-        mse_Tc = mean_squared_error(molecule.expt_Tc, values["sim_Tc"])
-        mape_Tc = mean_absolute_percentage_error(molecule.expt_Tc, values["sim_Tc"]) * 100.0
-        mse_rhoc = mean_squared_error(molecule.expt_rhoc, values["sim_rhoc"])
-        mape_rhoc = mean_absolute_percentage_error(molecule.expt_rhoc, values["sim_rhoc"]) * 100.0
         new_quantities = {
-            "mse_liq_density": mse_liq_density,
-            "mse_vap_density": mse_vap_density,
-            "mse_Pvap": mse_Pvap,
-            "mse_Hvap": mse_Hvap,
-            "mse_Tc": mse_Tc,
-            "mse_rhoc": mse_rhoc,
-            "mape_liq_density": mape_liq_density,
-            "mape_vap_density": mape_vap_density,
-            "mape_Pvap": mape_Pvap,
-            "mape_Hvap": mape_Hvap,
-            "mape_Tc": mape_Tc,
-            "mape_rhoc": mape_rhoc,
-        }
-        
-        new_data.append(list(group) + list(new_quantities.values()))
-    columns = list(molecules) + list(new_quantities.keys())
+                "mse_liq_density": mse_liq_density,
+                "mse_vap_density": mse_vap_density,
+                "mse_Pvap": mse_Pvap,
+                "mse_Hvap": mse_Hvap,
+                "mse_Tc": mse_Tc,
+                "mse_rhoc": mse_rhoc,
+                "mapd_liq_density": mapd_liq_density,
+                "mapd_vap_density": mapd_vap_density,
+                "mapd_Pvap": mapd_Pvap,
+                "mapd_Hvap": mapd_Hvap,
+                "mapd_Tc": mapd_Tc,
+                "mapd_rhoc": mapd_rhoc,
+            }
+
+        data_to_append = list(group) + list(new_quantities.values())
+        # print(data_to_append)
+        new_data.append(data_to_append)
+    columns = list(["molecule"]) + list(new_quantities.keys())
     new_df = pd.DataFrame(new_data, columns=columns)
 
     if csv_name != None:
@@ -280,42 +356,55 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     return new_df
 
 def get_min_max(curr_min, curr_max, new_vals):
-    for val in new_vals:
-        if min(val) < curr_min:
-            curr_min = val
-        if max(val) > curr_max:
-            curr_max = val
+    if isinstance(new_vals, float):
+        new_vals = [new_vals]
+    min_new_val = min(new_vals)
+    max_new_val = max(new_vals)
+    if min_new_val < curr_min:
+        curr_min = min_new_val
+    if max_new_val > curr_max:
+        curr_max = max_new_val
     return curr_min, curr_max
 
-def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
-    molec = str(molec_dict.keys())
+def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
+    molec = list(molec_dict.keys())[0]
     mol_data = molec_dict[molec]
     # Plot VLE envelopes
-    fig, ax2 = plt.subplots(1, 1, figsize=(6,6))
-    temps = mol_data.expt_liq_density
-
+    fig, ax2 = plt.subplots(1, 1, figsize=(6,6))    
+    
+    dfs_given = [df_gaff, df_opt, df_lit, df_nw, df_trappe,]
     #Initialize min and max values
-    min_temp = min(temps)
-    max_temp = mol_data.expt_Tc
-    min_rho = min(mol_data.expt_vap_density.values())
-    max_rho = max(mol_data.expt_liq_density.values())
+    if molec not in ["R152", "R134"]:
+        min_temp = min(mol_data.expt_liq_density.keys())
+        max_temp = mol_data.expt_Tc
+        min_rho = min(mol_data.expt_vap_density.values())
+        max_rho = max(mol_data.expt_liq_density.values())
+    else:
+        for df in dfs_given:
+            if df is not None:
+                min_temp = min(df["temperature"].values)
+                max_temp = max(df["temperature"].values)
+                min_rho = min(df["sim_vap_density"].values)
+                max_rho = max(df["sim_liq_density"].values)
+                break
 
     #Plot opt_scheme_ms vle curve
-    min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_liq_density"])
-    min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_vap_density"])
-    ax2.scatter(df_opt["sim_liq_density"], df_opt["temperature"],
-        c='blue', s=160, alpha=0.7,)
-    ax2.scatter(df_opt["sim_vap_density"], df_opt["temperature"],
-        c='blue',s=160,alpha=0.7,)
-    #Plot critical points
-    ax2.scatter(df_opt["sim_rhoc"],df_opt["sim_Tc"],
-        c='blue',s=160,alpha=0.7, label = "This Work")
+    if df_opt is not None:
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_liq_density"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_vap_density"].values)
+        ax2.scatter(df_opt["sim_liq_density"], df_opt["temperature"],
+            c='blue', s=160, alpha=0.7,)
+        ax2.scatter(df_opt["sim_vap_density"], df_opt["temperature"],
+            c='blue',s=160,alpha=0.7,)
+        #Plot critical points
+        ax2.scatter(df_opt["sim_rhoc"],df_opt["sim_Tc"],
+            c='blue',s=160,alpha=0.7, label = "This Work")
 
     #Plot GAFF VLE Data if it exists
     if df_gaff is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["sim_Tc"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["sim_liq_density"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["sim_vap_density"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["sim_Tc"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["sim_liq_density"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["sim_vap_density"].values)
         ax2.scatter(df_gaff["sim_liq_density"], df_gaff["temperature"],
             c='gray',s=120,alpha=0.7,marker='s',label="GAFF",)
         ax2.scatter(df_gaff["sim_vap_density"],df_gaff["temperature"],
@@ -325,9 +414,9 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
 
     #Plot NW Data if it exists
     if df_nw is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["sim_Tc"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["sim_liq_density"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["sim_vap_density"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["sim_Tc"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["sim_liq_density"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["sim_vap_density"].values)
         ax2.scatter(df_nw["sim_liq_density"],df_nw["temperature"],
             c='green',s=160,alpha=0.7,marker='o',label="Wang et al.",)
         ax2.scatter(df_nw["sim_vap_density"], df_nw["temperature"],
@@ -337,9 +426,9 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
         
     #Plot Potoff Data if it exists
     if df_lit is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["sim_Tc"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["sim_liq_density"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["sim_vap_density"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["sim_Tc"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["sim_liq_density"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["sim_vap_density"].values)
         ax2.scatter(df_lit["sim_liq_density"],df_lit["temperature"],
             c='#0989d9',s=160,alpha=0.7,marker='^',label="Potoff et al.",)
         ax2.scatter(df_lit["sim_vap_density"], df_lit["temperature"],
@@ -349,9 +438,9 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
 
     #Plot TraPPE data if it exists
     if df_trappe is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_trappe["sim_Tc"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["sim_liq_density"])
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["sim_vap_density"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_trappe["sim_Tc"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["sim_liq_density"].values)
+        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["sim_vap_density"].values)
         ax2.scatter(df_trappe["sim_liq_density"],df_trappe["temperature"],
             c='red',s=160,alpha=0.7,marker='*',label="TraPPE",)
         ax2.scatter(df_trappe["sim_vap_density"],df_trappe["temperature"],
@@ -360,11 +449,12 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
             c='red',s=160, alpha=0.7,marker='*',)
 
     #Plot experimental data
-    ax2.scatter(mol_data.expt_liq_density.values(),mol_data.expt_liq_density.keys(),
-        color="black",marker="x",linewidths=2,s=200,label="Experiment",)
-    ax2.scatter(mol_data.expt_vap_density.values(),mol_data.expt_vap_density.keys(),
-        color="black",marker="x",linewidths=2,s=200,)
-    ax2.scatter(mol_data.expt_rhoc, mol_data.expt_Tc, color="black", marker="x", linewidths=2, s=200)
+    if molec not in ["R152", "R134"]:
+        ax2.scatter(mol_data.expt_liq_density.values(),mol_data.expt_liq_density.keys(),
+            color="black",marker="x",linewidths=2,s=200,label="Experiment",)
+        ax2.scatter(mol_data.expt_vap_density.values(),mol_data.expt_vap_density.keys(),
+            color="black",marker="x",linewidths=2,s=200,)
+        ax2.scatter(mol_data.expt_rhoc, mol_data.expt_Tc, color="black", marker="x", linewidths=2, s=200)
 
     #Set Axes
     ax2.set_xlim(min_rho*0.95,max_rho*1.05)
@@ -395,80 +485,71 @@ def plot_vle_envelopes(molec_dict, df_opt, df_lit = None, df_nw = None, df_trapp
     #     path = os.path.join(save_name, "vle_plt.png")
     #     fig.savefig(path,dpi=300)
 
-
-def calc_critical(df):
-    """Compute the critical temperature and density
-
-    Accepts a dataframe with "T_K", "rholiq_kgm3" and "rhovap_kgm3"
-    Returns the critical temperature (K) and density (kg/m3)
-
-    Computes the critical properties with the law of rectilinear diameters
-    """
-    temps = df["temperature"].values
-    liq_density = df["sim_liq_density"].values
-    vap_density = df["sim_vap_density"].values
-    # Critical Point (Law of rectilinear diameters)
-    slope1, intercept1, r_value1, p_value1, std_err1 = linregress(
-        temps,(liq_density + vap_density) / 2.0,)
-
-    slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
-        temps,(liq_density - vap_density) ** (1 / 0.32),)
-
-    Tc = np.abs(intercept2 / slope2)
-    rhoc = intercept1 + slope1 * Tc
-
-    return Tc, rhoc
-
-def plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
-    molec = str(molec_dict.keys())
+def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
+    molec = list(molec_dict.keys())[0]
     mol_data = molec_dict[molec]
     # Plot Pvap and Hvap
-    fig, ax2 = plt.subplots(1, 1, figsize=(6,6))
-    temps = mol_data.expt_Hvap.keys()
-
+    
+    dfs_given = [df_gaff, df_opt, df_lit, df_nw, df_trappe, ]
     #Initialize min and max values
-    min_temp = min(temps)
-    max_temp = mol_data.expt_Tc
-    min_pvap = min(mol_data.expt_Pvap.values())
-    max_pvap = max(mol_data.expt_Pvap.values())
-    min_hvap = min(mol_data.expt_Hvap.values())
-    max_hvap = max(mol_data.expt_Hvap.values())
+    if molec not in ["R152", "R134"]:
+        min_temp = min(mol_data.expt_Pvap.keys())
+        max_temp = mol_data.expt_Tc
+        min_pvap = min(mol_data.expt_Pvap.values())
+        max_pvap = max(mol_data.expt_Pvap.values())
+    else:
+        for df in dfs_given:
+            if df is not None:
+                min_temp = min(df["temperature"].values)
+                max_temp = max(df["temperature"].values)
+                min_pvap = min(df["sim_Pvap"].values)
+                max_pvap = max(df["sim_Pvap"].values)
+                break
+
+    if molec not in ["R152", "R134", "R143"]:
+        min_hvap = min(mol_data.expt_Hvap.values())
+        max_hvap = max(mol_data.expt_Hvap.values())
+    else:
+        for df in dfs_given:
+            if df is not None:
+                min_hvap = min(df["sim_Hvap"].values)
+                max_hvap = max(df["sim_Hvap"].values)
+                break
 
     # Plot Pvap / Hvap
     fig, axs = plt.subplots(nrows=1, ncols=2,figsize=(12,6))
     #fig, ax1 = plt.subplots(1, 1, figsize=(6,6))
-    clrs = seaborn.color_palette('bright', n_colors=len(df_opt))
-    np.random.seed(11)
-    np.random.shuffle(clrs)
 
     #Plot opt pvap
-    min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_opt["sim_Pvap"])
-    axs[0].scatter(df_opt["temperature"], df_opt["sim_Pvap"], c='blue',s=70,alpha=0.7, label = "This Work")
+    if df_opt is not None:
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_opt["sim_Pvap"].values)
+        axs[0].scatter(df_opt["temperature"], df_opt["sim_Pvap"], c='blue',s=70,alpha=0.7, label = "This Work")
     
     #Plot GAFF pvap if it exists
     if df_gaff is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"])
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_gaff["sim_Pvap"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"].values)
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_gaff["sim_Pvap"].values)
         axs[0].scatter(df_gaff["temperature"],df_gaff["sim_Pvap"],
             c='gray',s=70,alpha=0.7,marker='s',label="GAFF",)
 
     #Plot potoff pvap if it exists
     if df_lit is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"])
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_lit["sim_Pvap"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"].values)
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_lit["sim_Pvap"].values)
         axs[0].scatter(df_lit["temperature"],df_lit["sim_Pvap"],
             c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
 
     #Plot Nw pvap if it exists
     if df_nw is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"])
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_nw["sim_Pvap"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"].values)
+        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_nw["sim_Pvap"].values)
         axs[0].scatter(df_nw["temperature"],df_nw["sim_Pvap"],
-            c='green',s=70,alpha=0.7,marker='^',label="Wang et al.",)
+            c='green',s=70,alpha=0.7,marker='o',label="Wang et al.",)
         
     #Plot experimental pvap
-    axs[0].scatter(mol_data.expt_Pvap.keys(),mol_data.expt_Pvap.values(),
-        color="black",marker="x",label="Experiment",s=80,)
+    if molec not in ["R152", "R134"]:
+        axs[0].scatter(mol_data.expt_Pvap.keys(),mol_data.expt_Pvap.values(),
+            color="black",marker="x",label="Experiment",s=80,)
 
 
     axs[0].set_xlim(min_temp*0.95,max_temp*1.05)
@@ -488,34 +569,36 @@ def plot_pvap_hvap(molec_dict, df_opt, df_lit = None, df_nw = None, df_trappe = 
     axs[0].set_ylabel(r"$\mathregular{P_{vap}}$ (bar)", fontsize=16, labelpad=8)
 
     # Plot Enthalpy of Vaporization
-    min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_opt["sim_Hvap"], label = "This Work")
-    axs[1].scatter(df_opt["temperature"],df_opt["sim_Hvap"], c='blue',s=70,alpha=0.7,)
+    if df_opt is not None:
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_opt["sim_Hvap"], label = "This Work")
+        axs[1].scatter(df_opt["temperature"],df_opt["sim_Hvap"], c='blue',s=70,alpha=0.7,)
         
     #Plot GAFF Hvap if it exists
     if df_gaff is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"])
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_gaff["sim_Hvap"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"].values)
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_gaff["sim_Hvap"].values)
         axs[1].scatter(df_gaff["temperature"],df_gaff["sim_Hvap"],
             c='gray',s=70,alpha=0.7,marker='s',label="GAFF",)
-        print(df_gaff["temperature"],df_gaff["sim_Hvap"])
+        # print(df_gaff["temperature"],df_gaff["sim_Hvap"])
 
     #Plot potoff Hvap if it exists
     if df_lit is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"])
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_lit["sim_Hvap"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"].values)
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_lit["sim_Hvap"].values)
         axs[1].scatter(df_lit["temperature"],df_lit["sim_Hvap"],
             c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
 
     #Plot Wang Hvap if it exists
     if df_nw is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"])
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_nw["sim_Hvap"])
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"].values)
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_nw["sim_Hvap"].values)
         axs[1].scatter(df_nw["temperature"],df_nw["sim_Hvap"],
-            c='green',s=70,alpha=0.7,marker='^',label="Wang et al.",)
+            c='green',s=70,alpha=0.7,marker='o',label="Wang et al.",)
         
     #Plot experimental Hvap
-    axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
-        color="black",marker="x",label="Experiment",s=80,)
+    if molec not in ["R152", "R134", "R143"]:
+        axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
+            color="black",marker="x",label="Experiment",s=80,)
 
     axs[1].set_xlim(min_temp*0.95,max_temp*1.05)
     axs[1].xaxis.set_major_locator(MultipleLocator(40))
