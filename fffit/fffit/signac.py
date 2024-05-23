@@ -18,12 +18,12 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
     csv_name : string
         name of csv file to save results
     """
-    if type(param_names) not in (list, tuple):
-        raise TypeError("param_names must be a list or tuple")
+    # if type(param_names) not in (list, tuple):
+    #     raise TypeError("param_names must be a list or tuple")
     if type(property_names) not in (list, tuple):
         raise TypeError("property_names must be a list or tuple")
 
-    job_groupby = tuple(param_names)
+    job_groupby = param_names #tuple(param_names)
     property_names = tuple(property_names)
 
     print(f"Extracting the following properties: {property_names}")
@@ -46,14 +46,17 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
             temperature = round(job.sp.T)
             new_row["temperature"] = temperature
 
+            job_fail_stat = False
             # Extract property values. Insert N/A if not found
             for property_name in property_names:
                 try:
                     property_ = job.doc[property_name]
                     new_row[property_name] = property_
                 except KeyError:
-                    print(f"Job failed: {job.id}")
+                    job_fail_stat = True
                     new_row[property_name] = np.nan
+            if job_fail_stat:
+                print(f"Job {job.id} in project {project} failed. Molecule {job.sp.mol_name} at T = {temperature} K.")
 
             data.append(new_row)
 

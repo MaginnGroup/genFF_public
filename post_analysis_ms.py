@@ -6,6 +6,7 @@ import unyt as u
 import pandas as pd
 import os
 import copy
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import scipy 
 from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes, plot_pvap_hvap
@@ -45,9 +46,9 @@ molec_dict = {"R14": R14,
                 "R23": R23,
                 "R161":R161,
                 "R152a":R152a,
-                # "R152": R152,
-                # "R143": R143,
-                # "R134": R134,
+                "R152": R152,
+                "R143": R143,
+                "R134": R134,
                 "R116": R116}
 
 at_number = 11
@@ -82,8 +83,6 @@ for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
     df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root_final + "_err.csv")
     
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
-
-
 ff_names = ["Potoff", "TraPPE", "Wang_FFO"]
 for ff_name in ff_names:
     #Check that files all exist and load them if they do
@@ -91,11 +90,8 @@ for ff_name in ff_names:
     df_simple = pd.read_csv(read_path) if os.path.exists(read_path) else None
     #Use prepare_df_vle to get the data in the correct format and save the data
     csv_path_final = os.path.join("Results_MS", ff_name + ".csv")
-    df_ff_final = prepare_df_vle(df_molec, molec_dict, csv_name=csv_path_final)
+    df_ff_final = prepare_df_vle(df_simple, molec_dict, csv_name=csv_path_final)
     ff_list.append(df_ff_final)
-    #Calculate MAPD and MSE for each T point
-    csv_err_path = os.path.join("Results_MS", ff_name + "err.csv")
-    df_ff_err = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_err_path)
     
 #Work on combining into 1 PDF
 pdf_vle = PdfPages(os.path.join("Results_MS", "at_" + str(at_number) ,"vle.csv"))
@@ -107,18 +103,20 @@ for molec in molecules:
     one_molec_dict = {molec: molec_dict[molec]}
     ff_molec_list = []
     for df_ff in ff_list:
-        df_molec = copy.copy(df_all[df_all['molecule'] == molec])
+        df_molec = copy.copy(df_ff[df_ff['molecule'] == molec])
         if df_molec.empty:
             df_molec = None
-        else:
-            ff_molec_list.append(df_molec)
+        ff_molec_list.append(df_molec)
+    #Get the data for the molecule from each FF
     df_optff, df_gaff, df_pot, df_trappe, df_wang = ff_molec_list
 
     #Plot Vle, Hvap, and Pvap and save to different pdfs
     pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, df_optff, 
                                    df_pot, df_wang, df_trappe, df_gaff))
+    plt.close()
     pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, df_optff, 
                                    df_pot, df_wang, df_trappe, df_gaff))
+    plt.close()
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
