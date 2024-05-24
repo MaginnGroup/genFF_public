@@ -202,7 +202,9 @@ def NVT_liqbox(job):
                 temperature=job.sp.T * u.K,
                 **custom_args
             )
-            job.doc.use_crit = False
+
+            if "use_crit" not in job.doc:
+                job.doc.use_crit = False
             
     except:
         #Note this overwrites liquid and vapor box lengths in job.doc
