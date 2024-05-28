@@ -16,7 +16,7 @@ from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_env
 import signac
 import sys
 
-from fffit.signac import save_signac_results
+from fffit.fffit.signac import save_signac_results
 
 #Load class properies for each training and testing molecule
 R14 = r14.R14Constants()
@@ -53,16 +53,17 @@ molec_dict = {"R14": R14,
 
 at_number = 11
 ff_list = []
-for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
+for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     project = signac.get_project(project_path)
     if project_path == "opt_ff_ms":
         project = project.find_jobs({"atom_type": at_number})
         at_num_str = "at_" + str(at_number)
     else:
         at_num_str = ""
-    csv_root = os.path.join("Results_MS","unprocessed_csv", at_num_str, project_path)
-    csv_root_final = os.path.join("Results_MS", at_num_str, project_path)
-    os.makedirs(csv_root, exist_ok=True)
+    csv_root_unproc = os.path.join("Results_MS","unprocessed_csv", at_num_str)
+    csv_root_final = os.path.join("Results_MS", at_num_str)
+    os.makedirs(csv_root_unproc, exist_ok=True)
+    os.makedirs(csv_root_final, exist_ok=True)
 
     #Create a large df with just the molecule name and property predictions (param values calculated in Results)
     property_names = [
@@ -75,12 +76,14 @@ for project_path in ["gaff_ff_ms", "opt_ff_ms"]:
     ]
 
     #Get data from molecular simulations. Group by molecule name and save
-    df_molec = save_signac_results(project, "mol_name", property_names, csv_name=csv_root + ".csv")
+    csv_name_unproc = os.path.join(csv_root_unproc, project_path)
+    df_molec = save_signac_results(project, "mol_name", property_names, csv_name= csv_name_unproc + ".csv")
     #process data and save
-    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_root_final + ".csv")
+    csv_name_final = os.path.join(csv_root_final, project_path)
+    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_name_final + ".csv")
     ff_list.append(df_all)
     #Calculate MAPD and MSE for each T point
-    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_root_final + "_err.csv")
+    df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_name_final + "_err.csv")
     
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
 ff_names = ["Potoff", "TraPPE", "Wang_FFO"]
@@ -94,8 +97,10 @@ for ff_name in ff_names:
     ff_list.append(df_ff_final)
     
 #Work on combining into 1 PDF
-pdf_vle = PdfPages(os.path.join("Results_MS", "at_" + str(at_number) ,"vle.csv"))
-pdf_hpvap = PdfPages(os.path.join("Results_MS", "at_" + str(at_number) ,"h_p_vap.csv"))
+full_at_dir = os.path.join("Results_MS", "at_" + str(at_number))
+os.makedirs(full_at_dir, exist_ok=True)
+pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
+pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
 #For each molecule
 molecules = df_paramsets['molecule'].unique().tolist()
 for molec in molecules:
@@ -112,14 +117,11 @@ for molec in molecules:
 
     #Plot Vle, Hvap, and Pvap and save to different pdfs
     pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, df_optff, 
-                                   df_pot, df_wang, df_trappe, df_gaff))
+                                   df_pot, df_wang, df_trappe, df_gaff), bbox_inches='tight')
     plt.close()
     pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, df_optff, 
-                                   df_pot, df_wang, df_trappe, df_gaff))
+                                   df_pot, df_wang, df_trappe, df_gaff), bbox_inches='tight')
     plt.close()
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
-    
-    
-    
