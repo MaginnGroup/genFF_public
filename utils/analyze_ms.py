@@ -40,9 +40,9 @@ molec_dict = {"R14": R14,
                 "R23": R23,
                 "R161":R161,
                 "R152a":R152a,
-                # "R152": R152,
-                # "R143": R143,
-                # "R134": R134,
+                "R152": R152,
+                "R143": R143,
+                "R134": R134,
                 "R116": R116}
 
 def block_average(data):
@@ -214,15 +214,19 @@ def calc_critical(df):
         slope1, intercept1, r_value1, p_value1, std_err1 = linregress(
             temps,(liq_density + vap_density) / 2.0,)
 
-        slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
-            temps,abs((liq_density - vap_density))**(1/0.32),)
+        try:
+            slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
+                temps,(liq_density - vap_density)**(1/0.32),)
+        except:
+            slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
+                temps,abs((liq_density - vap_density))**(1/0.32),)
 
         Tc_mol = np.abs(intercept2 / slope2)
         rhoc_mol = intercept1 + slope1 * Tc_mol
 
         Tc += list([Tc_mol])*len(temps)
         rhoc += list([rhoc_mol])*len(temps)
-        # print(Tc)
+        
     return Tc, rhoc
 
 def prepare_df_vle_errors(df, molec_dict, csv_name = None):
@@ -302,16 +306,18 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
             sim_Tc_arr = np.array([values["sim_Tc"].values[0]])
             expt_rhoc_arr = np.array([molecule.expt_rhoc])
             sim_rhoc_arr = np.array([values["sim_rhoc"].values[0]])
-            if sim_Tc_arr is not np.nan:
+            try:
                 mse_Tc = mean_squared_error(expt_Tc_arr, sim_Tc_arr)
                 mapd_Tc = mean_absolute_percentage_error(expt_Tc_arr, sim_Tc_arr) * 100.0
-            else:
+            except ValueError as e:
+                print(f"Error in calculating Tc for {group[0]}: {e}. Setting MSE and MAPD to NaN")
                 mse_Tc = np.nan
                 mapd_Tc = np.nan
-            if sim_rhoc_arr is not np.nan:
+            try:
                 mse_rhoc = mean_squared_error(expt_rhoc_arr, sim_rhoc_arr)
                 mapd_rhoc = mean_absolute_percentage_error(expt_rhoc_arr, sim_rhoc_arr) * 100.0
-            else:
+            except ValueError as e:
+                print(f"Error in calculating rhoc for {group[0]}: {e}. Setting MSE and MAPD to NaN")
                 mse_rhoc = np.nan
                 mapd_rhoc = np.nan
             
@@ -347,6 +353,7 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
         data_to_append = list(group) + list(new_quantities.values())
         # print(data_to_append)
         new_data.append(data_to_append)
+
     columns = list(["molecule"]) + list(new_quantities.keys())
     new_df = pd.DataFrame(new_data, columns=columns)
 
@@ -392,6 +399,7 @@ def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df
     if df_opt is not None:
         min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_liq_density"].values)
         min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_vap_density"].values)
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_opt["sim_Tc"].values)
         ax2.scatter(df_opt["sim_liq_density"], df_opt["temperature"],
             c='blue', s=160, alpha=0.7,)
         ax2.scatter(df_opt["sim_vap_density"], df_opt["temperature"],
@@ -476,7 +484,7 @@ def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df
         ax2.spines[axis].set_linewidth(2.0)
 
     ax2.legend(loc="lower left", bbox_to_anchor=(-0.16, 1.03), ncol=2, fontsize=22, handletextpad=0.1, markerscale=0.9, edgecolor="dimgrey")
-    ax2.text(0.7,  0.82, molec, fontsize=30, transform=ax2.transAxes)
+    ax2.text(0.60,  0.82, molec, fontsize=30, transform=ax2.transAxes)
     fig.subplots_adjust(bottom=0.2, top=0.75, left=0.15, right=0.95, wspace=0.55)
 
     return fig
@@ -522,6 +530,7 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
 
     #Plot opt pvap
     if df_opt is not None:
+        min_temp, max_temp = get_min_max(min_temp, max_temp, df_opt["temperature"].values)
         min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_opt["sim_Pvap"].values)
         axs[0].scatter(df_opt["temperature"], df_opt["sim_Pvap"], c='blue',s=70,alpha=0.7, label = "This Work")
     
@@ -570,7 +579,7 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
 
     # Plot Enthalpy of Vaporization
     if df_opt is not None:
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_opt["sim_Hvap"], label = "This Work")
+        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_opt["sim_Hvap"].values)
         axs[1].scatter(df_opt["temperature"],df_opt["sim_Hvap"], c='blue',s=70,alpha=0.7,)
         
     #Plot GAFF Hvap if it exists
