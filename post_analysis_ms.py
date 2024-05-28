@@ -92,8 +92,10 @@ for ff_name in ff_names:
     read_path = os.path.join("Results_MS/unprocessed_csv", ff_name + ".csv")
     df_simple = pd.read_csv(read_path) if os.path.exists(read_path) else None
     #Use prepare_df_vle to get the data in the correct format and save the data
-    csv_path_final = os.path.join("Results_MS", ff_name + ".csv")
-    df_ff_final = prepare_df_vle(df_simple, molec_dict, csv_name=csv_path_final)
+    csv_path_final = os.path.join("Results_MS", ff_name)
+    df_ff_final = prepare_df_vle(df_simple, molec_dict, csv_name=csv_path_final + ".csv")
+    if ff_name == "Wang_FFO":
+        df_paramsets_w = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_path_final + "_err.csv")
     ff_list.append(df_ff_final)
     
 #Work on combining into 1 PDF
