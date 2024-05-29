@@ -236,7 +236,7 @@ def NVT_liqbox(job):
 
 
 @Project.pre.after(NVT_liqbox)
-@Project.post(lambda job: job.isfile("nvt.final.xyz") or job.isfile("liqbox.xyz"))
+@Project.post(lambda job: job.isfile("nvt.final.xyz") or "nsteps_nvt" not in job.sp)
 @Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc or "liqbox_final_dim" in job.doc)
 @Project.operation
 def extract_final_NVT_config(job):
@@ -271,7 +271,7 @@ def npt_finished(job):
 
     with job:
         try:
-            if job.isfile("liqbox-equil/equil.out.prp"):
+            if job.isfile("liqbox-equil/equil.out.prp") and "nsteps_nvt" not in job.sp:
                 thermo_data = np.genfromtxt("liqbox-equil/equil.out.prp", skip_header=3
                 )
             else:
@@ -503,7 +503,7 @@ def NPT_liqbox(job):
 #     job.doc.liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
 @Project.pre.after(NPT_liqbox)
-@Project.post(lambda job: job.isfile("npt.final.xyz") or job.isfile("liqbox.xyz"))
+@Project.post(lambda job: job.isfile("npt.final.xyz") or (job.isfile("liqbox.xyz") and "nsteps_nvt" not in job.sp))
 @Project.post(lambda job: "npt_liqbox_final_dim" or "liqbox_final_dim" in job.doc)
 @Project.operation
 def extract_final_NPT_config(job):
