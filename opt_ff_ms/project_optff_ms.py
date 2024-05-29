@@ -4,9 +4,13 @@ import warnings
 from pathlib import Path
 import os
 import sys
+import unyt as u
+import copy
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
+sys.path.append("..")
+from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+sys.path.remove("..")
 
 class Project(FlowProject):
     def __init__(self):
@@ -27,66 +31,264 @@ def create_forcefield(job):
     with open(job.fn("ff.xml"), "w") as ff:
         ff.write(content)
 
+def calc_box_helper(job):
+    "Calculate the initial box length of the boxes"
+
+    import unyt as u
+    #Get reference data from constants file
+    #Load class properies for each training and testing molecule
+    class_dict = _get_class_from_molecule(job.sp.mol_name)
+    class_data = class_dict[job.sp.mol_name]
+    # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in ProjectGAFF_gaff.py as needed)
+    ref = {}
+    
+    #If the gemc simulation failed previously, use the critical values
+    if "use_crit" in job.doc and job.doc.use_crit == True:
+        rho_liq = class_data.expt_rhoc * u.kilogram/(u.meter)**3
+        rho_vap = class_data.expt_rhoc * u.kilogram/(u.meter)**3
+    else:
+        #Initialize rho_liq and rho_vap as the experimental values
+        rho_liq = job.sp.expt_liq_density * u.kilogram/(u.meter)**3
+        rho_vap = class_data.expt_vap_density[int(job.sp.T)] * u.kilogram/(u.meter)**3
+
+    # Create a tuple containing the values from each dictionary
+    ref[int(job.sp.T)] = (rho_liq, rho_vap, job.sp.P)
+
+    vap_density = ref[job.sp.T][1]
+    mol_density = vap_density / (job.sp.mol_weight * u.amu)
+    vol_vap = job.sp.N_vap / mol_density
+    vapboxl = vol_vap ** (1.0 / 3.0)
+
+    # Strip unyts and round to 0.1 angstrom
+    vapboxl = round(float(vapboxl.in_units(u.nm).to_value()), 2)
+
+    # Save to job document file
+    job.doc.vapboxl = vapboxl  # nm, compatible with mbuild
+
+    liq_density = ref[job.sp.T][0]
+    mol_density = liq_density / (job.sp.mol_weight * u.amu)
+    vol_liq = job.sp.N_liq / mol_density
+    liqboxl = vol_liq ** (1.0 / 3.0)
+
+    # Strip unyts and round to 0.1 angstrom
+    liqboxl = round(float(liqboxl.in_units(u.nm).to_value()), 2)
+
+    # Save to job document file
+    job.doc.liqboxl = liqboxl  # nm, compatible with mbuild
+
+    return job.doc.liqboxl, job.doc.vapboxl
 
 @Project.post(lambda job: "vapboxl" in job.doc)
-@Project.operation
-def calc_vapboxl(job):
-    "Calculate the initial box length of the vapor box"
-
-    import unyt as u
-
-    pressure = job.sp.P * u.bar
-    temperature = job.sp.T * u.K
-    nmols_vap = job.sp.N_vap
-
-    vol_vap = nmols_vap * u.kb * temperature / pressure
-    boxl = vol_vap ** (1.0 / 3.0)
-    # Strip unyts and round to 0.1 angstrom
-    boxl = round(float(boxl.in_units(u.nm).value), 2)
-    # Save to job document file
-    job.doc.vapboxl = boxl  # nm, compatible with mbuild
-
 @Project.post(lambda job: "liqboxl" in job.doc)
 @Project.operation
-def calc_liqboxl(job):
-    "Calculate the initial box length of the liquid box"
+def calc_boxes(job):
+    "Calculate the initial box length of the boxes"
+    liqbox, vapbox = calc_box_helper(job)
 
-    import unyt as u
+# @Project.post(lambda job: "vapboxl" in job.doc)
+# @Project.operation
+# def calc_vapboxl(job):
+#     "Calculate the initial box length of the vapor box"
 
-    nmols_liq = job.sp.N_liq
-    liq_density = job.sp.expt_liq_density * u.Unit("kg/m**3")
-    molweight = job.sp.mol_weight * u.amu
-    mol_density = liq_density / molweight
-    vol_liq = nmols_liq / mol_density
-    boxl = vol_liq ** (1.0 / 3.0)
-    # Strip unyts and round to 0.1 angstrom
-    boxl = round(float(boxl.in_units(u.nm).value), 2)
-    # Save to job document file
-    job.doc.liqboxl = boxl  # nm, compatible with mbuild
+#     import unyt as u
 
+#     pressure = job.sp.P * u.bar
+#     temperature = job.sp.T * u.K
+#     nmols_vap = job.sp.N_vap
+
+#     vol_vap = nmols_vap * u.kb * temperature / pressure
+#     boxl = vol_vap ** (1.0 / 3.0)
+#     # Strip unyts and round to 0.1 angstrom
+#     boxl = round(float(boxl.in_units(u.nm).value), 2)
+#     # Save to job document file
+#     job.doc.vapboxl = boxl  # nm, compatible with mbuild
+
+# @Project.post(lambda job: "liqboxl" in job.doc)
+# @Project.operation
+# def calc_liqboxl(job):
+#     "Calculate the initial box length of the liquid box"
+
+#     import unyt as u
+
+#     nmols_liq = job.sp.N_liq
+#     liq_density = job.sp.expt_liq_density * u.Unit("kg/m**3")
+#     molweight = job.sp.mol_weight * u.amu
+#     mol_density = liq_density / molweight
+#     vol_liq = nmols_liq / mol_density
+#     boxl = vol_liq ** (1.0 / 3.0)
+#     # Strip unyts and round to 0.1 angstrom
+#     boxl = round(float(boxl.in_units(u.nm).value), 2)
+#     # Save to job document file
+#     job.doc.liqboxl = boxl  # nm, compatible with mbuild
 
 @Project.label
-def liqbox_equilibrated(job):
-    "Confirm liquid box equilibration completed"
-
+def nvt_finished(job):
+    "Confirm a given simulation is completed"
     import numpy as np
-
-    try:
-        thermo_data = np.genfromtxt(
-            job.fn("liqbox-equil/equil.out.prp"), skip_header=3
-        )
-        completed = int(thermo_data[-1][0]) == job.sp.nsteps_liqeq
-    except:
-        completed = False
-        pass
+    import os 
+    #If nsteps not in init, then GEMC ran without it earlier
+    if "nsteps_nvt" not in job.sp:
+        completed = True
+    else:
+        with job:
+            try:
+                thermo_data = np.genfromtxt(
+                    "nvt.eq.out.prp", skip_header=3
+                )
+                completed = int(thermo_data[-1][0]) == job.sp.nsteps_nvt #job.sp.nsteps_liqeq
+            except:
+                completed = False
+                pass
 
     return completed
 
+@Project.pre.after(create_forcefield, calc_boxes)
+@Project.post(nvt_finished)
+@Project.operation(directives={"omp_num_threads": 12})
+def NVT_liqbox(job):
+    "Equilibrate the liquid box using NVT simulation"
 
-@Project.pre.after(create_forcefield, calc_liqboxl, calc_vapboxl)
-@Project.post(liqbox_equilibrated)
-@Project.operation(directives={"omp_num_threads": 2})
-def equilibrate_liqbox(job):
+    import os
+    import errno
+    import mbuild
+    import foyer
+    import mosdef_cassandra as mc
+    import unyt as u
+
+    ff = foyer.Forcefield(job.fn("ff.xml"))
+
+    # Load the compound and apply the ff
+    compound = mbuild.load(job.sp.smiles, smiles=True)
+    compound_ff = ff.apply(compound)
+
+    # Create a new moves object and species list
+    species_list = [compound_ff]
+    moves = mc.MoveSet("nvt", species_list)
+
+    # Property outputs relevant for NPT simulations
+    thermo_props = [
+            "energy_total", 
+            "pressure"
+            ]
+
+    custom_args = {
+        "vdw_style": "lj",
+        "cutoff_style": "cut_tail",
+        "vdw_cutoff": 12.0 * u.angstrom,
+        "charge_style": "ewald",
+        "charge_cutoff": 12.0 * u.angstrom, 
+        "ewald_accuracy": 1.0e-5, 
+        "mixing_rule": "lb",
+        "units": "steps",
+        "coord_freq": 1000,
+        "prop_freq": 1000,
+    }
+    custom_args["run_name"] = "nvt.eq"
+    custom_args["properties"] = thermo_props
+    mols_to_add = [[job.sp.N_liq]]
+
+    # Create box list 
+    boxl = job.doc.liqboxl
+    box = mbuild.Box(lengths=[boxl, boxl, boxl])
+    box_list = [box]
+    system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
+
+    # Move into the job dir and start doing things
+    try:
+        with job:
+            # Run equilibration
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_nvt,
+                temperature=job.sp.T * u.K,
+                **custom_args
+            )
+
+            if "use_crit" not in job.doc:
+                job.doc.use_crit = False
+            
+    except:
+        #Note this overwrites liquid and vapor box lengths in job.doc
+        liqbox, vapbox = calc_box_helper(job)
+        # Create system with box lengths based on critical points
+        boxl = job.doc.liqboxl
+        box = mbuild.Box(lengths=[boxl, boxl, boxl])
+        box_list = [box]
+        system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
+        
+        try:
+            with job:
+                # Run equilibration
+                mc.run(
+                    system=system,
+                    moveset=moves,
+                    run_type="equilibration",
+                    run_length=job.sp.nsteps_nvt,
+                    temperature=job.sp.T * u.K,
+                    **custom_args
+                )
+                job.doc.use_crit = True
+        except:
+            job.doc.nvt_failed == True
+            raise Exception("NVT failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
+
+
+@Project.pre.after(NVT_liqbox)
+@Project.post(lambda job: job.isfile("nvt.final.xyz") or job.isfile("liqbox.xyz"))
+@Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc or "liqbox_final_dim" in job.doc)
+@Project.operation
+def extract_final_NVT_config(job):
+    "Extract final coords and box dims from the liquid box simulation"
+
+    import subprocess
+
+    lines = job.sp.N_liq * job.sp.N_atoms
+    cmd = [
+        "tail",
+        "-n",
+        str(lines + 2),
+        job.fn("nvt.eq.out.xyz"),
+    ]
+
+    # Save final liuqid box xyz file
+    xyz = subprocess.check_output(cmd).decode("utf-8")
+    with open(job.fn("nvt.final.xyz"), "w") as xyzfile:
+        xyzfile.write(xyz)
+
+    # Save final box dims to job.doc
+    box_data = []
+    with open(job.fn("nvt.eq.out.H")) as f:
+        for line in f:
+            box_data.append(line.strip().split())
+    job.doc.nvt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
+
+def npt_finished(job):
+    "Confirm a given simulation is completed"
+    import numpy as np
+    import os
+
+    with job:
+        try:
+            if job.isfile("liqbox-equil/equil.out.prp"):
+                thermo_data = np.genfromtxt("liqbox-equil/equil.out.prp", skip_header=3
+                )
+            else:
+                thermo_data = np.genfromtxt(
+                    "npt.eq.out.prp", skip_header=3
+                )
+            completed = int(thermo_data[-1][0]) == job.sp.nsteps_liqeq #job.sp.nsteps_liqeq
+        except:
+            completed = False
+            pass
+
+    return completed
+
+@Project.pre.after(extract_final_NVT_config)
+@Project.post(npt_finished)
+@Project.operation(directives={"omp_num_threads": 12})
+def NPT_liqbox(job):
     "Equilibrate the liquid box"
 
     import os
@@ -95,22 +297,29 @@ def equilibrate_liqbox(job):
     import foyer
     import mosdef_cassandra as mc
     import unyt as u
+
     ff = foyer.Forcefield(job.fn("ff.xml"))
 
     # Load the compound and apply the ff
     compound = mbuild.load(job.sp.smiles, smiles=True)
     compound_ff = ff.apply(compound)
 
-    # Create box list and species list
-    boxl = job.doc.liqboxl
-    box = mbuild.Box(lengths=[boxl, boxl, boxl])
+    with job:
+        liq_box = mbuild.formats.xyz.read_xyz(job.fn("nvt.final.xyz"))
 
-    box_list = [box]
+    boxl = job.doc.nvt_liqbox_final_dim
+
+    liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90., 90., 90.])
+
+    liq_box.periodicity = [True, True, True]
+
+    box_list = [liq_box]
+
     species_list = [compound_ff]
 
-    mols_to_add = [[job.sp.N_liq]]
+    mols_in_boxes = [[job.sp.N_liq]]
 
-    system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
+    system = mc.System(box_list, species_list, mols_in_boxes=mols_in_boxes)
 
     # Create a new moves object
     moves = mc.MoveSet("npt", species_list)
@@ -146,15 +355,11 @@ def equilibrate_liqbox(job):
         "properties": thermo_props,
     }
 
+    custom_args["run_name"] = "npt.eq"
+    custom_args["properties"] = thermo_props
+
     # Move into the job dir and start doing things
     with job:
-        liq_dir = "liqbox-equil"
-        try:
-            os.mkdir(liq_dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
-        os.chdir(liq_dir)
         # Run equilibration
         mc.run(
             system=system,
@@ -167,35 +372,164 @@ def equilibrate_liqbox(job):
         )
 
 
-@Project.pre.after(equilibrate_liqbox)
-@Project.post.isfile("liqbox.xyz")
-@Project.post(lambda job: "liqbox_final_dim" in job.doc)
+# @Project.label
+# def liqbox_equilibrated(job):
+#     "Confirm liquid box equilibration completed"
+
+#     import numpy as np
+
+#     try:
+#         thermo_data = np.genfromtxt(
+#             job.fn("liqbox-equil/equil.out.prp"), skip_header=3
+#         )
+#         completed = int(thermo_data[-1][0]) == job.sp.nsteps_liqeq
+#     except:
+#         completed = False
+#         pass
+
+#     return completed
+
+# @Project.pre.after(create_forcefield, calc_liqboxl, calc_vapboxl)
+# @Project.post(liqbox_equilibrated)
+# @Project.operation(directives={"omp_num_threads": 2})
+# def equilibrate_liqbox(job):
+#     "Equilibrate the liquid box"
+
+#     import os
+#     import errno
+#     import mbuild
+#     import foyer
+#     import mosdef_cassandra as mc
+#     import unyt as u
+#     ff = foyer.Forcefield(job.fn("ff.xml"))
+
+#     # Load the compound and apply the ff
+#     compound = mbuild.load(job.sp.smiles, smiles=True)
+#     compound_ff = ff.apply(compound)
+
+#     # Create box list and species list
+#     boxl = job.doc.liqboxl
+#     box = mbuild.Box(lengths=[boxl, boxl, boxl])
+
+#     box_list = [box]
+#     species_list = [compound_ff]
+
+#     mols_to_add = [[job.sp.N_liq]]
+
+#     system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
+
+#     # Create a new moves object
+#     moves = mc.MoveSet("npt", species_list)
+
+#     # Edit the volume move probability to be more reasonable
+#     orig_prob_volume = moves.prob_volume
+#     new_prob_volume = 1.0 / job.sp.N_liq
+#     moves.prob_volume = new_prob_volume
+
+#     moves.prob_translate = (
+#         moves.prob_translate + orig_prob_volume - new_prob_volume
+#     )
+
+#     # Define thermo output props
+#     thermo_props = [
+#         "energy_total",
+#         "pressure",
+#         "volume",
+#         "nmols",
+#         "mass_density",
+#     ]
+
+#     # Define custom args
+#     custom_args = {
+#         "run_name": "equil",
+#         "charge_style": "ewald",
+#         "rcut_min": 1.0 * u.angstrom,
+#         "vdw_cutoff": 12.0 * u.angstrom,
+#         "units": "sweeps",
+#         "steps_per_sweep": job.sp.N_liq,
+#         "coord_freq": 500,
+#         "prop_freq": 10,
+#         "properties": thermo_props,
+#     }
+
+#     # Move into the job dir and start doing things
+#     with job:
+#         liq_dir = "liqbox-equil"
+#         try:
+#             os.mkdir(liq_dir)
+#         except OSError as e:
+#             if e.errno != errno.EEXIST:
+#                 raise
+#         os.chdir(liq_dir)
+#         # Run equilibration
+#         mc.run(
+#             system=system,
+#             moveset=moves,
+#             run_type="equilibration",
+#             run_length=job.sp.nsteps_liqeq,
+#             temperature=job.sp.T * u.K,
+#             pressure=job.sp.P * u.bar,
+#             **custom_args
+#         )
+
+
+# @Project.pre.after(equilibrate_liqbox)
+# @Project.post.isfile("liqbox.xyz")
+# @Project.post(lambda job: "liqbox_final_dim" in job.doc)
+# @Project.operation
+# def extract_final_liqbox(job):
+#     "Extract final coords and box dims from the liquid box simulation"
+
+#     import subprocess
+
+#     n_atoms = job.sp.N_liq * job.sp.N_atoms
+#     cmd = [
+#         "tail",
+#         "-n",
+#         str(n_atoms + 2),
+#         job.fn("liqbox-equil/equil.out.xyz"),
+#     ]
+
+#     # Save final liuqid box xyz file
+#     xyz = subprocess.check_output(cmd).decode("utf-8")
+#     with open(job.fn("liqbox.xyz"), "w") as xyzfile:
+#         xyzfile.write(xyz)
+
+#     # Save final box dims to job.doc
+#     box_data = []
+#     with open(job.fn("liqbox-equil/equil.out.H")) as f:
+#         for line in f:
+#             box_data.append(line.strip().split())
+#     job.doc.liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
+
+@Project.pre.after(NPT_liqbox)
+@Project.post(lambda job: job.isfile("npt.final.xyz") or job.isfile("liqbox.xyz"))
+@Project.post(lambda job: "npt_liqbox_final_dim" or "liqbox_final_dim" in job.doc)
 @Project.operation
-def extract_final_liqbox(job):
+def extract_final_NPT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
 
     import subprocess
 
-    n_atoms = job.sp.N_liq * job.sp.N_atoms
+    lines = job.sp.N_liq * job.sp.N_atoms
     cmd = [
         "tail",
         "-n",
-        str(n_atoms + 2),
-        job.fn("liqbox-equil/equil.out.xyz"),
+        str(lines + 2),
+        job.fn("npt.eq.out.xyz"),
     ]
 
     # Save final liuqid box xyz file
     xyz = subprocess.check_output(cmd).decode("utf-8")
-    with open(job.fn("liqbox.xyz"), "w") as xyzfile:
+    with open(job.fn("npt.final.xyz"), "w") as xyzfile:
         xyzfile.write(xyz)
 
     # Save final box dims to job.doc
     box_data = []
-    with open(job.fn("liqbox-equil/equil.out.H")) as f:
+    with open(job.fn("npt.eq.out.H")) as f:
         for line in f:
             box_data.append(line.strip().split())
-    job.doc.liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
-
+    job.doc.npt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
 @Project.label
 def gemc_equil_complete(job):
@@ -229,7 +563,7 @@ def gemc_prod_complete(job):
     return completed
 
 
-@Project.pre.after(extract_final_liqbox)
+@Project.pre.after(extract_final_NPT_config)
 @Project.post(gemc_prod_complete)
 @Project.operation(directives={"omp_num_threads": 2})
 def run_gemc(job):
@@ -246,14 +580,16 @@ def run_gemc(job):
     compound_ff = ff.apply(compound)
 
     # Create box list and species list
-    boxl = job.doc.liqbox_final_dim  # saved in nm
-    liq_box = mbuild.load(job.fn("liqbox.xyz"))
+    boxl_liq = job.doc.liqbox_final_dim  # saved in nm
+    # liq_box = mbuild.load(job.fn("liqbox.xyz"))
+    with job:
+        liq_box = mbuild.formats.xyz.read_xyz(job.fn("npt.final.xyz"))
 
-    liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90., 90., 90.])
+    liq_box.box = mbuild.Box(lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90., 90., 90.])
     liq_box.periodicity = [True, True, True]
 
-    boxl = job.doc.vapboxl  # nm
-    vap_box = mbuild.Box(lengths=[boxl, boxl, boxl])
+    boxl_vap = job.doc.vapboxl  # nm
+    vap_box = mbuild.Box(lengths=[boxl_vap, boxl_vap, boxl_vap])
 
     box_list = [liq_box, vap_box]
     species_list = [compound_ff]
@@ -298,12 +634,12 @@ def run_gemc(job):
 
     # Define custom args
     custom_args = {
-        "run_name": "equil",
+        "run_name": "gemc.eq",
         "charge_style": "ewald",
         "rcut_min": 1.0 * u.angstrom,
-        "charge_cutoff_box2": 25.0 * u.angstrom,
+        "charge_cutoff_box2": 0.4 * (boxl_vap * u.nanometer).to("angstrom"), #25.0 * u.angstrom,
         "vdw_cutoff_box1": 12.0 * u.angstrom,
-        "vdw_cutoff_box2": 25.0 * u.angstrom,
+        "vdw_cutoff_box2": 0.4 * (boxl_vap * u.nanometer).to("angstrom"), #25.0 * u.angstrom,
         "units": "sweeps",
         "steps_per_sweep": job.sp.N_liq + job.sp.N_vap,
         "coord_freq": 500,
@@ -312,32 +648,51 @@ def run_gemc(job):
     }
 
     # Move into the job dir and start doing things
-    with job:
-        # Run equilibration
-        mc.run(
-            system=system,
-            moveset=moves,
-            run_type="equilibration",
-            run_length=job.sp.nsteps_eq,
-            temperature=job.sp.T * u.K,
-            **custom_args
-        )
+    try:
+        with job:
+            # Run equilibration
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_eq,
+                temperature=job.sp.T * u.K,
+                **custom_args
+            )
 
-        # Adjust custom args for production
-        #custom_args["run_name"] = "prod"
-        #custom_args["restart_name"] = "equil"
+            # Adjust custom args for production
+            #custom_args["run_name"] = "prod"
+            #custom_args["restart_name"] = "equil"
 
-        # Run production
-        mc.restart(
-            #system=system,
-            restart_from="equil",
-            #moveset=moves,
-            run_type="production",
-            total_run_length=job.sp.nsteps_prod,
-            run_name="prod",
-            #temperature=job.sp.T * u.K,
-            #**custom_args
-        )
+            # Run production
+            mc.restart(
+                restart_from="gemc.eq",
+                run_type="production",
+                total_run_length=job.sp.nsteps_prod,
+                run_name="prod",
+            )
+    except:
+        #if GEMC failed with critical conditions as intial conditions, terminate with error
+        if "use_crit" in job.doc and job.doc.use_crit == True:
+            #If so, terminate with error and log failure in job document
+            job.doc.gemc_failed = True
+            raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
+        else:
+            #Otherwise, try with critical conditions
+            job.doc.use_crit = True
+            #If GEMC fails, remove files in post conditions of previous operations
+            del job.doc["vapboxl"] #calc_boxes
+            del job.doc["liqboxl"] #calc_boxes
+            with job:
+                if job.isfile("nvt.eq.out.prp"): 
+                    os.remove("nvt.eq.out.prp") #NVT_liqbox
+                    os.remove("npt.eq.out.prp") #NPT_liqbox
+                    os.remove("nvt.final.xyz") #extract_final_NVT_config
+                    os.remove("npt.final.xyz") #extract_final_NPT_config
+                else:
+                    del job.doc["liqbox_final_dim"] #extract_final_NPT_config
+                    os.remove("liqbox.xyz") #extract_final_NPT_config
+
 
 
 @Project.pre.after(run_gemc)
@@ -439,6 +794,45 @@ def calculate_props(job):
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
 #####################################################################
+def _get_molec_dicts():
+    #Load class properies for each training and testing molecule
+    R14 = r14.R14Constants()
+    R32 = r32.R32Constants()
+    R50 = r50.R50Constants()
+    R125 = r125.R125Constants()
+    R134a = r134a.R134aConstants()
+    R143a = r143a.R143aConstants()
+    R170 = r170.R170Constants()
+    R41 = r41.R41Constants()
+    R23 = r23.R23Constants()
+    R161 = r161.R161Constants()
+    R152a = r152a.R152aConstants()
+    R152 = r152.R152Constants()
+    R143 = r143.R143Constants()
+    R134 = r134.R134Constants()
+    R116 = r116.R116Constants()
+
+    molec_dict = {"R14": R14,
+                    "R32": R32,
+                    "R50": R50,
+                    "R125": R125,
+                    "R134a": R134a,
+                    "R143a": R143a,
+                    "R170": R170,
+                    "R41": R41,
+                    "R23": R23,
+                    "R161":R161,
+                    "R152a":R152a,
+                    "R152": R152,
+                    "R143": R143,
+                    "R134": R134,
+                    "R116": R116}
+    return molec_dict
+
+def _get_class_from_molecule(molecule_name):
+    molec_dict = _get_molec_dicts()
+    return {molecule_name: molec_dict[molecule_name]}
+
 def _get_xml_from_molecule(molecule_name):
     if molecule_name == "R41":
         molec_xml_function = _generate_r41_xml

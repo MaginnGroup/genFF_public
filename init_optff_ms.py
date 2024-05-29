@@ -108,6 +108,8 @@ for molec_name, molec_data in molec_dict.items():
                 "nsteps_eq": 10000,
                 "nsteps_prod": 100000,
             }
-            state_point = unpack_molec_values(molec_name, at_class, sample, state_point)      
+            state_point = unpack_molec_values(molec_name, at_class, sample, state_point)    
+            if molec_name in ["R41", "R23"]:
+                state_point["nsteps_nvt"] = 2500000  
             job = project.open_job(state_point)
             job.init()
