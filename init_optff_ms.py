@@ -104,12 +104,14 @@ for molec_name, molec_data in molec_dict.items():
                 "N_vap": n_vap,
                 "N_liq": n_liq,
                 "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
-                "nsteps_liqeq": 5000,
                 "nsteps_eq": 10000,
                 "nsteps_prod": 100000,
             }
             state_point = unpack_molec_values(molec_name, at_class, sample, state_point)    
             if molec_name in ["R41", "R23"]:
-                state_point["nsteps_nvt"] = 2500000  
+                state_point["nsteps_nvt"] = 2500000
+                state_point["nsteps_liqeq"]= 7000
+            else:
+                state_point["nsteps_liqeq"]= 5000
             job = project.open_job(state_point)
             job.init()
