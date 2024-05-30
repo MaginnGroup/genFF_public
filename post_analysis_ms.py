@@ -85,8 +85,8 @@ for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     #Calculate MAPD and MSE for each T point
     df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_name_final + "_err.csv")
     
-#Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff
-ff_names = ["Potoff", "TraPPE", "Wang_FFO"]
+#Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff, and BBFF
+ff_names = ["Potoff", "TraPPE", "Wang_FFO", "BBFF"]
 for ff_name in ff_names:
     #Check that files all exist and load them if they do
     read_path = os.path.join("Results_MS/unprocessed_csv", ff_name + ".csv")
@@ -94,7 +94,7 @@ for ff_name in ff_names:
     #Use prepare_df_vle to get the data in the correct format and save the data
     csv_path_final = os.path.join("Results_MS", ff_name)
     df_ff_final = prepare_df_vle(df_simple, molec_dict, csv_name=csv_path_final + ".csv")
-    if ff_name == "Wang_FFO":
+    if ff_name in  ["Wang_FFO", "BBFF"]:
         df_paramsets_w = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_path_final + "_err.csv")
     ff_list.append(df_ff_final)
     
@@ -115,14 +115,10 @@ for molec in molecules:
             df_molec = None
         ff_molec_list.append(df_molec)
     #Get the data for the molecule from each FF
-    df_optff, df_gaff, df_pot, df_trappe, df_wang = ff_molec_list
-
     #Plot Vle, Hvap, and Pvap and save to different pdfs
-    pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, df_optff, 
-                                   df_pot, df_wang, df_trappe, df_gaff), bbox_inches='tight')
+    pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_list), bbox_inches='tight')
     plt.close()
-    pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, df_optff, 
-                                   df_pot, df_wang, df_trappe, df_gaff), bbox_inches='tight')
+    pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_list), bbox_inches='tight')
     plt.close()
 #Close figures    
 pdf_vle.close()

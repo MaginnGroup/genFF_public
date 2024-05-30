@@ -373,13 +373,17 @@ def get_min_max(curr_min, curr_max, new_vals):
         curr_max = max_new_val
     return curr_min, curr_max
 
-def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
+def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
     molec = list(molec_dict.keys())[0]
     mol_data = molec_dict[molec]
     # Plot VLE envelopes
     fig, ax2 = plt.subplots(1, 1, figsize=(6,6))    
     
-    dfs_given = [df_gaff, df_opt, df_lit, df_nw, df_trappe,]
+    df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
+    df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
+    df_markers = ['o', 's', '^', '*', 'p', 'd']
+    df_z_order = [6,3,2,1,5,4]
+
     #Initialize min and max values
     if molec not in ["R152", "R134"]:
         min_temp = min(mol_data.expt_liq_density.keys())
@@ -387,7 +391,7 @@ def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df
         min_rho = min(mol_data.expt_vap_density.values())
         max_rho = max(mol_data.expt_liq_density.values())
     else:
-        for df in dfs_given:
+        for df in df_ff_list:
             if df is not None:
                 min_temp = min(df["temperature"].values)
                 max_temp = max(df["temperature"].values)
@@ -395,74 +399,31 @@ def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df
                 max_rho = max(df["sim_liq_density"].values)
                 break
 
-    #Plot opt_scheme_ms vle curve
-    if df_opt is not None:
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_liq_density"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_opt["sim_vap_density"].values)
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_opt["sim_Tc"].values)
-        ax2.scatter(df_opt["sim_liq_density"], df_opt["temperature"],
-            c='blue', s=160, alpha=0.7,)
-        ax2.scatter(df_opt["sim_vap_density"], df_opt["temperature"],
-            c='blue',s=160,alpha=0.7,)
-        #Plot critical points
-        ax2.scatter(df_opt["sim_rhoc"],df_opt["sim_Tc"],
-            c='blue',s=160,alpha=0.7, label = "This Work")
-
-    #Plot GAFF VLE Data if it exists
-    if df_gaff is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["sim_Tc"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["sim_liq_density"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_gaff["sim_vap_density"].values)
-        ax2.scatter(df_gaff["sim_liq_density"], df_gaff["temperature"],
-            c='gray',s=120,alpha=0.7,marker='s',label="GAFF",)
-        ax2.scatter(df_gaff["sim_vap_density"],df_gaff["temperature"],
-            c='gray',s=120,alpha=0.7, marker='s',)
-        ax2.scatter(df_gaff["sim_rhoc"],df_gaff["sim_Tc"],
-            c='gray',s=120,alpha=0.7,marker='s',)
-
-    #Plot NW Data if it exists
-    if df_nw is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["sim_Tc"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["sim_liq_density"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_nw["sim_vap_density"].values)
-        ax2.scatter(df_nw["sim_liq_density"],df_nw["temperature"],
-            c='green',s=160,alpha=0.7,marker='o',label="Wang et al.",)
-        ax2.scatter(df_nw["sim_vap_density"], df_nw["temperature"],
-            c='green',s=160,alpha=0.7,marker='o',)
-        ax2.scatter(df_nw["sim_rhoc"],df_nw["sim_Tc"],
-            c='green',s=160,alpha=0.7,marker='o',)
-        
-    #Plot Potoff Data if it exists
-    if df_lit is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["sim_Tc"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["sim_liq_density"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_lit["sim_vap_density"].values)
-        ax2.scatter(df_lit["sim_liq_density"],df_lit["temperature"],
-            c='#0989d9',s=160,alpha=0.7,marker='^',label="Potoff et al.",)
-        ax2.scatter(df_lit["sim_vap_density"], df_lit["temperature"],
-            c='#0989d9',s=160,alpha=0.7,marker='^',)
-        ax2.scatter(df_lit["sim_rhoc"],df_lit["sim_Tc"],
-            c='#0989d9',s=160,alpha=0.7,marker='^',)
-
-    #Plot TraPPE data if it exists
-    if df_trappe is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_trappe["sim_Tc"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["sim_liq_density"].values)
-        min_rho, max_rho = get_min_max(min_rho, max_rho, df_trappe["sim_vap_density"].values)
-        ax2.scatter(df_trappe["sim_liq_density"],df_trappe["temperature"],
-            c='red',s=160,alpha=0.7,marker='*',label="TraPPE",)
-        ax2.scatter(df_trappe["sim_vap_density"],df_trappe["temperature"],
-            c='red',s=160,alpha=0.7,marker='*',)
-        ax2.scatter(df_trappe["sim_rhoc"],df_trappe["sim_Tc"],
-            c='red',s=160, alpha=0.7,marker='*',)
+    for i in range(len(df_ff_list)):
+        df_ff = df_ff_list[i]
+        if df_ff is not None:
+            #Set new max and mins
+            min_rho, max_rho = get_min_max(min_rho, max_rho, df_ff["sim_liq_density"].values)
+            min_rho, max_rho = get_min_max(min_rho, max_rho, df_ff["sim_vap_density"].values)
+            min_temp, max_temp = get_min_max(min_temp, max_temp, df_ff["sim_Tc"].values)
+            # #Plot opt_scheme_ms vle curve
+            ax2.scatter(df_ff["sim_liq_density"], df_ff["temperature"], c=df_colors[i],s=70, 
+                        marker = df_markers[i], alpha=0.7, zorder = df_z_order[i],)
+            ax2.scatter(df_ff["sim_vap_density"], df_ff["temperature"],c=df_colors[i],s=70, 
+                        marker = df_markers[i], alpha=0.7, zorder = df_z_order[i],)
+            #Plot critical points
+            ax2.scatter(df_ff["sim_rhoc"],df_ff["sim_Tc"], c=df_colors[i],s=70, 
+                        marker = df_markers[i], alpha=0.7, zorder = df_z_order[i],
+                        label = df_labels[i] )
 
     #Plot experimental data
     if molec not in ["R152", "R134"]:
         ax2.scatter(mol_data.expt_liq_density.values(),mol_data.expt_liq_density.keys(),
-            color="black",marker="x",linewidths=2,s=200,label="Experiment",)
+            color="black",marker="x",linewidths=2,s=80,label="Experiment", zorder = 7)
         ax2.scatter(mol_data.expt_vap_density.values(),mol_data.expt_vap_density.keys(),
-            color="black",marker="x",linewidths=2,s=200,)
-        ax2.scatter(mol_data.expt_rhoc, mol_data.expt_Tc, color="black", marker="x", linewidths=2, s=200)
+            color="black",marker="x",linewidths=2,s=80, zorder = 7)
+        ax2.scatter(mol_data.expt_rhoc, mol_data.expt_Tc, color="black", marker="x", linewidths=2, 
+                    s=200, zorder = 7)
 
     #Set Axes
     ax2.set_xlim(min_rho*0.95,max_rho*1.05)
@@ -493,16 +454,15 @@ def plot_vle_envelopes(molec_dict, df_opt= None, df_lit = None, df_nw = None, df
     #     path = os.path.join(save_name, "vle_plt.png")
     #     fig.savefig(path,dpi=300)
 
-def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_trappe = None, df_gaff = None, save_name = None):
+def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
     molec = list(molec_dict.keys())[0]
     mol_data = molec_dict[molec]
     # Plot Pvap and Hvap
     
-    dfs_given = [df_gaff, df_opt, df_lit, df_nw, df_trappe]
-    df_labels = ["GAFF", "This Work", "Potoff et al.", "Wang et al.", "TraPPE"]
-    df_colors = ['gray', 'blue', '#0989d9', 'green', 'red']
-    df_markers = ['s', 'o', '^', 'o', '*']
-    df_z_order = [4,5,2,3,1]
+    df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
+    df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
+    df_markers = ['o', 's', '^', '*', 'p', 'd']
+    df_z_order = [6,3,2,1,5,4]
 
     #Initialize min and max values
     if molec not in ["R152", "R134"]:
@@ -511,7 +471,7 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
         min_pvap = min(np.log(np.array(list(mol_data.expt_Pvap.values()))))
         max_pvap = max(np.log(np.array(list(mol_data.expt_Pvap.values()))))
     else:
-        for df in dfs_given:
+        for df in df_ff_list:
             if df is not None:
                 min_temp = min(df["temperature"].values)
                 max_temp = max(df["temperature"].values)
@@ -523,7 +483,7 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
         min_hvap = min(mol_data.expt_Hvap.values())
         max_hvap = max(mol_data.expt_Hvap.values())
     else:
-        for df in dfs_given:
+        for df in df_ff_list:
             if df is not None:
                 min_hvap = min(df["sim_Hvap"].values)
                 max_hvap = max(df["sim_Hvap"].values)
@@ -534,8 +494,8 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
     #fig, ax1 = plt.subplots(1, 1, figsize=(6,6))
 
     #Loop over dfs of given ff results
-    for i in range(len(dfs_given)):
-        df_ff = dfs_given[i]
+    for i in range(len(df_ff_list)):
+        df_ff = df_ff_list[i]
         if df_ff is not None:
             #Set new max and mins
             min_temp, max_temp = get_min_max(min_temp, max_temp, df_ff["temperature"].values)
@@ -554,11 +514,11 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
     if molec not in ["R152", "R134"]:
         axs[0].scatter(1/np.array(list(mol_data.expt_Pvap.keys())),
                        np.log(np.array(list(mol_data.expt_Pvap.values()))),
-            color="black",marker="x",label="Experiment",s=80,zorder = 6)
+            color="black",marker="x",label="Experiment",s=80,zorder = 7)
     #Plot experimental Hvap
     if molec not in ["R152", "R134", "R143"]:
         axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
-            color="black",marker="x",label="Experiment",s=80, zorder = 6)
+            color="black",marker="x",label="Experiment",s=80, zorder = 7)
 
     #Set axes details
     axs[0].set_xlim((1/max_temp)*0.95,(1/min_temp)*1.05)
