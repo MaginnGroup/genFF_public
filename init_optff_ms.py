@@ -110,7 +110,7 @@ for molec_name, molec_data in molec_dict.items():
             state_point = unpack_molec_values(molec_name, at_class, sample, state_point)    
             if molec_name in ["R41", "R23"]:
                 state_point["nsteps_nvt"] = 2500000
-                state_point["nsteps_liqeq"]= 7000
+                state_point["nsteps_liqeq"]= 10000
             elif molec_name in "R161" and temp == 240.0:
                 state_point["nsteps_nvt"] = 2500000
                 state_point["nsteps_liqeq"]= 5000
