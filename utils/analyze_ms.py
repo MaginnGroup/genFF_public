@@ -498,20 +498,25 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
     mol_data = molec_dict[molec]
     # Plot Pvap and Hvap
     
-    dfs_given = [df_gaff, df_opt, df_lit, df_nw, df_trappe, ]
+    dfs_given = [df_gaff, df_opt, df_lit, df_nw, df_trappe]
+    df_labels = ["GAFF", "This Work", "Potoff et al.", "Wang et al.", "TraPPE"]
+    df_colors = ['gray', 'blue', '#0989d9', 'green', 'red']
+    df_markers = ['s', 'o', '^', 'o', '*']
+    df_z_order = [4,5,2,3,1]
+
     #Initialize min and max values
     if molec not in ["R152", "R134"]:
-        min_temp = min(mol_data.expt_Pvap.keys())
+        min_temp = max(np.array(list(mol_data.expt_Pvap.keys())))
         max_temp = mol_data.expt_Tc
-        min_pvap = min(mol_data.expt_Pvap.values())
-        max_pvap = max(mol_data.expt_Pvap.values())
+        min_pvap = min(np.log(np.array(list(mol_data.expt_Pvap.values()))))
+        max_pvap = max(np.log(np.array(list(mol_data.expt_Pvap.values()))))
     else:
         for df in dfs_given:
             if df is not None:
                 min_temp = min(df["temperature"].values)
                 max_temp = max(df["temperature"].values)
-                min_pvap = min(df["sim_Pvap"].values)
-                max_pvap = max(df["sim_Pvap"].values)
+                min_pvap = min(np.log(df["sim_Pvap"].values))
+                max_pvap = max(np.log(df["sim_Pvap"].values))
                 break
 
     if molec not in ["R152", "R134", "R143"]:
@@ -528,94 +533,57 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
     fig, axs = plt.subplots(nrows=1, ncols=2,figsize=(12,6))
     #fig, ax1 = plt.subplots(1, 1, figsize=(6,6))
 
-    #Plot opt pvap
-    if df_opt is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_opt["temperature"].values)
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_opt["sim_Pvap"].values)
-        axs[0].scatter(df_opt["temperature"], df_opt["sim_Pvap"], c='blue',s=70,alpha=0.7, label = "This Work")
-    
-    #Plot GAFF pvap if it exists
-    if df_gaff is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"].values)
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_gaff["sim_Pvap"].values)
-        axs[0].scatter(df_gaff["temperature"],df_gaff["sim_Pvap"],
-            c='gray',s=70,alpha=0.7,marker='s',label="GAFF",)
-
-    #Plot potoff pvap if it exists
-    if df_lit is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"].values)
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_lit["sim_Pvap"].values)
-        axs[0].scatter(df_lit["temperature"],df_lit["sim_Pvap"],
-            c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
-
-    #Plot Nw pvap if it exists
-    if df_nw is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"].values)
-        min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, df_nw["sim_Pvap"].values)
-        axs[0].scatter(df_nw["temperature"],df_nw["sim_Pvap"],
-            c='green',s=70,alpha=0.7,marker='o',label="Wang et al.",)
+    #Loop over dfs of given ff results
+    for i in range(len(dfs_given)):
+        df_ff = dfs_given[i]
+        if df_ff is not None:
+            #Set new max and mins
+            min_temp, max_temp = get_min_max(min_temp, max_temp, df_ff["temperature"].values)
+            min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, np.log(df_ff["sim_Pvap"]).values)
+            min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_ff["sim_Hvap"].values)
+            #Plot 1/T vs log(Pvap) 
+            axs[0].scatter(1/df_ff["temperature"], np.log(df_ff["sim_Pvap"]), c=df_colors[i], 
+                           s=70,alpha=0.7, label = df_labels[i], marker = df_markers[i],
+                           zorder = df_z_order[i])
+            #Plot T vs Hvap
+            axs[1].scatter(df_ff["temperature"],df_ff["sim_Hvap"], c=df_colors[i], 
+                           s=70,alpha=0.7, marker = df_markers[i],
+                           zorder = df_z_order[i])
         
     #Plot experimental pvap
     if molec not in ["R152", "R134"]:
-        axs[0].scatter(mol_data.expt_Pvap.keys(),mol_data.expt_Pvap.values(),
-            color="black",marker="x",label="Experiment",s=80,)
+        axs[0].scatter(1/np.array(list(mol_data.expt_Pvap.keys())),
+                       np.log(np.array(list(mol_data.expt_Pvap.values()))),
+            color="black",marker="x",label="Experiment",s=80,zorder = 6)
+    #Plot experimental Hvap
+    if molec not in ["R152", "R134", "R143"]:
+        axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
+            color="black",marker="x",label="Experiment",s=80, zorder = 6)
 
+    #Set axes details
+    axs[0].set_xlim((1/max_temp)*0.95,(1/min_temp)*1.05)
+    # axs[0].xaxis.set_major_locator(MultipleLocator(40))
+    # axs[0].xaxis.set_minor_locator(AutoMinorLocator(4))
 
-    axs[0].set_xlim(min_temp*0.95,max_temp*1.05)
-    axs[0].xaxis.set_major_locator(MultipleLocator(40))
-    axs[0].xaxis.set_minor_locator(AutoMinorLocator(4))
-
-    axs[0].set_ylim(min_pvap*0.95,max_pvap*1.05)
-    axs[0].yaxis.set_major_locator(MultipleLocator(10))
-    axs[0].yaxis.set_minor_locator(AutoMinorLocator(5))
+    axs[0].set_ylim(min_pvap*0.8,max_pvap*1.05)
+    # axs[0].yaxis.set_major_locator(MultipleLocator(10))
+    # axs[0].yaxis.set_minor_locator(AutoMinorLocator(5))
 
     axs[0].tick_params("both", direction="in", which="both", length=2, labelsize=16, pad=10)
     axs[0].tick_params("both", which="major", length=4)
     axs[0].xaxis.set_ticks_position("both")
     axs[0].yaxis.set_ticks_position("both")
 
-    axs[0].set_xlabel("T (K)", fontsize=16, labelpad=8)
-    axs[0].set_ylabel(r"$\mathregular{P_{vap}}$ (bar)", fontsize=16, labelpad=8)
-
-    # Plot Enthalpy of Vaporization
-    if df_opt is not None:
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_opt["sim_Hvap"].values)
-        axs[1].scatter(df_opt["temperature"],df_opt["sim_Hvap"], c='blue',s=70,alpha=0.7,)
-        
-    #Plot GAFF Hvap if it exists
-    if df_gaff is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_gaff["temperature"].values)
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_gaff["sim_Hvap"].values)
-        axs[1].scatter(df_gaff["temperature"],df_gaff["sim_Hvap"],
-            c='gray',s=70,alpha=0.7,marker='s',label="GAFF",)
-        # print(df_gaff["temperature"],df_gaff["sim_Hvap"])
-
-    #Plot potoff Hvap if it exists
-    if df_lit is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_lit["temperature"].values)
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_lit["sim_Hvap"].values)
-        axs[1].scatter(df_lit["temperature"],df_lit["sim_Hvap"],
-            c='#0989d9',s=70,alpha=0.7,marker='^',label="Potoff et al.",)
-
-    #Plot Wang Hvap if it exists
-    if df_nw is not None:
-        min_temp, max_temp = get_min_max(min_temp, max_temp, df_nw["temperature"].values)
-        min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_nw["sim_Hvap"].values)
-        axs[1].scatter(df_nw["temperature"],df_nw["sim_Hvap"],
-            c='green',s=70,alpha=0.7,marker='o',label="Wang et al.",)
-        
-    #Plot experimental Hvap
-    if molec not in ["R152", "R134", "R143"]:
-        axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
-            color="black",marker="x",label="Experiment",s=80,)
+    axs[0].set_xlabel("1/T " + r"$\mathregular{K^{-1}}$", fontsize=16, labelpad=8)
+    axs[0].set_ylabel(r"$\mathregular{log(P_{vap})}$ (bar)", fontsize=16, labelpad=8)
 
     axs[1].set_xlim(min_temp*0.95,max_temp*1.05)
-    axs[1].xaxis.set_major_locator(MultipleLocator(40))
-    axs[1].xaxis.set_minor_locator(AutoMinorLocator(4))
+    # axs[1].xaxis.set_major_locator(MultipleLocator(40))
+    # axs[1].xaxis.set_minor_locator(AutoMinorLocator(4))
 
     axs[1].set_ylim(min_hvap*0.95, max_hvap*1.05)
-    axs[1].yaxis.set_major_locator(MultipleLocator(100))
-    axs[1].yaxis.set_minor_locator(AutoMinorLocator(5))
+    # axs[1].yaxis.set_major_locator(MultipleLocator(100))
+    # axs[1].yaxis.set_minor_locator(AutoMinorLocator(5))
 
     axs[1].tick_params("both", direction="in", which="both", length=2, labelsize=16, pad=10)
     axs[1].tick_params("both", which="major", length=4)
@@ -625,7 +593,7 @@ def plot_pvap_hvap(molec_dict, df_opt = None, df_lit = None, df_nw = None, df_tr
     axs[1].set_xlabel("T (K)", fontsize=16, labelpad=8)
     axs[1].set_ylabel(r"$\mathregular{\Delta H_{vap}}$ (kJ/kg)", fontsize=16, labelpad=8)
 
-    axs[0].text(0.08, 0.8, molec, fontsize=20, transform=axs[0].transAxes)
+    axs[0].text(0.08, 0.3, molec, fontsize=20, transform=axs[0].transAxes)
     axs[0].legend(loc="lower left", bbox_to_anchor=(0.35, 1.05), ncol=3, fontsize=16, handletextpad=0.1, markerscale=0.8, edgecolor="dimgrey")
 
     fig.subplots_adjust(bottom=0.15, top=0.85, left=0.15, right=0.85, wspace=0.55, hspace=0.5)
