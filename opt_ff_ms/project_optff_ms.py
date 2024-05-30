@@ -62,6 +62,10 @@ def calc_box_helper(job):
     # Strip unyts and round to 0.1 angstrom
     vapboxl = round(float(vapboxl.in_units(u.nm).to_value()), 2)
 
+    #If molecule is R41, reduce the vapor box length by 20% to keep it inside the phase envelope
+    if job.sp.mol_name == "R41":
+        vapboxl = vapboxl*0.80
+
     # Save to job document file
     job.doc.vapboxl = vapboxl  # nm, compatible with mbuild
 
