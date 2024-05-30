@@ -111,6 +111,9 @@ for molec_name, molec_data in molec_dict.items():
             if molec_name in ["R41", "R23"]:
                 state_point["nsteps_nvt"] = 2500000
                 state_point["nsteps_liqeq"]= 7000
+            elif molec_name in "R161" and temp == 240.0:
+                state_point["nsteps_nvt"] = 2500000
+                state_point["nsteps_liqeq"]= 5000
             else:
                 state_point["nsteps_liqeq"]= 5000
             job = project.open_job(state_point)
