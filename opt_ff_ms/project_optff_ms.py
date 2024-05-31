@@ -584,7 +584,10 @@ def run_gemc(job):
     compound_ff = ff.apply(compound)
 
     # Create box list and species list
-    boxl_liq = job.doc.liqbox_final_dim  # saved in nm
+    if "liqbox_final_dim" in job.doc:
+        boxl_liq = job.doc.liqbox_final_dim  # saved in nm
+    else:
+        boxl_liq = job.doc.npt_liqbox_final_dim  # saved in nm
     # liq_box = mbuild.load(job.fn("liqbox.xyz"))
     with job:
         liq_box = mbuild.formats.xyz.read_xyz(job.fn("npt.final.xyz"))
