@@ -224,8 +224,12 @@ def calc_critical(df):
         Tc_mol = np.abs(intercept2 / slope2)
         rhoc_mol = intercept1 + slope1 * Tc_mol
 
-        Tc += list([Tc_mol])*len(temps)
-        rhoc += list([rhoc_mol])*len(temps)
+        if len(temps) == 5:
+            Tc += list([Tc_mol])*len(temps)
+            rhoc += list([rhoc_mol])*len(temps)
+        else:
+            Tc += [np.nan]*len(temps)
+            rhoc += [np.nan]*len(temps)
         
     return Tc, rhoc
 
