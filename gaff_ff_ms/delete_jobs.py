@@ -5,6 +5,6 @@ project = signac.get_project()
 
 # Iterate through all jobs in the project
 for job in project:
-    if job.sp.mol_name == "R41" and job.sp.T == 270:
+    if job.sp.mol_name == "R170" and job.sp.T in [270,290]:
         print(job.id)
         job.remove()

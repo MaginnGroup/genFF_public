@@ -224,12 +224,12 @@ def calc_critical(df):
         Tc_mol = np.abs(intercept2 / slope2)
         rhoc_mol = intercept1 + slope1 * Tc_mol
 
-        if len(temps) == 5:
-            Tc += list([Tc_mol])*len(temps)
-            rhoc += list([rhoc_mol])*len(temps)
-        else:
-            Tc += [np.nan]*len(temps)
-            rhoc += [np.nan]*len(temps)
+        # if len(temps) == 5:
+        Tc += list([Tc_mol])*len(temps)
+        rhoc += list([rhoc_mol])*len(temps)
+        # else:
+        #     Tc += [np.nan]*len(temps)
+        #     rhoc += [np.nan]*len(temps)
         
     return Tc, rhoc
 
@@ -448,6 +448,9 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
     for axis in ['top','bottom','left','right']:
         ax2.spines[axis].set_linewidth(2.0)
 
+    if molec not in ["R14", "R50", "R170", "R116"]:
+        #Substitute mole string R w/ HFC
+        molec = molec.replace("R","HFC")
     ax2.legend(loc="lower left", bbox_to_anchor=(-0.16, 1.03), ncol=2, fontsize=22, handletextpad=0.1, markerscale=0.9, edgecolor="dimgrey")
     ax2.text(0.60,  0.82, molec, fontsize=30, transform=ax2.transAxes)
     fig.subplots_adjust(bottom=0.2, top=0.75, left=0.15, right=0.95, wspace=0.55)
@@ -557,6 +560,9 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
     axs[1].set_xlabel("T (K)", fontsize=16, labelpad=8)
     axs[1].set_ylabel(r"$\mathregular{\Delta H_{vap}}$ (kJ/kg)", fontsize=16, labelpad=8)
 
+    if molec not in ["R14", "R50", "R170", "R116"]:
+        #Substitute mole string R w/ HFC
+        molec = molec.replace("R","HFC")
     axs[0].text(0.08, 0.3, molec, fontsize=20, transform=axs[0].transAxes)
     axs[0].legend(loc="lower left", bbox_to_anchor=(0.35, 1.05), ncol=3, fontsize=16, handletextpad=0.1, markerscale=0.8, edgecolor="dimgrey")
 
