@@ -59,7 +59,12 @@ def unpack_molec_values(molec_name, at_class, sample, state_point):
     #Add params based on the order they show up in given the mapping
     for param in param_names:
         state_point[param] = sample[index_mapping[param]].item()
-
+    
+    #For R41 and R23 add the GAFF Parameter for epsilon C1 instead of the OptFF one
+    if molec_name in ["R41", "R23"]:
+        state_point["epsilon_C1"] = float(55.052 * (u.K * u.kb).in_units("kJ/mol"))
+        state_point["GAFF_epsilon_C1"] = True
+        # print(state_point)
     return state_point
 
 #Loop over all molecules
