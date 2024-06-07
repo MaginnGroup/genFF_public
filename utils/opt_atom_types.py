@@ -496,6 +496,37 @@ class Problem_Setup:
             
         return jac
     
+    def approx_jac_many(self, x, save_data = False, x_label=None):
+        """
+        Builds Jacobian Approximation
+
+        Parameters
+        ----------
+        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        jac: np.ndarray, the jacobian approximation
+        """
+        assert isinstance(x, np.ndarray), "x must be an np.ndarray"
+        assert isinstance(save_data, bool), "save_data must be a bool"
+        assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
+        num_points = x.shape[0]
+        m = x.shape[1]
+        jacobians = np.zeros((num_points, m))
+        for i in range(num_points):
+            jac = nd.Jacobian(self.one_output_calc_obj)(x)
+            jacobians[i,:] = jac.flatten()
+
+        if save_data:
+            x_label = x_label if x_label is not None else "param_guess"
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            os.makedirs(dir_name, exist_ok=True) 
+            save_path = os.path.join(dir_name, x_label + "_jac_many_approx.npy")
+            np.save(save_path, jacobians)
+            
+        return jacobians
+    
     def approx_hess(self, x, save_data = False, x_label=None):
         '''
         Calculate gradient of function my_f using central difference formula and my_grad
