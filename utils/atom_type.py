@@ -60,6 +60,7 @@ class Atom_Types:
         self.at_names = at_names
         self.molec_map_dicts = molec_map_dicts
         self.at_matrices = {}
+        self.at_bounds_nm_kjmol = self.scale_bounds()
 
     def scale_bounds(self):
         """
@@ -79,7 +80,8 @@ class Atom_Types:
             new_bound = np.array(sigmas + epsilons)
             at_bounds_nm_kjmol[:,i] = new_bound
 
-        self.at_bounds_nm_kjmol = at_bounds_nm_kjmol
+        # self.at_bounds_nm_kjmol = at_bounds_nm_kjmol
+        return at_bounds_nm_kjmol
 
 
     def get_transformation_matrix(self, molec_map_dict):

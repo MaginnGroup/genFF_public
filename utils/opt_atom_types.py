@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as optimize
+from sklearn.preprocessing import MinMaxScaler
 import scipy
 import os
 import time
@@ -527,6 +528,19 @@ class Problem_Setup:
             
         return jacobians
     
+    def hess_scl_calc_obj(self, theta_guess):
+        """
+        Wrapper function converting scaled x values from 0 to 1 to nm and kj/mol values before inputting to calc_obj
+        """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        #Unscale data from 0 to 1 to get correct objective values
+        at_bounds_pref = self.at_class.at_bounds_nm_kjmol
+        theta_guess = values_scaled_to_real(theta_guess.reshape(1,-1), at_bounds_pref)
+        obj, sse_pieces = self.calc_obj(theta_guess.flatten())
+
+        return obj
+
+
     def approx_hess(self, x, save_data = False, x_label=None):
         '''
         Calculate gradient of function my_f using central difference formula and my_grad
@@ -542,14 +556,17 @@ class Problem_Setup:
         assert isinstance(x, np.ndarray), "x must be an np.ndarray"
         assert isinstance(save_data, bool), "save_data must be a bool"
         assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
-
-        H = nd.Hessian(self.one_output_calc_obj)(x)
+        
+        # H = nd.Hessian(self.one_output_calc_obj)(x) #Use this if you don't want params scaled between 0 and 1 for calculation of Hessian
+        #Scale x values between 0 and 1 to get Hessian scaled w.r.t parameter differences
+        x = values_real_to_scaled(x.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
+        H = nd.Hessian(self.hess_scl_calc_obj)(x)
 
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
             os.makedirs(dir_name, exist_ok=True) 
-            save_path = os.path.join(dir_name, x_label + "_hess_approx.npy")
+            save_path = os.path.join(dir_name, x_label + "_hess_approx_scl.npy")
             np.save(save_path, H)
         
         return H
