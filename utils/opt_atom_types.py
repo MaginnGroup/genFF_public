@@ -7,8 +7,10 @@ import time
 import pandas as pd
 import pickle
 import gpflow
-from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
+from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real, generate_lhs
 from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params, plot_model_vs_exp, plot_obj_contour
+from fffit.fffit.pareto import find_pareto_set, is_pareto_efficient
+
 import unyt as u
 import matplotlib
 import matplotlib.pyplot as plt
@@ -451,7 +453,7 @@ class Problem_Setup:
             obj = expected_sse_val
         
         # print(obj)
-        return float(obj), sse_pieces
+        return float(obj), sse_pieces, var_ratios
     
     #define one output calc obj
     def one_output_calc_obj(self, theta_guess):
@@ -467,7 +469,7 @@ class Problem_Setup:
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        obj, sse_pieces = self.calc_obj(theta_guess)
+        obj, sse_pieces, var_ratios = self.calc_obj(theta_guess)
 
         return obj
     
@@ -536,7 +538,7 @@ class Problem_Setup:
         #Unscale data from 0 to 1 to get correct objective values
         at_bounds_pref = self.at_class.at_bounds_nm_kjmol
         theta_guess = values_scaled_to_real(theta_guess.reshape(1,-1), at_bounds_pref)
-        obj, sse_pieces = self.calc_obj(theta_guess.flatten())
+        obj, sse_pieces, var_ratios = self.calc_obj(theta_guess.flatten())
 
         return obj
 
@@ -791,7 +793,7 @@ class Opt_ATs(Problem_Setup):
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        obj, sse_pieces =self.calc_obj(theta_guess)
+        obj, sse_pieces, var_ratios =self.calc_obj(theta_guess)
         
         #Scale theta_guess to preferred units
         theta_guess_pref = self.values_real_to_pref(theta_guess)
@@ -811,6 +813,70 @@ class Opt_ATs(Problem_Setup):
             # print(self.iter_count, obj)
 
         return obj
+    
+    def gen_pareto_sets(self, samples, bounds, save_data= False):
+        """
+        generate LHS samples, calculate objective values, and sort them based on non-dominated sorting
+        """
+        #Generate LHS samples
+        samples = generate_lhs(samples, bounds, self.seed, labels = None)
+        #Define cost matrix (n_samplesx4)
+        molec_dict1 = next(iter(self.all_gp_dict.values()))
+        num_props = len(next(iter(molec_dict1.values())))
+        costs = pd.DataFrame()
+
+        #Loop over samples
+        for s in samples:
+            #Calculate objective values
+            obj, obj_pieces, var_ratios = self.calc_obj(s)
+            #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
+            prop_var_ratios = var_ratios.reshape(-1, num_props).sum(axis=-1)
+            df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
+            #Set columns for costs
+            if s ==0:
+                costs.columns = prop_names
+            df_sums_reordered = df_sums[costs.columns]
+            # Concatenate the DataFrames along the rows axis
+            costs = pd.concat([costs, df_sums_reordered], ignore_index=True)
+        #Sort based on non-dominated sorting (call fffit.find_pareto_set(data, is_pareto_efficient)
+        idcs, pareto_cost, dom_cost = find_pareto_set(costs.to_numpy(), is_pareto_efficient)
+        #Put samples and cost values in order
+        df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
+        df_samples["is_pareto"]= idcs
+        costs["is_pareto"]= idcs
+        pareto_points = df_samples[df_samples["is_pareto"] == True]
+        pareto_costs = costs[costs["is_pareto"] == True]
+        pareto_info = pd.merge(pareto_points, pareto_costs, on='is_pareto', how='outer')
+        
+        #Save pareto info
+        if save_data == True:
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
+            pareto_info.to_csv(save_csv_path1, index = False, header = True)
+        
+        return pareto_info
+
+    def __sum_sse_keys(self, obj_pieces):
+
+        # Dictionary to store the sum of values for each key
+        sums_by_prop = {}
+
+        # Iterate over the dictionary
+        for full_key, value in obj_pieces.items():
+            # Split the key to get the part after "molecX-" and before "-sse"
+            key_part = full_key.split('-')[1]  # This will give 'keyX'
+            
+            # Accumulate the sum for this key
+            if key_part in sums_by_prop:
+                sums_by_prop[key_part] += value
+            else:
+                sums_by_prop[key_part] = value
+
+        df_sums = pd.DataFrame(list(sums_by_prop.items()), columns=['Key', 'Sum'])
+        df_needed = df_sums.set_index('Key').T
+
+        return df_needed, list(sums_by_prop.keys())
+
 
     def get_param_inits(self):
         """
@@ -824,10 +890,31 @@ class Opt_ATs(Problem_Setup):
         if self.seed is not None:
             np.random.seed(self.seed)
 
-        #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
-        lb = self.at_class.at_bounds_nm_kjmol[:,0].T
-        ub = self.at_class.at_bounds_nm_kjmol[:,1].T
-        param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
+        #Try to load from csv params
+        #Save pareto info
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
+        if os.path.exists("pareto_params.csv"):
+            all_pareto_info = pd.read_csv("pareto_params.csv", header = 0, index_col= False)
+            all_points = all_pareto_info.drop(columns = self.at_class.at_names)
+            pareto_points = all_points[all_points["is_pareto"] == True]
+
+            if len(pareto_points) < self.repeats:
+                num_false = self.repeats - len(pareto_points)
+                pareto_data_false = all_points[all_points["is_pareto"] == False].sample(n=num_false, random_state=self.seed)
+                restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
+            else:
+                restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
+            pareto_points.drop(columns = ["is_pareto"], inplace=True)
+            param_inits = pareto_points.to_numpy()
+        else:
+            param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
+                                      self.seed, labels = None)
+            param_inits = param_sets.to_numpy()
+            #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
+            # lb = self.at_class.at_bounds_nm_kjmol[:,0].T
+            # ub = self.at_class.at_bounds_nm_kjmol[:,1].T
+            # param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
         
         return param_inits
     
