@@ -822,31 +822,29 @@ class Opt_ATs(Problem_Setup):
         samples = generate_lhs(samples, bounds, self.seed, labels = None)
         #Define cost matrix (n_samplesx4)
         molec_dict1 = next(iter(self.all_gp_dict.values()))
-        num_props = len(next(iter(molec_dict1.values())))
-        costs = pd.DataFrame()
+        num_props = len(list(molec_dict1.keys()))
 
         #Loop over samples
-        for s in samples:
+        for s in range(len(samples)):
             #Calculate objective values
-            obj, obj_pieces, var_ratios = self.calc_obj(s)
+            obj, obj_pieces, var_ratios = self.calc_obj(samples[s])
             #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
             prop_var_ratios = var_ratios.reshape(-1, num_props).sum(axis=-1)
             df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
             #Set columns for costs
-            if s ==0:
-                costs.columns = prop_names
+            #FIx this to not add costs to itself every time
+            if s == 0:
+                costs = pd.DataFrame(columns=prop_names)
             df_sums_reordered = df_sums[costs.columns]
             # Concatenate the DataFrames along the rows axis
             costs = pd.concat([costs, df_sums_reordered], ignore_index=True)
+            
         #Sort based on non-dominated sorting (call fffit.find_pareto_set(data, is_pareto_efficient)
         idcs, pareto_cost, dom_cost = find_pareto_set(costs.to_numpy(), is_pareto_efficient)
         #Put samples and cost values in order
         df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
-        df_samples["is_pareto"]= idcs
         costs["is_pareto"]= idcs
-        pareto_points = df_samples[df_samples["is_pareto"] == True]
-        pareto_costs = costs[costs["is_pareto"] == True]
-        pareto_info = pd.merge(pareto_points, pareto_costs, on='is_pareto', how='outer')
+        pareto_info = pd.concat([df_samples, costs], axis = 1)
         
         #Save pareto info
         if save_data == True:
@@ -896,7 +894,7 @@ class Opt_ATs(Problem_Setup):
         save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
         if os.path.exists("pareto_params.csv"):
             all_pareto_info = pd.read_csv("pareto_params.csv", header = 0, index_col= False)
-            all_points = all_pareto_info.drop(columns = self.at_class.at_names)
+            all_points = all_pareto_info[self.at_class.at_names].copy()
             pareto_points = all_points[all_points["is_pareto"] == True]
 
             if len(pareto_points) < self.repeats:
@@ -905,8 +903,8 @@ class Opt_ATs(Problem_Setup):
                 restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
             else:
                 restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
-            pareto_points.drop(columns = ["is_pareto"], inplace=True)
-            param_inits = pareto_points.to_numpy()
+            restart_data.drop(columns = ["is_pareto"], inplace=True)
+            param_inits = restart_data.to_numpy()
         else:
             param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
                                       self.seed, labels = None)

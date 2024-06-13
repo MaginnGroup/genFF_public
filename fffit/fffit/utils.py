@@ -160,7 +160,7 @@ def shuffle_and_split(df, param_names, property_name, fraction_train=0.8, shuffl
 
 def generate_lhs(samples, bounds, seed, labels = None):
     assert bounds.shape[1] == 2, "Bounds must be a 2D array"
-
+    assert isinstance(samples, int), "Number of samples must be an integer"
     #Define number of dimensions
     dimensions = bounds.shape[0]
     #Define sampler
@@ -170,7 +170,7 @@ def generate_lhs(samples, bounds, seed, labels = None):
     #Generate LHS data given bounds
     lhs_data = qmc.scale(lhs_data, bounds[:,0], bounds[:,1])
 
-    sample = pd.DataFrame(sample)
+    sample = pd.DataFrame(lhs_data)
 
     if labels is not None:
         assert len(labels) == bounds.shape[0], "Number of labels must match number of bounds"
