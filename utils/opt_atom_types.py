@@ -337,6 +337,71 @@ class Problem_Setup:
 
         return np.squeeze(gp_mean),  np.squeeze(gp_covar), gp_var
     
+    def calc_fxn(self, theta_guess):
+        """
+        Calculates the sse objective function
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        obj: float, the objective function value
+        sse_pieces: dict, dictionary of sse values for each property
+        mean_wt_pieces: dict, dictionary of mean weights for each property
+        """
+        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        #Initialize weight and squared error arrays
+        mean_array  = []
+        var_array = []
+        var_theta = []
+
+        #Unscale data from 0 to 1 to get correct objective values
+        at_bounds_pref = self.at_class.at_bounds_nm_kjmol
+        theta_guess = values_scaled_to_real(theta_guess.reshape(1,-1), at_bounds_pref)
+
+        #Loop over molecules
+        for molec in list(self.molec_data_dict.keys()):
+            #Get constants for molecule
+            molec_object = self.molec_data_dict[molec]
+            #Get theta associated with each gp
+            param_matrix = self.at_class.get_transformation_matrix({molec: molec_object})
+            #Transform the guess, and scale to bounds
+            gp_theta = theta_guess.reshape(-1,1).T@param_matrix
+            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
+            #Get GPs associated with each molecule
+            molec_gps_dict = self.all_gp_dict[molec]
+            
+            #Loop over gps (1 per property)
+            for key in list(molec_gps_dict.keys()):
+                #Get GP associated with property
+                gp_model = molec_gps_dict[key]
+                #Get X and Y data and bounds associated with the GP
+                exp_data, y_bounds, y_names = self.get_exp_data(molec_object, key)
+                #Get x and y data
+                x_exp = np.array(list(exp_data.keys())).reshape(-1,1)
+                y_exp = np.array(list(exp_data.values()))
+                # #Evaluate GP
+                gp_mean_scl, gp_covar_scl, gp_var_scl = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
+                #Scale gp output to real value
+                gp_mean = values_scaled_to_real(gp_mean_scl, y_bounds)
+                #Get y data uncertainties
+                unc = molec_object.uncertainties[key.replace("sim", "expt")]
+                y_var_unc = (y_exp*unc)**2
+                y_var_2pct = (y_exp*0.02)**2
+                y_var = np.maximum(y_var_unc, y_var_2pct)
+                y_std =np.sqrt(y_var)
+                gp_mean_y_scl = gp_mean.flatten()/y_std.flatten()
+                #Scale gp_variances to real values
+                y_bounds_2D = np.asarray(y_bounds).reshape(-1,2)
+                gp_covar = gp_covar_scl * (y_bounds_2D[:, 1] - y_bounds_2D[:, 0]) ** 2
+                gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
+                mean_array += list(gp_mean_y_scl)
+                var_array += list(gp_var.flatten())
+
+        return np.array(mean_array)
+        
     def calc_wt_res(self, theta_guess):
         """
         Calculates the sse objective function
