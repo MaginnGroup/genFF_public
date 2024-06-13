@@ -139,6 +139,7 @@ class Problem_Setup:
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
         self.obj_choice = obj_choice
+        self.seed = 1
 
     def make_results_dir(self, molecules):
         """
@@ -187,6 +188,7 @@ class Problem_Setup:
         theta_guess = np.array(sigmas + epsilons)
         
         return theta_guess
+    
     
     def values_real_to_pref(self, theta_guess):
         """
@@ -742,6 +744,67 @@ class Problem_Setup:
             df.to_csv(save_csv_path, index = False, header = True)
             
         return df
+    
+    def gen_pareto_sets(self, samples, bounds, save_data= False):
+        """
+        generate LHS samples, calculate objective values, and sort them based on non-dominated sorting
+        """
+        #Generate LHS samples
+        samples = generate_lhs(samples, bounds, self.seed, labels = None)
+        #Define cost matrix (n_samplesx4)
+        molec_dict1 = next(iter(self.all_gp_dict.values()))
+        num_props = len(list(molec_dict1.keys()))
+
+        #Loop over samples
+        for s in range(len(samples)):
+            #Calculate objective values
+            obj, obj_pieces, var_ratios = self.calc_obj(samples[s])
+            #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
+            prop_var_ratios = var_ratios.reshape(-1, num_props).sum(axis=-1)
+            df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
+            #Set columns for costs
+            #FIx this to not add costs to itself every time
+            if s == 0:
+                costs = pd.DataFrame(columns=prop_names)
+            df_sums_reordered = df_sums[costs.columns]
+            # Concatenate the DataFrames along the rows axis
+            costs = pd.concat([costs, df_sums_reordered], ignore_index=True)
+            
+        #Sort based on non-dominated sorting (call fffit.find_pareto_set(data, is_pareto_efficient)
+        idcs, pareto_cost, dom_cost = find_pareto_set(costs.to_numpy(), is_pareto_efficient)
+        #Put samples and cost values in order
+        df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
+        costs["is_pareto"]= idcs
+        pareto_info = pd.concat([df_samples, costs], axis = 1)
+        
+        #Save pareto info
+        if save_data == True:
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
+            pareto_info.to_csv(save_csv_path1, index = False, header = True)
+        
+        return pareto_info
+
+    def __sum_sse_keys(self, obj_pieces):
+
+        # Dictionary to store the sum of values for each key
+        sums_by_prop = {}
+
+        # Iterate over the dictionary
+        for full_key, value in obj_pieces.items():
+            # Split the key to get the part after "molecX-" and before "-sse"
+            key_part = full_key.split('-')[1]  # This will give 'keyX'
+            
+            # Accumulate the sum for this key
+            if key_part in sums_by_prop:
+                sums_by_prop[key_part] += value
+            else:
+                sums_by_prop[key_part] = value
+
+        df_sums = pd.DataFrame(list(sums_by_prop.items()), columns=['Key', 'Sum'])
+        df_needed = df_sums.set_index('Key').T
+
+        return df_needed, list(sums_by_prop.keys())
 class Opt_ATs(Problem_Setup):
     """
     The class for Least Squares regression analysis. Child class of General_Analysis
@@ -813,68 +876,6 @@ class Opt_ATs(Problem_Setup):
             # print(self.iter_count, obj)
 
         return obj
-    
-    def gen_pareto_sets(self, samples, bounds, save_data= False):
-        """
-        generate LHS samples, calculate objective values, and sort them based on non-dominated sorting
-        """
-        #Generate LHS samples
-        samples = generate_lhs(samples, bounds, self.seed, labels = None)
-        #Define cost matrix (n_samplesx4)
-        molec_dict1 = next(iter(self.all_gp_dict.values()))
-        num_props = len(list(molec_dict1.keys()))
-
-        #Loop over samples
-        for s in range(len(samples)):
-            #Calculate objective values
-            obj, obj_pieces, var_ratios = self.calc_obj(samples[s])
-            #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
-            prop_var_ratios = var_ratios.reshape(-1, num_props).sum(axis=-1)
-            df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
-            #Set columns for costs
-            #FIx this to not add costs to itself every time
-            if s == 0:
-                costs = pd.DataFrame(columns=prop_names)
-            df_sums_reordered = df_sums[costs.columns]
-            # Concatenate the DataFrames along the rows axis
-            costs = pd.concat([costs, df_sums_reordered], ignore_index=True)
-            
-        #Sort based on non-dominated sorting (call fffit.find_pareto_set(data, is_pareto_efficient)
-        idcs, pareto_cost, dom_cost = find_pareto_set(costs.to_numpy(), is_pareto_efficient)
-        #Put samples and cost values in order
-        df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
-        costs["is_pareto"]= idcs
-        pareto_info = pd.concat([df_samples, costs], axis = 1)
-        
-        #Save pareto info
-        if save_data == True:
-            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
-            pareto_info.to_csv(save_csv_path1, index = False, header = True)
-        
-        return pareto_info
-
-    def __sum_sse_keys(self, obj_pieces):
-
-        # Dictionary to store the sum of values for each key
-        sums_by_prop = {}
-
-        # Iterate over the dictionary
-        for full_key, value in obj_pieces.items():
-            # Split the key to get the part after "molecX-" and before "-sse"
-            key_part = full_key.split('-')[1]  # This will give 'keyX'
-            
-            # Accumulate the sum for this key
-            if key_part in sums_by_prop:
-                sums_by_prop[key_part] += value
-            else:
-                sums_by_prop[key_part] = value
-
-        df_sums = pd.DataFrame(list(sums_by_prop.items()), columns=['Key', 'Sum'])
-        df_needed = df_sums.set_index('Key').T
-
-        return df_needed, list(sums_by_prop.keys())
-
 
     def get_param_inits(self):
         """
@@ -893,7 +894,7 @@ class Opt_ATs(Problem_Setup):
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
         if os.path.exists("pareto_params.csv"):
-            all_pareto_info = pd.read_csv("pareto_params.csv", header = 0, index_col= False)
+            all_pareto_info = pd.read_csv("pareto_params.csv", header = 0)
             all_points = all_pareto_info[self.at_class.at_names].copy()
             pareto_points = all_points[all_points["is_pareto"] == True]
 
