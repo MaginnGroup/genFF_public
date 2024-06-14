@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize as optimize
 from sklearn.preprocessing import MinMaxScaler
+import warnings
 import scipy
 import os
 import time
@@ -958,18 +959,21 @@ class Opt_ATs(Problem_Setup):
         #Save pareto info
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
-        if os.path.exists("pareto_params.csv"):
-            all_pareto_info = pd.read_csv("pareto_params.csv", header = 0)
-            all_points = all_pareto_info[self.at_class.at_names].copy()
-            pareto_points = all_points[all_points["is_pareto"] == True]
+        if os.path.exists(save_csv_path1):
+            all_pareto_info = pd.read_csv(save_csv_path1, header = 0)
+            pareto_data = all_pareto_info[all_pareto_info["is_pareto"] == True]
+            dominated_data = all_pareto_info[all_pareto_info["is_pareto"] == False]
+            pareto_points = pareto_data[self.at_class.at_names].copy()
+            dom_points = dominated_data[self.at_class.at_names].copy()
 
             if len(pareto_points) < self.repeats:
-                num_false = self.repeats - len(pareto_points)
-                pareto_data_false = all_points[all_points["is_pareto"] == False].sample(n=num_false, random_state=self.seed)
-                restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
-            else:
-                restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
-            restart_data.drop(columns = ["is_pareto"], inplace=True)
+                #Could opt to use more repeats than # of pareto sets
+                warnings.warn(f"More repeats ({self.repeats}) than Pareto optimal sets ({len(pareto_points)}). Generating repeats for number of Paerto sets", UserWarning)
+                self.repeats = len(pareto_points)
+                # num_false = self.repeats - len(pareto_points)
+                # pareto_data_false = dom_points.sample(n=num_false, random_state=self.seed)
+                # restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
+            restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
             param_inits = restart_data.to_numpy()
         else:
             param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
