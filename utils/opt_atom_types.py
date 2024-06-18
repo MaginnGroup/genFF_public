@@ -286,16 +286,16 @@ class Problem_Setup:
         #Get dict of testing data
         test_data = {}
         train_data = {}
-        for str in ["train", "test"]:
+        for strng in ["train", "test"]:
             #OPTIONAL (but not implemented here) append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-            file_x = os.path.join("molec_gp_data/" + molec_key +"-vlegp/x_" + str +".csv")
+            file_x = os.path.join("molec_gp_data/" + molec_key +"-vlegp/x_" + strng +".csv")
             assert os.path.isfile(file_x), "molec_gp_data/key-vlegp/x_****.csv does not exist. Check key list carefully"
             x = np.loadtxt(file_x, delimiter=",",skiprows=1)
-            dict = train_data if str == "train" else test_data
+            dict = train_data if strng == "train" else test_data
             dict["x"]=x
 
             for prop_key in prop_keys:
-                file_y = os.path.join("molec_gp_data/" + molec_key +"-vlegp/" + prop_key + "_y_" +str+ ".csv")
+                file_y = os.path.join("molec_gp_data/" + molec_key +"-vlegp/" + prop_key + "_y_" +strng+ ".csv")
                 prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
                 dict[prop_key]=prop_data
 
@@ -1160,9 +1160,9 @@ class Vis_Results(Problem_Setup):
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_train_gp_dict[molec]
             #Get testing data for that molecule
-            train_data, test_data = self.get_train_test_data(molec, molec_gps_dict.keys())
+            train_data, test_data = self.get_train_test_data(molec, list(molec_gps_dict.keys()))
             #Make pdf
-            dir_name = self.make_results_dir(list(molec)) 
+            dir_name = self.make_results_dir(molec) 
             pdf = PdfPages(dir_name + '/gp_val_figs.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
