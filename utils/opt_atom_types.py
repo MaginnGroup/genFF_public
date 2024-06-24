@@ -1013,7 +1013,7 @@ class Opt_ATs(Problem_Setup):
         loss_k = np.zeros(len(ranked_indices)+1)
         # Calculate the loss for the full parameter set with no guesses
         loss_k[0] = self.one_output_calc_obj(theta_guess)
-        loss_k_params[0] = theta_guess
+        loss_k_params[0,:] = theta_guess
         for i in range(1, len(ranked_indices)+1):
             # Create a mask to identify which parameters are being optimized
             #Note that the indices are 1-based
@@ -1027,13 +1027,13 @@ class Opt_ATs(Problem_Setup):
                 theta_full[mask] = x_estim
                 return self.__scipy_min_fxn(theta_full, *args)
 
-            solution = optimize.minimize(obj_wrapper, theta_estim, bounds=self.at_class.at_bounds_nm_kjmol[:,ranked_indices[:i]-1],
+            solution = optimize.minimize(obj_wrapper, theta_estim, bounds=self.at_class.at_bounds_nm_kjmol[ranked_indices[:i]-1,:],
                                         method='L-BFGS-B', options = {'disp':False, 'eps' : 1e-10, 'ftol':1e-10})
             
             # Reconstruct the full parameter list with optimized values
             theta_opt = theta_guess
             theta_opt[mask] = solution.x
-            loss_k_params[i] = theta_opt
+            loss_k_params[i,:] = theta_opt
             loss_k[i] = solution.fun
 
         #Compute critical ratio. Note that the last rcc is 0 by definition
