@@ -942,6 +942,112 @@ class Opt_ATs(Problem_Setup):
             # print(self.iter_count, obj)
 
         return obj
+    
+    def rank_parameters(self, theta_guess):
+        """
+        Ranks parameter estimability according to Yao 2003 algorithm
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        ranked_indices: np.ndarray, the ranked indices of the parameters
+        """
+        at_bounds_pref = self.at_class.at_bounds_nm_kjmol
+        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), at_bounds_pref)
+
+        #Get Sensitivity Matrix
+        fun = lambda x: self.calc_fxn(x)
+        dfun = nd.Gradient(fun)
+        Z = dfun([theta_scl])
+
+        # Step 1: Calculate the magnitude of each column in Z
+        column_magnitudes = np.linalg.norm(Z, axis=0)
+        
+        # Initialize variables
+        ranked_indices = []  # To keep track of ranked parameter indices
+        k = 1
+        n_data, m = Z.shape
+
+        while k <= m:
+            if k == 1:
+                # Step 2: Identify the most estimable parameter
+                max_index = np.argmax(column_magnitudes)
+                ranked_indices.append(max_index)
+            else:
+                # Step 3: Build X_k with the k most estimable columns
+                X_k = Z[:, ranked_indices]
+
+                # Predict Z using ordinary least-squares
+                Z_hat, _, _, _ = scipy.linalg.lstsq(X_k, Z)
+
+                # Calculate the residual matrix R_k
+                R_k = Z - X_k @ Z_hat
+
+                # Step 4: Calculate the magnitude of each column in R_k
+                residual_magnitudes = np.linalg.norm(R_k, axis=0)
+
+                # Step 5: Determine the next most estimable parameter
+                # Ensure we pick a column that hasn't been ranked yet
+                for idx in np.argsort(-residual_magnitudes):
+                    if idx not in ranked_indices:
+                        ranked_indices.append(idx)
+                        break
+            
+            k += 1  # Step 6: Increase k and repeat
+
+        return np.array(ranked_indices), n_data
+
+    def estimate_opt(self, theta_guess, ranked_indices, n_data):
+        """
+        Determines the optimal number of parameters to estimate
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+        """
+        #Create arrays to store results
+        loss_k_params = np.zeros((len(ranked_indices)+1, len(theta_guess)))
+        loss_k = np.zeros(len(ranked_indices)+1)
+        # Calculate the loss for the full parameter set with no guesses
+        loss_k[0] = self.one_output_calc_obj(theta_guess)
+        loss_k_params[0] = theta_guess
+        for i in range(1, len(ranked_indices)+1):
+            # Create a mask to identify which parameters are being optimized
+            #Note that the indices are 1-based
+            theta_estim = theta_guess[ranked_indices[:i]-1]
+            mask = np.zeros(len(theta_guess), dtype=bool)
+            mask[ranked_indices[:i]-1] = True
+
+            def obj_wrapper(x_estim, *args):
+                # Reconstruct the full parameter list
+                theta_full = theta_guess.copy()
+                theta_full[mask] = x_estim
+                return self.__scipy_min_fxn(theta_full, *args)
+
+            solution = optimize.minimize(obj_wrapper, theta_estim, bounds=self.at_class.at_bounds_nm_kjmol[:,ranked_indices[:i]-1],
+                                        method='L-BFGS-B', options = {'disp':False, 'eps' : 1e-10, 'ftol':1e-10})
+            
+            # Reconstruct the full parameter list with optimized values
+            theta_opt = theta_guess
+            theta_opt[mask] = solution.x
+            loss_k_params[i] = theta_opt
+            loss_k[i] = solution.fun
+
+        #Compute critical ratio. Note that the last rcc is 0 by definition
+        rcc = np.zeros(len(ranked_indices))
+        for k in range(1, len(ranked_indices)):
+            p = len(ranked_indices)
+            rck = (loss_k[k] - loss_k[-1])/(p-k)
+            rc_kub = max(rck -1, 2*rck/(p-k+2))
+            rcc[k-1] = (p-k)*(rc_kub-1)/n_data
+
+        opt_num_params = np.argmin(rcc) + 1
+
+        return opt_num_params, rcc, loss_k, loss_k_params
+
 
     def get_param_inits(self):
         """
