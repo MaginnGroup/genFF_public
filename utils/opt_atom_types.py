@@ -943,7 +943,7 @@ class Opt_ATs(Problem_Setup):
 
         return obj
     
-    def rank_parameters(self, theta_guess):
+    def rank_parameters(self, theta_guess, save_data = False):
         """
         Ranks parameter estimability according to Yao 2003 algorithm
 
@@ -954,6 +954,7 @@ class Opt_ATs(Problem_Setup):
         Returns
         -------
         ranked_indices: np.ndarray, the ranked indices of the parameters
+        n_data: int, the number of data points
         """
         at_bounds_pref = self.at_class.at_bounds_nm_kjmol
         theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), at_bounds_pref)
@@ -998,15 +999,32 @@ class Opt_ATs(Problem_Setup):
             
             k += 1  # Step 6: Increase k and repeat
 
+        if save_data:
+            #Write ranked indices and n_data to a csv on separate lines
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_csv_path1 = os.path.join(dir_name, "ranked_indices.csv")
+            save_csv_path2 = os.path.join(dir_name, "n_data.csv")
+            np.savetxt(save_csv_path1, ranked_indices, delimiter=",")
+            np.savetxt(save_csv_path2, np.array([n_data]), delimiter=",")
+
         return np.array(ranked_indices), n_data
 
-    def estimate_opt(self, theta_guess, ranked_indices, n_data):
+    def estimate_opt(self, theta_guess, ranked_indices, n_data, save_data = False):
         """
         Determines the optimal number of parameters to estimate
 
         Parameters
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+        ranked_indices: np.ndarray, the ranked indices of the parameters
+        n_data: int, the number of data points
+
+        Returns
+        -------
+        opt_num_params: int, the optimal number of parameters to estimate
+        rcc: np.ndarray, the relative critical cost values
+        loss_k: np.ndarray, the loss values for each k
+        loss_k_params: np.ndarray, the parameter values for each k
         """
         #Create arrays to store results
         loss_k_params = np.zeros((len(ranked_indices)+1, len(theta_guess)))
@@ -1045,6 +1063,20 @@ class Opt_ATs(Problem_Setup):
             rcc[k-1] = (p-k)*(rc_kub-1)/n_data
 
         opt_num_params = np.argmin(rcc) + 1
+
+        #Save data
+        if save_data:
+            #Write ranked indices and n_data to a csv on separate lines
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_csv_path1 = os.path.join(dir_name, "opt_num_params.csv")
+            save_csv_path2 = os.path.join(dir_name, "rcc.csv")
+            save_csv_path3 = os.path.join(dir_name, "loss_data.csv")
+            loss_matrix = np.hstack((loss_k_params, loss_k[:, np.newaxis]))
+            loss_df = pd.DataFrame(loss_matrix) 
+            loss_df.columns = [self.at_class.at_names] + [self.obj_choice]
+            loss_df.to_csv(save_csv_path3, index = False, header = True)
+            np.savetxt(save_csv_path1, np.array([opt_num_params]), delimiter=",")
+            np.savetxt(save_csv_path2, rcc, delimiter=",")
 
         return opt_num_params, rcc, loss_k, loss_k_params
 
