@@ -519,6 +519,25 @@ class Problem_Setup:
             # print("sum_var_ratios: ", sum_var_ratios)
             expected_sse_val = sse + sum_var_ratios
             obj = expected_sse_val
+
+        gen_pareto = True
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        #If we have pareto info saved, get the average value of the pareto set
+        if os.exists(dir_name + "pareto_info.csv"):
+            pareto_info = pd.read_csv(dir_name + "pareto_info.csv", index_col=False, header=0)
+            if "Obj_val" in pareto_info.columns:
+                gen_pareto = False
+        #If we have no info saved, then generate it
+        if gen_pareto:
+            pareto_info = self.gen_pareto_sets(int(10**5), self.at_class.at_bounds_nm_kjmol, save_data= True)
+        #Get average value of pareto set for each parameter
+        g_avg = pareto_info["Obj_val"].mean()
+        #Calculate weights for each parameter
+        #A diff_penalty value difference from GAFF parameters are weighted as 5% increase of our objective
+        inv_w2 = (0.05*g_avg)/(self.at_class.diff_penalty**2)
+        #Add parameter penalty
+        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
+        #Get GAFF parameters
         
         # print(obj)
         return float(obj), sse_pieces, var_ratios
@@ -829,7 +848,6 @@ class Problem_Setup:
             prop_var_ratios = var_ratios.reshape(-1, num_props).sum(axis=-1)
             df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
             #Set columns for costs
-            #FIx this to not add costs to itself every time
             if s == 0:
                 costs = pd.DataFrame(columns=prop_names)
             df_sums_reordered = df_sums[costs.columns]
@@ -842,6 +860,7 @@ class Problem_Setup:
         df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
         costs["is_pareto"]= idcs
         pareto_info = pd.concat([df_samples, costs], axis = 1)
+        pareto_info['Obj_val'] = pareto_info[prop_names].sum(axis=1)
         
         #Save pareto info
         if save_data == True:
