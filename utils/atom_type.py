@@ -413,7 +413,7 @@ class AT_Scheme_10(Atom_Types):
         super().__init__(at_bounds, at_names, molec_map_dicts)
         #Get scaled bounds
         self.scale_bounds()
-        
+
 class AT_Scheme_11(Atom_Types):
     """
     Class for Atom Type Scheme 11
@@ -435,11 +435,16 @@ class AT_Scheme_11(Atom_Types):
                     "epsilon_F_1","epsilon_F_2","epsilon_F_3", "epsilon_F_4"]
         assert len(at_keys) == len(at_param_bounds_l) == len(at_param_bounds_u), "Length of at_keys, at_param_bounds_l, and at_param_bounds_u must be the same"
         # Get weight information
-        weight_info = np.zeros(len(at_keys))
-        mask = np.isin(at_keys, list(["sigma_F_1", "epsilon_F_1", "sigma_C1", "epsilon_C1", "epsilon_C2_1"]))
-        weight_info[mask] = 1
-        GAFF_params = np.array([3.118, 30.696, 3.400, 55.052, 55.052])
-        g_weights = np.array([0.15**2, 0.15**2, 0.15**2, 0.5**2])
+        at_weights = np.zeros(len(at_keys))
+        gaff_params = np.array(at_param_bounds_l) #set initial gaff parameters as lower bounds
+        mask = np.isin(at_keys, list(["sigma_C2_2", "sigma_F_1", "epsilon_C1", "epsilon_C2_1", "epsilon_F_1"]))
+        GAFF_params = np.array([3.400, 3.118, 55.052, 55.052, 30.696])
+        #For all of these, a value of 0.15 difference from GAFF is weighted as 5% of the average best objective for ExpVal
+        g_weights = np.array([0.05/0.15**2, 0.05/0.15**2, 0.05/0.15**2, 0.05/0.15**2, 0.05/0.15**2])
+        at_weights[mask] = g_weights
+        gaff_params[mask] = GAFF_params
+        self.at_weights = at_weights
+        self.gaff_params = gaff_params
 
         #Create a file that maps param names (keys) to at_param names for atom type 11 (values) for each molecule
         r14_map_dict = {"sigma_C1": "sigma_C1",
