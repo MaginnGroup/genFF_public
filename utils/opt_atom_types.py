@@ -1001,9 +1001,10 @@ class Opt_ATs(Problem_Setup):
                 X_k = Z[:, ranked_indices]
 
                 # Predict Z using ordinary least-squares
+                #Note that this value is reporting Z_hat, without scaling by Xk
                 Z_hat, _, _, _ = scipy.linalg.lstsq(X_k, Z)
 
-                # Calculate the residual matrix R_k
+                # Calculate the residual matrix R_k, scaling Z_hat by Xk
                 R_k = Z - X_k @ Z_hat
 
                 # Step 4: Calculate the magnitude of each column in R_k
