@@ -1163,34 +1163,40 @@ class Opt_ATs(Problem_Setup):
         if self.seed is not None:
             np.random.seed(self.seed)
 
-        #Try to load from csv params
-        #Save pareto info
+        #Try to load from csv params if it exists
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
         if os.path.exists(save_csv_path1):
             all_pareto_info = pd.read_csv(save_csv_path1, header = 0)
-            pareto_data = all_pareto_info[all_pareto_info["is_pareto"] == True]
-            dominated_data = all_pareto_info[all_pareto_info["is_pareto"] == False]
-            pareto_points = pareto_data[self.at_class.at_names].copy()
-            dom_points = dominated_data[self.at_class.at_names].copy()
-
-            if len(pareto_points) < self.repeats:
-                #Could opt to use more repeats than # of pareto sets
-                warnings.warn(f"More repeats ({self.repeats}) than Pareto optimal sets ({len(pareto_points)}). Generating repeats for number of Paerto sets", UserWarning)
-                self.repeats = len(pareto_points)
-                # num_false = self.repeats - len(pareto_points)
-                # pareto_data_false = dom_points.sample(n=num_false, random_state=self.seed)
-                # restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
-            restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
-            param_inits = restart_data.to_numpy()
+        #Otherwise generate 10**5 pareto sets, and save the data
         else:
-            param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
-                                      self.seed, labels = None)
-            param_inits = param_sets.to_numpy()
-            #Get initial guesses from bounds (Sigma in nm and Epsilon in kJ/mol)
-            # lb = self.at_class.at_bounds_nm_kjmol[:,0].T
-            # ub = self.at_class.at_bounds_nm_kjmol[:,1].T
-            # param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
+            all_pareto_info = self.gen_pareto_sets(int(10**5), self.at_class.at_bounds_nm_kjmol, save_data= True)
+        #Get dominated vs nondominated points
+        pareto_data = all_pareto_info[all_pareto_info["is_pareto"] == True]
+        dominated_data = all_pareto_info[all_pareto_info["is_pareto"] == False]
+        pareto_points = pareto_data[self.at_class.at_names].copy()
+        dom_points = dominated_data[self.at_class.at_names].copy()
+        #Ensure we are using less repeats than pareto optimal points
+        if len(pareto_points) < self.repeats:
+            #Could opt to use more repeats than # of pareto sets
+            warnings.warn(f"More repeats ({self.repeats}) than Pareto optimal sets ({len(pareto_points)}). Generating repeats for number of Paerto sets", UserWarning)
+            self.repeats = len(pareto_points)
+            # num_false = self.repeats - len(pareto_points)
+            # pareto_data_false = dom_points.sample(n=num_false, random_state=self.seed)
+            # restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
+        #Randomly sample pareto points without replacement
+        restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
+        param_inits = restart_data.to_numpy()
+
+        #Could also sample with LHS
+        # param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
+        #                             self.seed, labels = None)
+        # param_inits = param_sets.to_numpy()
+
+        # Could also sample randomly
+        # lb = self.at_class.at_bounds_nm_kjmol[:,0].T
+        # ub = self.at_class.at_bounds_nm_kjmol[:,1].T
+        # param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
         
         return param_inits
     
