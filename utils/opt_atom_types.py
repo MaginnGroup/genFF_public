@@ -134,15 +134,53 @@ class Problem_Setup:
         assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
         assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(obj_choice, str), "obj_choice must be string"
-        assert obj_choice in ["ExpVal", "SSE"], "obj_choice must be SSE or ExpVal"
+        assert obj_choice in ["ExpVal", "SSE", "ExpValPrior"], "obj_choice must be SSE, ExpVal, or ExpValPrior"
         #Placeholder that will be overwritten if None
         self.molec_data_dict = molec_data_dict
         self.all_gp_dict = all_gp_dict
         self.at_class = at_class
-        self.obj_choice = obj_choice
         self.seed = 1
 
-    def make_results_dir(self, molecules):
+        #If using ExpValPrior, check that you can calculate the average value of the pareto set of ExpVal
+        if obj_choice == "ExpValPrior":
+            assert hasattr(at_class, "gaff_params"), "at_class must have attribute gaff_params"
+            assert hasattr(at_class, "at_weights"), "at_class must have attribute at_weights"
+            assert len(at_class.gaff_params) == len(at_class.at_weights) == len(at_class.at_names), "at_class gaff_params must have same length as at_weights"
+            #Get g_avg from Exp Val pareto_info.csv
+            pareto_info = self.__get_ExpVal_info()
+            if pareto_info is None:
+                warnings.warn("ExpValPrior requires  ExpVal pareto_info.csv to exist with an 'Min Obj' column. Generating ExpVal LHS Data")
+                self.obj_choice = "ExpVal"
+                pareto_info = self.gen_pareto_sets(10**5, self.at_class.at_bounds_nm_kjmol, save_data= True)
+            
+            #Get average value of pareto set for each parameter
+            Esse_avg = pareto_info["Min Obj"].mean()
+            self.Esse_avg = Esse_avg
+        
+        #Reset self.obj_choice as ExpValPrior or set obj_choice as obj_choice
+        self.obj_choice = obj_choice
+
+    def __get_ExpVal_info(self):
+        """
+        Get pareto info for ExpVal
+
+        Returns
+        -------
+        pareto_info: pd.DataFrame, dataframe of pareto info
+        """
+        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice="ExpVal")
+        file = "/best_per_run.csv" #/pareto_info.csv
+        if os.path.exists(dir_name + file):
+            pareto_info = pd.read_csv(dir_name + file, index_col=False, header=0)
+            prop_names = ["sim_liq_density","sim_vap_density","sim_Pvap","sim_Hvap"]
+            if "Min Obj" in pareto_info.columns:
+                return pareto_info
+            elif set(prop_names).issubset(pareto_info.columns) == True:
+                pareto_info['Min Obj'] = pareto_info[prop_names].sum(axis=1)
+                return pareto_info
+        return None
+    
+    def make_results_dir(self, molecules, obj_choice=None):
         """
         Makes a directory for results based on the scheme name, optimization method, and molecule names
         
@@ -154,6 +192,9 @@ class Problem_Setup:
         -------
         dir_name: str, directory name for results
         """
+        if obj_choice == None:
+            obj_choice = self.obj_choice
+        assert isinstance(obj_choice, str) and obj_choice in ["ExpVal", "SSE", "ExpValPrior"], "obj_choice must be a string or None"
         assert isinstance(molecules, (str, list, np.ndarray)), "molecules must be a string or list/np.ndarray of strings"
         scheme_name = self.at_class.scheme_name
         if isinstance(molecules, str):
@@ -166,7 +207,7 @@ class Problem_Setup:
         else:
             molecule_str = molecules[0]
 
-        dir_name = os.path.join("Results" ,scheme_name, molecule_str, self.obj_choice)
+        dir_name = os.path.join("Results" ,scheme_name, molecule_str, obj_choice)
 
         return dir_name
     
@@ -355,8 +396,8 @@ class Problem_Setup:
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         #Initialize weight and squared error arrays
         mean_array  = []
-        var_array = []
-        var_theta = []
+        # var_array = []
+        # var_theta = []
 
         #Unscale data from 0 to 1 to get correct objective values
         at_bounds_pref = self.at_class.at_bounds_nm_kjmol
@@ -386,20 +427,22 @@ class Problem_Setup:
                 # #Evaluate GP
                 gp_mean_scl, gp_covar_scl, gp_var_scl = self.eval_gp_new_theta(gp_theta_guess, molec_object, gp_model, x_exp)
                 #Scale gp output to real value
-                gp_mean = values_scaled_to_real(gp_mean_scl, y_bounds)
+                # gp_mean = values_scaled_to_real(gp_mean_scl, y_bounds)
                 #Get y data uncertainties
-                unc = molec_object.uncertainties[key.replace("sim", "expt")]
-                y_var_unc = (y_exp*unc)**2
-                y_var_2pct = (y_exp*0.02)**2
-                y_var = np.maximum(y_var_unc, y_var_2pct)
-                y_std =np.sqrt(y_var)
-                gp_mean_y_scl = gp_mean.flatten()/y_std.flatten()
+                # unc = molec_object.uncertainties[key.replace("sim", "expt")]
+                # y_var_unc = (y_exp*unc)**2
+                # y_var_2pct = (y_exp*0.02)**2
+                # y_var = np.maximum(y_var_unc, y_var_2pct)
+                # y_std =np.sqrt(y_var)
+                # gp_mean_y_scl = gp_mean.flatten()/y_std.flatten()
                 #Scale gp_variances to real values
-                y_bounds_2D = np.asarray(y_bounds).reshape(-1,2)
-                gp_covar = gp_covar_scl * (y_bounds_2D[:, 1] - y_bounds_2D[:, 0]) ** 2
-                gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
-                mean_array += list(gp_mean_y_scl)
-                var_array += list(gp_var.flatten())
+                # y_bounds_2D = np.asarray(y_bounds).reshape(-1,2)
+                # gp_covar = gp_covar_scl * (y_bounds_2D[:, 1] - y_bounds_2D[:, 0]) ** 2
+                # gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
+                # mean_array += list(gp_mean_y_scl)
+                #Return objective value standardized to 0 mean and unit variance since each property has different units
+                mean_array += list(gp_mean_scl)
+                # var_array += list(gp_var.flatten())
 
         return np.array(mean_array)
         
@@ -520,24 +563,18 @@ class Problem_Setup:
             expected_sse_val = sse + sum_var_ratios
             obj = expected_sse_val
 
-        gen_pareto = True
-        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         #If we have pareto info saved, get the average value of the pareto set
-        if os.exists(dir_name + "pareto_info.csv"):
-            pareto_info = pd.read_csv(dir_name + "pareto_info.csv", index_col=False, header=0)
-            if "Obj_val" in pareto_info.columns:
-                gen_pareto = False
-        #If we have no info saved, then generate it
-        if gen_pareto:
-            pareto_info = self.gen_pareto_sets(int(10**5), self.at_class.at_bounds_nm_kjmol, save_data= True)
-        #Get average value of pareto set for each parameter
-        g_avg = pareto_info["Obj_val"].mean()
-        #Calculate weights for each parameter
-        #A diff_penalty value difference from GAFF parameters are weighted as 5% increase of our objective
-        inv_w2 = (0.05*g_avg)/(self.at_class.diff_penalty**2)
-        #Add parameter penalty
-        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
-        #Get GAFF parameters
+        if self.obj_choice == "ExpValPrior":
+            #Calculate weights for each parameter
+            #A difference from GAFF parameters are weighted % increase of ExpVal best objective
+            inv_w2 = self.Esse_avg*self.at_class.at_weights
+            #Get scaled parameter values
+            theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
+            gaff_params_2D = self.at_class.gaff_params.flatten()
+            gaff_real = self.values_pref_to_real(gaff_params_2D)
+            gaff_scl = values_real_to_scaled(gaff_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
+            #Add objective value to difference
+            obj += np.sum(inv_w2*(theta_scl - gaff_scl)**2)
         
         # print(obj)
         return float(obj), sse_pieces, var_ratios
@@ -860,7 +897,7 @@ class Problem_Setup:
         df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
         costs["is_pareto"]= idcs
         pareto_info = pd.concat([df_samples, costs], axis = 1)
-        pareto_info['Obj_val'] = pareto_info[prop_names].sum(axis=1)
+        pareto_info['Min Obj'] = pareto_info[prop_names].sum(axis=1)
         
         #Save pareto info
         if save_data == True:
@@ -964,7 +1001,7 @@ class Opt_ATs(Problem_Setup):
     
     def rank_parameters(self, theta_guess, save_data = False):
         """
-        Ranks parameter estimability according to Yao 2003 algorithm
+        Ranks parameter estimability according to the alogithm in Table 2 Yao, K.Z., et al. (2003), Polym. React. Eng.
 
         Parameters
         ----------
@@ -975,12 +1012,13 @@ class Opt_ATs(Problem_Setup):
         ranked_indices: np.ndarray, the ranked indices of the parameters
         n_data: int, the number of data points
         """
-        at_bounds_pref = self.at_class.at_bounds_nm_kjmol
-        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), at_bounds_pref)
+        at_bounds_real = self.at_class.at_bounds_nm_kjmol
+        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), at_bounds_real)
 
         #Get Sensitivity Matrix
         fun = lambda x: self.calc_fxn(x)
         dfun = nd.Gradient(fun)
+        #Use standardized scaled values
         Z = dfun([theta_scl])
 
         # Step 1: Calculate the magnitude of each column in Z
@@ -1024,14 +1062,16 @@ class Opt_ATs(Problem_Setup):
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
             save_csv_path1 = os.path.join(dir_name, "ranked_indices.csv")
             save_csv_path2 = os.path.join(dir_name, "n_data.csv")
+            save_csv_path3 = os.path.join(dir_name, "Z_matrix.csv")
             np.savetxt(save_csv_path1, ranked_indices, delimiter=",")
             np.savetxt(save_csv_path2, np.array([n_data]), delimiter=",")
+            np.savetxt(save_csv_path3, Z, delimiter=",")
 
         return np.array(ranked_indices), n_data
 
     def estimate_opt(self, theta_guess, ranked_indices, n_data, save_data = False):
         """
-        Determines the optimal number of parameters to estimate
+        Determines the optimal number of parameters to estimate based on algorithm in Wu, S., et al. (2011). Int. J. Advanced Mechatronic Systems
 
         Parameters
         ----------
