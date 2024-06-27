@@ -887,11 +887,11 @@ class Problem_Setup:
             var_ratios_organized = var_ratios.reshape(num_molecs, num_props, -1)
             prop_var_ratios = np.sum(var_ratios_organized, axis=(0, 2))
             df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
+            #Add variance ratios for each property when not using SSE
             if self.obj_choice != "SSE":
-                #Add ExpVal ratios for each property
                 df_sums += prop_var_ratios
+            #Add GAFF penalty equally among all properties if using GAFF Prior objective
             if self.obj_choice == "ExpValPrior":
-                #Add GAFF penalty equally among all properties
                 df_sums += gaff_penalty/num_props
                 
             #Set columns for costs
