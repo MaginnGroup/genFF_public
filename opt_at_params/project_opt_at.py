@@ -85,32 +85,38 @@ def run_obj_alg(job):
 
     #Create param sets for the AT optimization based on seed and such
     param_inits = driver.get_param_inits()
-    #Get the correct parameter set from the param_inits based on which repeat we are evaluating
-    param_guess = param_inits[repeat_num-1].reshape(1,-1)
-    #Optimize atom types
-    ls_results, sort_ls_res, best_runs = driver.optimize_ats(param_guess, repeat_num-1)
-    
-    dir_name = driver.make_results_dir(training_molecules)
-    job.document.dir_name = dir_name
 
-    if job.sp.save_data == True:
-        #Save results for best set for each run and iter to a csv file in Results
-        #Ensure directory exists
-        os.makedirs(dir_name, exist_ok=True) 
-        save_path3 = os.path.join(dir_name, "best_per_run.csv")
-        #Save results. Append to file if it already exists
-        if os.path.exists(save_path3):
-            best_runs.to_csv(save_path3, mode = "a", index = False, header = False)
-        else:
-            best_runs.to_csv(save_path3, index = False)
+    #Get data if the repeat number is less than or equal to the number of param_inits
+    if repeat_num <= len(param_inits):
+        #Get the correct parameter set from the param_inits based on which repeat we are evaluating
+        param_guess = param_inits[repeat_num-1].reshape(1,-1)
+        #Optimize atom types
+        ls_results, sort_ls_res, best_runs = driver.optimize_ats(param_guess, repeat_num-1)
+        
+        dir_name = driver.make_results_dir(training_molecules)
+        job.document.dir_name = dir_name
 
-    #Store intermediate results in job directory
-    #Save original results
-    save_path1 = job.fn("opt_at_results.csv")
-    ls_results.to_csv(save_path1, index = False)
-    #Save sorted results
-    save_path2 =  job.fn("sorted_at_res.csv")
-    sort_ls_res.to_csv(save_path2, index = False)
+        if job.sp.save_data == True:
+            #Save results for best set for each run and iter to a csv file in Results
+            #Ensure directory exists
+            os.makedirs(dir_name, exist_ok=True) 
+            save_path3 = os.path.join(dir_name, "best_per_run.csv")
+            #Save results. Append to file if it already exists
+            if os.path.exists(save_path3):
+                best_runs.to_csv(save_path3, mode = "a", index = False, header = False)
+            else:
+                best_runs.to_csv(save_path3, index = False)
+
+        #Store intermediate results in job directory
+        #Save original results
+        save_path1 = job.fn("opt_at_results.csv")
+        ls_results.to_csv(save_path1, index = False)
+        #Save sorted results
+        save_path2 =  job.fn("sorted_at_res.csv")
+        sort_ls_res.to_csv(save_path2, index = False)
+    #If the repeat number is greater than the number of param_inits, then we have already done all the repeats. Delete the job
+    else:
+        job.remove()
 
 if __name__ == "__main__":
     ProjectOPT().main()
