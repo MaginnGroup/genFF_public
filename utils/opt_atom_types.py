@@ -149,14 +149,13 @@ class Problem_Setup:
             #Get g_avg from Exp Val pareto_info.csv
             pareto_info = self.__get_ExpVal_info()
             if pareto_info is None:
-                warnings.warn("ExpValPrior requires  ExpVal pareto_info.csv to exist with an 'Min Obj' column. Generating ExpVal LHS Data")
-                self.obj_choice = "ExpVal"
-                pareto_info = self.gen_pareto_sets(10**5, self.at_class.at_bounds_nm_kjmol, save_data= True)
-            
-            #Get average value of pareto set for each parameter
-            Esse_avg = pareto_info["Min Obj"].mean()
-            self.Esse_avg = Esse_avg
-        
+                warnings.warn("ExpValPrior requires ExpVal best_per_run.csv to exist. Setting obj_choice to ExpVal")
+                obj_choice = "ExpVal"
+            else:
+                #Get average value of pareto set for each parameter
+                Esse_avg = pareto_info["Min Obj"].mean()
+                self.Esse_avg = Esse_avg              
+
         #Reset self.obj_choice as ExpValPrior or set obj_choice as obj_choice
         self.obj_choice = obj_choice
 
@@ -170,15 +169,14 @@ class Problem_Setup:
         """
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice="ExpVal")
         file = "/best_per_run.csv" #/pareto_info.csv
+        prop_names = ["sim_liq_density","sim_vap_density","sim_Pvap","sim_Hvap"]
+        pareto_info = None
         if os.path.exists(dir_name + file):
             pareto_info = pd.read_csv(dir_name + file, index_col=False, header=0)
-            prop_names = ["sim_liq_density","sim_vap_density","sim_Pvap","sim_Hvap"]
-            if "Min Obj" in pareto_info.columns:
-                return pareto_info
-            elif set(prop_names).issubset(pareto_info.columns) == True:
+            if "Min Obj" not in pareto_info.columns and set(prop_names).issubset(pareto_info.columns) == True:
                 pareto_info['Min Obj'] = pareto_info[prop_names].sum(axis=1)
-                return pareto_info
-        return None
+                
+        return pareto_info
     
     def make_results_dir(self, molecules, obj_choice=None):
         """
@@ -574,10 +572,13 @@ class Problem_Setup:
             gaff_real = self.values_pref_to_real(gaff_params_2D)
             gaff_scl = values_real_to_scaled(gaff_real.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
             #Add objective value to difference
-            obj += np.sum(inv_w2*(theta_scl - gaff_scl)**2)
+            gaff_penalty = np.sum(inv_w2*(theta_scl - gaff_scl)**2)
+            obj += gaff_penalty
+        else:
+            gaff_penalty = 0
         
         # print(obj)
-        return float(obj), sse_pieces, var_ratios
+        return float(obj), sse_pieces, var_ratios, gaff_penalty
     
     #define one output calc obj
     def one_output_calc_obj(self, theta_guess):
@@ -593,7 +594,7 @@ class Problem_Setup:
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        obj, sse_pieces, var_ratios = self.calc_obj(theta_guess)
+        obj = self.calc_obj(theta_guess)[0]
 
         return obj
     
@@ -662,7 +663,7 @@ class Problem_Setup:
         #Unscale data from 0 to 1 to get correct objective values
         at_bounds_pref = self.at_class.at_bounds_nm_kjmol
         theta_guess = values_scaled_to_real(theta_guess.reshape(1,-1), at_bounds_pref)
-        obj, sse_pieces, var_ratios = self.calc_obj(theta_guess.flatten())
+        obj = self.calc_obj(theta_guess.flatten())[0]
 
         return obj
 
@@ -876,14 +877,23 @@ class Problem_Setup:
         #Define cost matrix (n_samplesx4)
         molec_dict1 = next(iter(self.all_gp_dict.values()))
         num_props = len(list(molec_dict1.keys()))
+        num_molecs = len(list(self.all_gp_dict.keys()))
 
         #Loop over samples
         for s in range(len(samples)):
             #Calculate objective values
-            obj, obj_pieces, var_ratios = self.calc_obj(samples[s])
+            obj, obj_pieces, var_ratios, gaff_penalty = self.calc_obj(samples[s])
             #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
-            prop_var_ratios = var_ratios.reshape(-1, num_props).sum(axis=-1)
+            var_ratios_organized = var_ratios.reshape(num_molecs, num_props, -1)
+            prop_var_ratios = np.sum(var_ratios_organized, axis=(0, 2))
             df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
+            if self.obj_choice != "SSE":
+                #Add ExpVal ratios for each property
+                df_sums += prop_var_ratios
+            if self.obj_choice == "ExpValPrior":
+                #Add GAFF penalty equally among all properties
+                df_sums += gaff_penalty/num_props
+                
             #Set columns for costs
             if s == 0:
                 costs = pd.DataFrame(columns=prop_names)
@@ -978,7 +988,7 @@ class Opt_ATs(Problem_Setup):
         obj: float, the objective function from the formula defined in the paper
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        obj, sse_pieces, var_ratios =self.calc_obj(theta_guess)
+        obj, sse_pieces, var_ratios, gaff_penalty =self.calc_obj(theta_guess)
         
         #Scale theta_guess to preferred units
         theta_guess_pref = self.values_real_to_pref(theta_guess)
