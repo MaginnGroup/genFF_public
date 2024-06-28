@@ -9,7 +9,7 @@ import copy
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import scipy 
-from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes, plot_pvap_hvap
+from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes, plot_pvap_hvap, plot_MAPD_each_prop, plot_MAPD_avg_props
 
 #After jobs are finished
 #save signac results for each atom for a given atom typing scheme and number of training parameters
@@ -53,6 +53,7 @@ molec_dict = {"R14": R14,
 
 at_number = 11
 ff_list = []
+MSE_path_dict = {}
 for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     project = signac.get_project(project_path)
     if project_path == "opt_ff_ms":
@@ -84,6 +85,7 @@ for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     ff_list.append(df_all)
     #Calculate MAPD and MSE for each T point
     df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_name_final + "_err.csv")
+    MSE_path_dict[project_path]= csv_name_final + "_err.csv"
     
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff, and BBFF
 ff_names = ["Potoff", "TraPPE", "Wang_FFO", "BBFF"]
@@ -96,6 +98,7 @@ for ff_name in ff_names:
     df_ff_final = prepare_df_vle(df_simple, molec_dict, csv_name=csv_path_final + ".csv")
     if ff_name in  ["Wang_FFO", "BBFF"]:
         df_paramsets_w = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_path_final + "_err.csv")
+        MSE_path_dict[ff_name]= csv_path_final + "_err.csv"
     ff_list.append(df_ff_final)
     
 #Work on combining into 1 PDF
@@ -123,3 +126,16 @@ for molec in molecules:
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
+
+#Make MAPD Plots
+full_at_dir = os.path.join("Results_MS", "at_" + str(at_number))
+os.makedirs(full_at_dir, exist_ok=True)
+pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
+#For each molecule
+molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170", "R41", "R23", "R161", "R152a",  "R143",  "R116"]
+pdf_MAPD.savefig(plot_MAPD_each_prop(molec_names, MSE_path_dict), bbox_inches='tight')
+plt.close()
+pdf_MAPD.savefig(plot_MAPD_avg_props(molec_names, MSE_path_dict), bbox_inches='tight')
+plt.close()
+#Close figures 
+pdf_MAPD.close()   

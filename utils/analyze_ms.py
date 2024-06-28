@@ -572,3 +572,81 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
     # if save_name is not None:
     #     path = os.path.join(save_name, "h_p_vap_plt.png")
     #     fig.savefig(path,dpi=300)
+
+def plot_MAPD_each_prop(molec_names, MSE_path_dict, save_name = None):
+    cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap", "mapd_Tc", "mapd_rhoc"]
+    names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization", "Critical Temperature", "Critical Density"]
+    df_labels = ["This Work", "GAFF", "Wang et al.", "Befort et al." ]
+    df_colors = ['blue', 'gray', 'green','purple']
+    df_mse_list = []
+    for key in list(MSE_path_dict.keys()):
+        df_mse = pd.read_csv(MSE_path_dict[key].value, header = 0, index_col = "molecule")
+        df_mse_list.append(df_mse.reindex(molec_names))
+
+    fig, axs = plt.subplots(3, 2, figsize=(24, 16), sharex = True)
+    # Plot each column in a subplot
+    for ax, column, name in zip(axs.flatten(), cols, names):
+        bar_width = 0.2
+        indices = np.arange(len(molec_names))
+        max_val_f = 0
+        for i in range(len(df_mse_list)):
+            df = df_mse_list[i]
+            if i < len(df_mse_list):
+                max_val = max(df[column])
+                max_val_f = max(max_val, max_val_f)
+            ax.bar(indices + i*bar_width, df[column], bar_width, label=df_labels[i], color = df_colors[i])
+        
+        ax.set_ylim(0, max_val_f*1.05)
+        ax.set_title(name, fontsize = 14) 
+        ax.set_xticks(indices + bar_width)
+        ax.set_xticklabels(molec_names, fontsize=14)
+        if name == "Liquid Density":
+            ax.legend(loc = 'upper right', fontsize = 14)
+
+    # Adjust layout
+    fig.supxlabel('Molecule', fontsize = 20)
+    fig.supylabel("MAPD", fontsize = 20)
+
+    plt.tight_layout(rect=[0.01, 0.0, 1, 1])
+    # Show the plot
+    return fig
+
+def plot_MAPD_avg_props(molec_names, MSE_path_dict, save_name = None):
+    #Load our results, Gaff results, and old result MAPD values
+    df_labels = ["This Work", "GAFF", "Wang et al.", "Befort et al." ]
+    df_colors = ['blue', 'gray', 'green','purple']
+    cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap", "mapd_Tc", "mapd_rhoc"]
+    df_mse_list = []
+    for key in list(MSE_path_dict.keys()):
+        df_mse = pd.read_csv(MSE_path_dict[key].value, header = 0, index_col = "molecule")
+        df_mse_list.append(df_mse.reindex(molec_names))
+
+    # #Get Avg MAPD values for each molecule and each property + get min and max values
+    df_avg_list = []
+    for df in df_mse_list:
+        df_avg = df[cols].agg(['mean', 'min', 'max'], axis=1)
+        df_avg.columns = ['MAPD', 'Min', 'Max']
+        df_avg_list.append(df_avg.reindex(molec_names))
+
+    #Merge the dataframes
+    merged_df = pd.concat(df_avg_list, axis=1, keys=df_labels)
+    # merged_df.drop(["R41", "R23", "R152", "R134"], inplace = True)
+
+    # Plot the merged DataFrame
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    yerr_list = []
+    for i in range(len(df_labels)):
+        label = df_labels[i]
+        color = df_colors[i]
+        y_err = [merged_df[label]['MAPD'] - merged_df[label]['Min'], merged_df[label]['Max'] - merged_df[label]['MAPD']]
+        merged_df[label]['MAPD'].plot(kind='bar', color=color, ax=ax, yerr =y_err, position=i, width=0.2, label=label, rot = 0)
+
+    ax.set_title('MAPD Comparison for Different Refrigerants')
+    ax.set_xlabel('Molecule')
+    ax.set_xlim(-0.4, len(merged_df.index) - 0.2)
+    ax.set_ylabel('Average MAPD')
+    ax.legend(loc='upper left')
+
+    # Show the plot
+    return fig
