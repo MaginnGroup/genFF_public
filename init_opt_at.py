@@ -4,16 +4,16 @@ import json
 project = signac.init_project("opt_at_params")
 
 #Set Initial Parameters
-Atom_Type = 14
-repeats  = 200
-repeats_ind = 20
+Atom_Type = 11
+repeats  = 22 #Repeats for full optimization
+repeats_ind = 22 #Repats for individual molecule optimization
 seed = 1
 save_data = True
 training_molecules = list(["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"])
 
 if isinstance(training_molecules, list):
     training_molecules_all = json.dumps(training_molecules)
-Objective = "ExpVal"
+Objective = "ExpValPrior"
 
 #Create job parameter dict
 for i in range(0, repeats):

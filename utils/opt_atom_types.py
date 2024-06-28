@@ -87,7 +87,7 @@ class Problem_Setup:
         molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
         all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
         at_class: Instance of Atom_Types, class for atom typing
-        obj_choice: str, the objective choice. "SSE" (SSE) or "ExpVal" (Expected Value of SSE)
+        obj_choice: str, the objective choice. "SSE" (SSE) or "ExpVal" (Expected Value of SSE) or "ExpValPrior" (Expected Value of SSE with GAFF Prior)
         """
         #Load class properies for each molecule
         r14_class = r14.R14Constants()
@@ -147,16 +147,16 @@ class Problem_Setup:
             assert hasattr(at_class, "at_weights"), "at_class must have attribute at_weights"
             assert len(at_class.gaff_params) == len(at_class.at_weights) == len(at_class.at_names), "at_class gaff_params must have same length as at_weights"
             #Get g_avg from Exp Val pareto_info.csv
-            pareto_info = self.__get_ExpVal_info()
-            if pareto_info is None:
+            best_info = self.__get_ExpVal_info()
+            if best_info is None:
                 warnings.warn("ExpValPrior requires ExpVal best_per_run.csv to exist. Setting obj_choice to ExpVal")
                 obj_choice = "ExpVal"
             else:
                 #Get average value of pareto set for each parameter
-                Esse_avg = pareto_info["Min Obj"].mean()
+                Esse_avg = best_info["Min Obj"].mean()
                 self.Esse_avg = Esse_avg              
 
-        #Reset self.obj_choice as ExpValPrior or set obj_choice as obj_choice
+        #set obj_choice
         self.obj_choice = obj_choice
 
     def __get_ExpVal_info(self):
@@ -165,18 +165,18 @@ class Problem_Setup:
 
         Returns
         -------
-        pareto_info: pd.DataFrame, dataframe of pareto info
+        best_run_info: pd.DataFrame, dataframe of info for the best runs of ExpVal
         """
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice="ExpVal")
         file = "/best_per_run.csv" #/pareto_info.csv
         prop_names = ["sim_liq_density","sim_vap_density","sim_Pvap","sim_Hvap"]
-        pareto_info = None
+        best_info = None
         if os.path.exists(dir_name + file):
-            pareto_info = pd.read_csv(dir_name + file, index_col=False, header=0)
-            if "Min Obj" not in pareto_info.columns and set(prop_names).issubset(pareto_info.columns) == True:
-                pareto_info['Min Obj'] = pareto_info[prop_names].sum(axis=1)
+            best_info = pd.read_csv(dir_name + file, index_col=False, header=0)
+            if not "Min Obj" in best_info.columns:
+                best_info = None
                 
-        return pareto_info
+        return best_info
     
     def make_results_dir(self, molecules, obj_choice=None):
         """
