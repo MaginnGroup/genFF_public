@@ -1379,17 +1379,15 @@ class Opt_ATs(Problem_Setup):
         #     best_runs.to_csv(save_path3, index = False)
 
         return ls_results, sort_ls_res, best_runs   
-class Vis_Results:
+class Vis_Results(Analyze_opt_res):
     """
     Class For vizualizing GP and Optimization Results
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, Analysis_class):
+    def __init__(mol_name_train, at_number, seed, obj_choice):
         #Asserts
-        assert isinstance(Analysis_class, Analyze_opt_res), "Analysis_class must be an instance of Analyze_opt_res"
-        self.save_dir = Analysis_class.use_dir_name
-        molecules = list(Analysis_class.molec_data_dict.keys())
+        super().__init__(mol_name_train, at_number, seed, obj_choice)
 
     #Define function to check GP Accuracy
     def check_GPs(self):
