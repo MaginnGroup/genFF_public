@@ -621,6 +621,168 @@ class Problem_Setup:
 
         return obj
     
+    def gen_pareto_sets(self, samples, bounds, save_data= False):
+        """
+        generate LHS samples, calculate objective values, and sort them based on non-dominated sorting
+        """
+        #Generate LHS samples
+        samples = generate_lhs(samples, bounds, self.seed, labels = None)
+        #Define cost matrix (n_samplesx4)
+        molec_dict1 = next(iter(self.all_gp_dict.values()))
+        num_props = len(list(molec_dict1.keys()))
+        num_molecs = len(list(self.all_gp_dict.keys()))
+
+        #Loop over samples
+        for s in range(len(samples)):
+            #Calculate objective values
+            obj, obj_pieces, var_ratios, gaff_penalty = self.calc_obj(samples[s])
+            #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
+            var_ratios_organized = var_ratios.reshape(num_molecs, num_props, -1)
+            prop_var_ratios = np.sum(var_ratios_organized, axis=(0, 2))
+            df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
+            #Add variance ratios for each property when not using SSE
+            if self.obj_choice != "SSE":
+                df_sums += prop_var_ratios
+            #Add GAFF penalty equally among all properties if using GAFF Prior objective
+            if self.obj_choice == "ExpValPrior":
+                df_sums += gaff_penalty/num_props
+                
+            #Set columns for costs
+            if s == 0:
+                costs = pd.DataFrame(columns=prop_names)
+            df_sums_reordered = df_sums[costs.columns]
+            # Concatenate the DataFrames along the rows axis
+            costs = pd.concat([costs, df_sums_reordered], ignore_index=True)
+            
+        #Sort based on non-dominated sorting (call fffit.find_pareto_set(data, is_pareto_efficient)
+        idcs, pareto_cost, dom_cost = find_pareto_set(costs.to_numpy(), is_pareto_efficient)
+        #Put samples and cost values in order
+        df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
+        costs["is_pareto"]= idcs
+        pareto_info = pd.concat([df_samples, costs], axis = 1)
+        pareto_info['Min Obj'] = pareto_info[prop_names].sum(axis=1)
+        
+        #Save pareto info
+        if save_data == True:
+            save_csv_path1 = self.use_dir_name / "pareto_info.csv"
+            pareto_info.to_csv(save_csv_path1, index = False, header = True)
+        
+        return pareto_info
+
+    def __sum_sse_keys(self, obj_pieces):
+
+        # Dictionary to store the sum of values for each key
+        sums_by_prop = {}
+
+        # Iterate over the dictionary
+        for full_key, value in obj_pieces.items():
+            # Split the key to get the part after "molecX-" and before "-sse"
+            key_part = full_key.split('-')[1]  # This will give 'keyX'
+            
+            # Accumulate the sum for this key
+            if key_part in sums_by_prop:
+                sums_by_prop[key_part] += value
+            else:
+                sums_by_prop[key_part] = value
+
+        df_sums = pd.DataFrame(list(sums_by_prop.items()), columns=['Key', 'Sum'])
+        df_needed = df_sums.set_index('Key').T
+
+        return df_needed, list(sums_by_prop.keys())
+    
+class Analyze_opt_res(Problem_Setup):
+    """
+    Class for analyzing problem and optimization results. Child class of General_Analysis
+    """
+
+    #Inherit objects from General_Analysis
+    def __init__(self, molec_data_dict, all_gp_dict, at_class, seed, obj_choice):
+        """
+        Parameters:
+        -----------
+        molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
+        all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
+        at_class: Instance of Atom_Types, class for atom typing
+        repeats: int, number of optimization runs to do
+        seed: int, random seed for optimization
+        obj_choice: str, the objective choice for optimization. "SSE" or "ExpVal"
+        """
+
+        #Asserts
+        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice)
+        assert isinstance(seed, int) or seed is None, "seed must be int or None"
+        self.seed = seed
+
+    def get_best_results(self, molec_data_dict, molec_ind):
+        """
+        Get the best optimization results. Pulls best parameter set from:
+            1) Literature (stored in molecule objects)
+            2) The algorithm trained for one training molecule (molec_ind)
+            3) The algorithm trained for all training molecules (molec_data_dict.values())
+
+        Parameters
+        ----------
+        molec_data_dict: dict, dictionary of molecule training data
+        molec_ind: str, the molecule name to consider
+        
+        Returns
+        -------
+        param_dict: dict, dictionary of the best optimization results overall, for each molecule, and literature comparison
+        """
+        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
+        assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
+        assert isinstance(molec_ind, str), "molec_ind must be a string"
+        assert molec_ind in list(self.all_train_molec_data.keys()), "molec_ind must be a key in all_train_molec_data"
+        #Initialize Dict
+        param_dict = {}
+        #Get names and transformation matrix
+        all_molec_list = list(molec_data_dict.keys())
+        param_matrix = self.at_class.get_transformation_matrix({molec_ind: self.all_train_molec_data[molec_ind]})
+        #Get best_per_run.csv for all molecules
+        all_molec_dir = self.make_results_dir(all_molec_list)
+        if os.path.exists(all_molec_dir+"/best_per_run.csv"):
+            unsorted_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+            all_df = unsorted_df.sort_values(by = "Min Obj")
+            first_param_name = self.at_class.at_names[0] + "_min"
+            last_param_name = self.at_class.at_names[-1] + "_min"
+            full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+            all_best_real = self.values_pref_to_real(full_opt_best)
+            all_best_nec = all_best_real.reshape(-1,1).T@param_matrix
+            all_best_gp = values_real_to_scaled(all_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
+            all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
+        else:
+            all_best_gp = None
+        
+        if len(all_molec_list) > 1 and isinstance(all_molec_list, (list,np.ndarray)):
+            molecule_str = '-'.join(all_molec_list)
+        else:
+            molecule_str = all_molec_list[0]
+        param_dict["Opt " + molecule_str] = all_best_gp
+
+        molec_dir = self.make_results_dir([molec_ind])
+        if os.path.exists(molec_dir+"/best_per_run.csv"):
+            unsorted_molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
+            molec_df = unsorted_molec_df.sort_values(by = "Min Obj")
+            first_param_name = self.at_class.at_names[0] + "_min"
+            last_param_name = self.at_class.at_names[-1] + "_min"
+            molec_best = molec_df.loc[0, first_param_name:last_param_name].values
+            ind_best_real = self.values_pref_to_real(molec_best)
+            ind_best_nec = ind_best_real.reshape(-1,1).T@param_matrix
+            ind_best_gp = values_real_to_scaled(ind_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
+            ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
+        else:
+            ind_best_gp = None
+        param_dict["Opt " + molec_ind] = ind_best_gp
+
+        molec_paper = np.array(list(molec_data_dict[molec_ind].lit_param_set.values()))
+        paper_real = self.values_pref_to_real(molec_paper)
+        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
+        paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
+
+        param_dict["Literature"] = paper_best_gp
+
+        return param_dict
+    
     def approx_jac(self, x, save_data = False, x_label=None):
         """
         Builds Jacobian Approximation
@@ -720,76 +882,6 @@ class Problem_Setup:
             np.save(save_path, H)
         
         return H
-    
-    def get_best_results(self, molec_data_dict, molec_ind):
-        """
-        Get the best optimization results. Pulls best parameter set from:
-            1) Literature (stored in molecule objects)
-            2) The algorithm trained for one training molecule (molec_ind)
-            3) The algorithm trained for all training molecules (molec_data_dict.values())
-
-        Parameters
-        ----------
-        molec_data_dict: dict, dictionary of molecule training data
-        molec_ind: str, the molecule name to consider
-        
-        Returns
-        -------
-        param_dict: dict, dictionary of the best optimization results overall, for each molecule, and literature comparison
-        """
-        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
-        assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
-        assert isinstance(molec_ind, str), "molec_ind must be a string"
-        assert molec_ind in list(self.all_train_molec_data.keys()), "molec_ind must be a key in all_train_molec_data"
-        #Initialize Dict
-        param_dict = {}
-        #Get names and transformation matrix
-        all_molec_list = list(molec_data_dict.keys())
-        param_matrix = self.at_class.get_transformation_matrix({molec_ind: self.all_train_molec_data[molec_ind]})
-        #Get best_per_run.csv for all molecules
-        all_molec_dir = self.make_results_dir(all_molec_list)
-        if os.path.exists(all_molec_dir+"/best_per_run.csv"):
-            unsorted_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
-            all_df = unsorted_df.sort_values(by = "Min Obj")
-            first_param_name = self.at_class.at_names[0] + "_min"
-            last_param_name = self.at_class.at_names[-1] + "_min"
-            full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
-            all_best_real = self.values_pref_to_real(full_opt_best)
-            all_best_nec = all_best_real.reshape(-1,1).T@param_matrix
-            all_best_gp = values_real_to_scaled(all_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
-            all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
-        else:
-            all_best_gp = None
-        
-        if len(all_molec_list) > 1 and isinstance(all_molec_list, (list,np.ndarray)):
-            molecule_str = '-'.join(all_molec_list)
-        else:
-            molecule_str = all_molec_list[0]
-        param_dict["Opt " + molecule_str] = all_best_gp
-
-        molec_dir = self.make_results_dir([molec_ind])
-        if os.path.exists(molec_dir+"/best_per_run.csv"):
-            unsorted_molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
-            molec_df = unsorted_molec_df.sort_values(by = "Min Obj")
-            first_param_name = self.at_class.at_names[0] + "_min"
-            last_param_name = self.at_class.at_names[-1] + "_min"
-            molec_best = molec_df.loc[0, first_param_name:last_param_name].values
-            ind_best_real = self.values_pref_to_real(molec_best)
-            ind_best_nec = ind_best_real.reshape(-1,1).T@param_matrix
-            ind_best_gp = values_real_to_scaled(ind_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
-            ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
-        else:
-            ind_best_gp = None
-        param_dict["Opt " + molec_ind] = ind_best_gp
-
-        molec_paper = np.array(list(molec_data_dict[molec_ind].lit_param_set.values()))
-        paper_real = self.values_pref_to_real(molec_paper)
-        paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
-        paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
-
-        param_dict["Literature"] = paper_best_gp
-
-        return param_dict
 
     def calc_MAPD_any(self, all_molec_list, theta_guess, save_data = False, save_label = None):
         """
@@ -890,75 +982,7 @@ class Problem_Setup:
             df.to_csv(save_csv_path, index = False, header = True)
             
         return df
-    
-    def gen_pareto_sets(self, samples, bounds, save_data= False):
-        """
-        generate LHS samples, calculate objective values, and sort them based on non-dominated sorting
-        """
-        #Generate LHS samples
-        samples = generate_lhs(samples, bounds, self.seed, labels = None)
-        #Define cost matrix (n_samplesx4)
-        molec_dict1 = next(iter(self.all_gp_dict.values()))
-        num_props = len(list(molec_dict1.keys()))
-        num_molecs = len(list(self.all_gp_dict.keys()))
 
-        #Loop over samples
-        for s in range(len(samples)):
-            #Calculate objective values
-            obj, obj_pieces, var_ratios, gaff_penalty = self.calc_obj(samples[s])
-            #Get SSE values per property by summing sse_dicts based on prescence of keys for each molecule
-            var_ratios_organized = var_ratios.reshape(num_molecs, num_props, -1)
-            prop_var_ratios = np.sum(var_ratios_organized, axis=(0, 2))
-            df_sums, prop_names = self.__sum_sse_keys(obj_pieces)
-            #Add variance ratios for each property when not using SSE
-            if self.obj_choice != "SSE":
-                df_sums += prop_var_ratios
-            #Add GAFF penalty equally among all properties if using GAFF Prior objective
-            if self.obj_choice == "ExpValPrior":
-                df_sums += gaff_penalty/num_props
-                
-            #Set columns for costs
-            if s == 0:
-                costs = pd.DataFrame(columns=prop_names)
-            df_sums_reordered = df_sums[costs.columns]
-            # Concatenate the DataFrames along the rows axis
-            costs = pd.concat([costs, df_sums_reordered], ignore_index=True)
-            
-        #Sort based on non-dominated sorting (call fffit.find_pareto_set(data, is_pareto_efficient)
-        idcs, pareto_cost, dom_cost = find_pareto_set(costs.to_numpy(), is_pareto_efficient)
-        #Put samples and cost values in order
-        df_samples = pd.DataFrame(samples, columns = self.at_class.at_names)
-        costs["is_pareto"]= idcs
-        pareto_info = pd.concat([df_samples, costs], axis = 1)
-        pareto_info['Min Obj'] = pareto_info[prop_names].sum(axis=1)
-        
-        #Save pareto info
-        if save_data == True:
-            save_csv_path1 = self.use_dir_name / "pareto_info.csv"
-            pareto_info.to_csv(save_csv_path1, index = False, header = True)
-        
-        return pareto_info
-
-    def __sum_sse_keys(self, obj_pieces):
-
-        # Dictionary to store the sum of values for each key
-        sums_by_prop = {}
-
-        # Iterate over the dictionary
-        for full_key, value in obj_pieces.items():
-            # Split the key to get the part after "molecX-" and before "-sse"
-            key_part = full_key.split('-')[1]  # This will give 'keyX'
-            
-            # Accumulate the sum for this key
-            if key_part in sums_by_prop:
-                sums_by_prop[key_part] += value
-            else:
-                sums_by_prop[key_part] = value
-
-        df_sums = pd.DataFrame(list(sums_by_prop.items()), columns=['Key', 'Sum'])
-        df_needed = df_sums.set_index('Key').T
-
-        return df_needed, list(sums_by_prop.keys())
 class Opt_ATs(Problem_Setup):
     """
     The class for Least Squares regression analysis. Child class of General_Analysis
