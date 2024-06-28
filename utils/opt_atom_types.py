@@ -166,7 +166,7 @@ class Problem_Setup:
             assert len(self.at_class.gaff_params) == len(self.at_class.at_weights) == len(self.at_class.at_names), "at_class gaff_params must have same length as at_weights"
             #Get g_avg from Exp Val pareto_info.csv
             best_info = self.__get_ExpVal_info()
-            print("best_info: ", best_info)
+            # print("best_info: ", best_info)
             if best_info is None:
                 warnings.warn("ExpValPrior requires ExpVal best_per_run.csv to exist. Setting obj_choice to ExpVal")
                 obj_choice = "ExpVal"
@@ -192,7 +192,7 @@ class Problem_Setup:
         prop_names = ["sim_liq_density","sim_vap_density","sim_Pvap","sim_Hvap"]
         best_info = None
         file = dir_name / (file_end)
-        print(file)
+        # print(file)
         if file.exists():
             best_info = pd.read_csv(file, index_col=False, header=0)
             if not "Min Obj" in best_info.columns:
@@ -235,6 +235,39 @@ class Problem_Setup:
         dir_name = use_dir_name / "Results" / (scheme_name) / (molecule_str) / (obj_choice)
 
         return dir_name
+    
+    def get_uncertainty_data(self):
+        df = pd.DataFrame(columns = ["Molecule", "Property", "Value", "Uncertainty", "Uncertainty Used", "Weight"])
+        for key in list(self.molec_data_dict.keys()):
+            molec_object = self.molec_data_dict[key]
+            for prop_key in list(molec_object.uncertainties.keys()):
+                if "vap_density" in prop_key:
+                    exp_data = molec_object.expt_vap_density
+                    property_bounds = molec_object.vap_density_bounds
+                    property_name = "Vapor Density [kg/m^3]"
+                elif "liq_density" in prop_key:
+                    exp_data = molec_object.expt_liq_density
+                    property_bounds = molec_object.liq_density_bounds
+                    property_name = "Liquid Density [kg/m^3]"
+                elif "Pvap" in prop_key: 
+                    exp_data = molec_object.expt_Pvap
+                    property_bounds = molec_object.Pvap_bounds
+                    property_name = "Vapor pressure [bar]"
+                elif "Hvap" in prop_key:
+                    exp_data = molec_object.expt_Hvap
+                    property_bounds = molec_object.Hvap_bounds
+                    property_name = "Enthalpy of Vaporization [kJ/kg]"
+
+                values = np.array(list(exp_data.values()))
+                y_unc = molec_object.uncertainties[prop_key]
+                unc_val = np.maximum(y_unc, 0.02)
+                weight = 1/(unc_val*values)**2
+                df_vals = [key, prop_key, values, y_unc, unc_val, weight]
+                iter_df = pd.DataFrame([df_vals], columns = df.columns)
+                iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
+                df = pd.concat([df, iter_df], ignore_index=True)
+        df.to_csv("molecule_exp_unc_data.csv", index = False, header = True)
+        return df
     
     def values_pref_to_real(self, theta_guess):
         """

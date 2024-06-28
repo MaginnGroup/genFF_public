@@ -49,36 +49,9 @@ def run_obj_alg(job):
     repeat_num = job.sp.repeat_number
     seed = job.sp.seed
     save_data = job.sp.save_data
-    at_class = atom_type.make_atom_type_class(job.sp.atom_type)
-
-    #Load class properies for each trainingmolecule
-    r14_class = r14.R14Constants()
-    r32_class = r32.R32Constants()
-    r50_class = r50.R50Constants()
-    r125_class = r125.R125Constants()
-    r134a_class = r134a.R134aConstants()
-    r143a_class = r143a.R143aConstants()
-    r170_class = r170.R170Constants()
-
-    #Get dict of refrigerant classes to consider, gps, and atom typing class
-    all_molec_data_dict = {"R14":r14_class, 
-                    "R32":r32_class, 
-                    "R50":r50_class, 
-                    "R170":r170_class, 
-                    "R125":r125_class, 
-                    "R134a":r134a_class, 
-                    "R143a":r143a_class}
-    
-    #Make molec data dict given molecules:
-    molec_data_dict = {}
-    if isinstance(training_molecules, list):
-        for molec in training_molecules:
-            if molec in list(all_molec_data_dict.keys()):
-                molec_data_dict[molec] = all_molec_data_dict[molec]
 
     #Get all gp data and make driver class
-    all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
-    driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, total_repeats, seed, obj_choice)
+    driver = opt_atom_types.Opt_ATs(training_molecules, job.sp.atom_type, total_repeats, seed, obj_choice)
 
     if job.sp.obj_choice == "ExpValPrior":
         #Save Esse average
