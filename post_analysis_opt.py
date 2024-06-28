@@ -9,24 +9,14 @@ import copy
 import scipy 
 import signac
 
-#Set params for saving results and whether obj wts are scaled
-save_data = True
-obj_choice = "ExpVal"
-at_number = 11
-seed = 1
+#Set params for what you want to analyze
+save_data = True #Data to save
+obj_choice = "ExpVal" #Objective to consider
+at_number = 11 #atom type to consider
+seed = 1 #Seed to use
+molec_names = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"] #Training data to consider
 
-#Load class properies for each molecule
-r14_class = r14.R14Constants()
-r32_class = r32.R32Constants()
-r50_class = r50.R50Constants()
-r125_class = r125.R125Constants()
-r134a_class = r134a.R134aConstants()
-r143a_class = r143a.R143aConstants()
-r170_class = r170.R170Constants()
-
-#Get dict of refrigerant classes to consider, gps, and atom typing class
-molec_names = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"]
-
+#Get best_run data saved in one csv from all jobs
 project = signac.get_project("opt_at_params")
 filtered_jobs = project.find_jobs({"obj_choice": obj_choice, "atom_type": at_number})
 grouped_jobs = filtered_jobs.groupby(statepoint="training_molecules")
@@ -43,7 +33,7 @@ for statepoint_value, group in grouped_jobs.items():
     #Save all the best sets in appropriate folder for each set of training molecules
     all_df.to_csv(os.path.join(save_path, "best_per_run.csv"), index=False)
 
-#Best set from Experiment
+#Create visualization object
 visual = opt_atom_types.Vis_Results(molec_names, at_number, seed, obj_choice)
 #Set parameter set of interest (in this case get the best parameter set)
 all_molec_dir = visual.use_dir_name
