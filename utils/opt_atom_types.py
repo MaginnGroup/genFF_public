@@ -22,6 +22,7 @@ from itertools import combinations
 import numdifftools as nd
 from sklearn.metrics import mean_absolute_percentage_error
 from .molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+from .atom_type import make_atom_type_class
 from pathlib import Path
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
@@ -87,13 +88,12 @@ class Problem_Setup:
     calc_MAPD_best: Calculate the mean absolute percentage deviation for each training data prediction
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice):
+    def __init__(self, molec_names, at_number, obj_choice):
         """
         Parameters:
         -----------
-        molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
-        all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
-        at_class: Instance of Atom_Types, class for atom typing
+        molec_data_dict: List of refrigerant names w/ capital R, values are class objects from r***.py
+        at_class: at_number, int with which to create class for atom typing
         obj_choice: str, the objective choice. "SSE" (SSE) or "ExpVal" (Expected Value of SSE) or "ExpValPrior" (Expected Value of SSE with GAFF Prior)
         """
         #Load class properies for each molecule
@@ -122,7 +122,7 @@ class Problem_Setup:
                    "R134a":r134a_class, 
                    "R143a":r143a_class}
 
-        self.all_molec_data = {"R41":r41_class, 
+        self.all_test_molec_data = {"R41":r41_class, 
                    "R23":r23_class, 
                    "R161":r161_class, 
                    "R152a":r152a_class, 
@@ -132,20 +132,24 @@ class Problem_Setup:
                    "R116": r116_class}
 
         self.all_train_gp_dict = get_gp_data_from_pkl(list(self.all_train_molec_data.keys()))
-        
-        self.valid_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
+        self.valid_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170", "R23", "R41", "R161", "R152a", "R152", "R134", "R143", "R116"]
+        self.valid_train_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
         self.valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
-        
-        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
-        assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
-        assert isinstance(all_gp_dict, dict), "all_gp_dict must be a dictionary"
-        assert list(molec_data_dict.keys()) == list(all_gp_dict.keys()), "molec_data_dict and all_gp_dict must have same keys"
         assert isinstance(obj_choice, str), "obj_choice must be string"
         assert obj_choice in ["ExpVal", "SSE", "ExpValPrior"], "obj_choice must be SSE, ExpVal, or ExpValPrior"
-        #Placeholder that will be overwritten if None
-        self.molec_data_dict = molec_data_dict
-        self.all_gp_dict = all_gp_dict
-        self.at_class = at_class
+
+        #Set training and testing data dictionaries
+        self.molec_data_dict = {}
+        self.test_data_dict = {}
+
+        for molec in molec_names:
+            if molec in list(self.all_train_molec_data.keys()):
+                self.molec_data_dict[molec] = self.all_train_molec_data[molec]
+            else:
+                self.test_data_dict[molec] = self.all_test_molec_data[molec]
+        
+        self.all_gp_dict = get_gp_data_from_pkl(list(self.molec_data_dict.keys()))
+        self.at_class = make_atom_type_class(at_number)
         self.seed = 1
 
         #Ensure we are working out of generalizedFF
@@ -157,9 +161,9 @@ class Problem_Setup:
 
         #If using ExpValPrior, check that you can calculate the average value of the pareto set of ExpVal
         if obj_choice == "ExpValPrior":
-            assert hasattr(at_class, "gaff_params"), "at_class must have attribute gaff_params"
-            assert hasattr(at_class, "at_weights"), "at_class must have attribute at_weights"
-            assert len(at_class.gaff_params) == len(at_class.at_weights) == len(at_class.at_names), "at_class gaff_params must have same length as at_weights"
+            assert hasattr(self.at_class, "gaff_params"), "at_class must have attribute gaff_params"
+            assert hasattr(self.at_class, "at_weights"), "at_class must have attribute at_weights"
+            assert len(self.at_class.gaff_params) == len(self.at_class.at_weights) == len(self.at_class.at_names), "at_class gaff_params must have same length as at_weights"
             #Get g_avg from Exp Val pareto_info.csv
             best_info = self.__get_ExpVal_info()
             print("best_info: ", best_info)
@@ -343,7 +347,7 @@ class Problem_Setup:
         if molec_key not in self.valid_mol_keys:
             raise ValueError(
                 "Invalid molec_key {}. Supported molec_key names are "
-                "{}".format(molec_key, self.valid_mol_keys))
+                "{}".format(molec_key, self.valid_train_mol_keys))
             
         #Get dict of testing data
         test_data = {}
@@ -690,30 +694,98 @@ class Problem_Setup:
 
         return df_needed, list(sums_by_prop.keys())
     
+    def rank_parameters(self, theta_guess, save_data = False):
+        """
+        Ranks parameter estimability according to the alogithm in Table 2 Yao, K.Z., et al. (2003), Polym. React. Eng.
+
+        Parameters
+        ----------
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+
+        Returns
+        -------
+        ranked_indices: np.ndarray, the ranked indices of the parameters
+        n_data: int, the number of data points
+        """
+        at_bounds_real = self.at_class.at_bounds_nm_kjmol
+        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), at_bounds_real)
+
+        #Get Sensitivity Matrix
+        fun = lambda x: self.calc_fxn(x)
+        dfun = nd.Gradient(fun)
+        #Use standardized scaled values
+        Z = dfun([theta_scl])
+
+        # Step 1: Calculate the magnitude of each column in Z
+        column_magnitudes = np.linalg.norm(Z, axis=0)
+        
+        # Initialize variables
+        ranked_indices = []  # To keep track of ranked parameter indices
+        k = 1
+        n_data, m = Z.shape
+
+        while k <= m:
+            if k == 1:
+                # Step 2: Identify the most estimable parameter
+                max_index = np.argmax(column_magnitudes)
+                ranked_indices.append(max_index)
+            else:
+                # Step 3: Build X_k with the k most estimable columns
+                X_k = Z[:, ranked_indices]
+
+                # Predict Z using ordinary least-squares
+                #Note that this value is reporting Z_hat, without scaling by Xk
+                Z_hat, _, _, _ = scipy.linalg.lstsq(X_k, Z)
+
+                # Calculate the residual matrix R_k, scaling Z_hat by Xk
+                R_k = Z - X_k @ Z_hat
+
+                # Step 4: Calculate the magnitude of each column in R_k
+                residual_magnitudes = np.linalg.norm(R_k, axis=0)
+
+                # Step 5: Determine the next most estimable parameter
+                # Ensure we pick a column that hasn't been ranked yet
+                for idx in np.argsort(-residual_magnitudes):
+                    if idx not in ranked_indices:
+                        ranked_indices.append(idx)
+                        break
+            
+            k += 1  # Step 6: Increase k and repeat
+
+        if save_data:
+            #Write ranked indices and n_data to a csv on separate lines
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+            save_csv_path1 = os.path.join(dir_name, "ranked_indices.csv")
+            save_csv_path2 = os.path.join(dir_name, "n_data.csv")
+            save_csv_path3 = os.path.join(dir_name, "Z_matrix.csv")
+            np.savetxt(save_csv_path1, ranked_indices, delimiter=",")
+            np.savetxt(save_csv_path2, np.array([n_data]), delimiter=",")
+            np.savetxt(save_csv_path3, Z, delimiter=",")
+
+        return np.array(ranked_indices), n_data
+    
 class Analyze_opt_res(Problem_Setup):
     """
     Class for analyzing problem and optimization results. Child class of General_Analysis
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, seed, obj_choice):
+    def __init__(self, mol_name_train, at_number, seed, obj_choice):
         """
         Parameters:
         -----------
-        molec_data_dict: dict, keys are training refrigerant names w/ capital R, values are class objects from r***.py
-        all_gp_dict: dict of dict, keys are training refrigerant names w/ capital R, values are dictionaries of properties and GP objects
-        at_class: Instance of Atom_Types, class for atom typing
-        repeats: int, number of optimization runs to do
+        mol_name_train: List of training molecules that were considered during optimization; training refrigerant names w/ capital R.
+        at_number: int, class for atom typing
         seed: int, random seed for optimization
         obj_choice: str, the objective choice for optimization. "SSE" or "ExpVal"
         """
 
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice)
+        super().__init__(mol_name_train, at_number, obj_choice)
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.seed = seed
 
-    def get_best_results(self, molec_data_dict, molec_ind):
+    def get_best_results(self, molec_ind):
         """
         Get the best optimization results. Pulls best parameter set from:
             1) Literature (stored in molecule objects)
@@ -722,22 +794,21 @@ class Analyze_opt_res(Problem_Setup):
 
         Parameters
         ----------
-        molec_data_dict: dict, dictionary of molecule training data
         molec_ind: str, the molecule name to consider
         
         Returns
         -------
         param_dict: dict, dictionary of the best optimization results overall, for each molecule, and literature comparison
         """
-        assert isinstance(molec_data_dict, dict), "molec_data_dict must be a dictionary"
-        assert set(molec_data_dict.keys()).issubset(set(self.all_train_molec_data.keys())), "molec_data_dict keys must be a subset of all_train_molec_data keys"
         assert isinstance(molec_ind, str), "molec_ind must be a string"
         assert molec_ind in list(self.all_train_molec_data.keys()), "molec_ind must be a key in all_train_molec_data"
+
         #Initialize Dict
         param_dict = {}
         #Get names and transformation matrix
-        all_molec_list = list(molec_data_dict.keys())
+        all_molec_list = list(self.molec_data_dict.keys())
         param_matrix = self.at_class.get_transformation_matrix({molec_ind: self.all_train_molec_data[molec_ind]})
+
         #Get best_per_run.csv for all molecules
         all_molec_dir = self.make_results_dir(all_molec_list)
         if os.path.exists(all_molec_dir+"/best_per_run.csv"):
@@ -774,7 +845,7 @@ class Analyze_opt_res(Problem_Setup):
             ind_best_gp = None
         param_dict["Opt " + molec_ind] = ind_best_gp
 
-        molec_paper = np.array(list(molec_data_dict[molec_ind].lit_param_set.values()))
+        molec_paper = np.array(list(self.molec_data_dict[molec_ind].lit_param_set.values()))
         paper_real = self.values_pref_to_real(molec_paper)
         paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
         paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
@@ -783,7 +854,7 @@ class Analyze_opt_res(Problem_Setup):
 
         return param_dict
     
-    def approx_jac(self, x, save_data = False, x_label=None):
+    def approx_jac(self, x, scale_theta = True, save_data = False, x_label=None):
         """
         Builds Jacobian Approximation
 
@@ -798,7 +869,15 @@ class Analyze_opt_res(Problem_Setup):
         assert isinstance(x, np.ndarray), "x must be an np.ndarray"
         assert isinstance(save_data, bool), "save_data must be a bool"
         assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
-        jac = nd.Jacobian(self.one_output_calc_obj)(x)
+
+        #If we want to scale parameters
+        if scale_theta:
+            #Scale x values between 0 and 1 to get Hessian scaled w.r.t parameter differences
+            x = values_real_to_scaled(x.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
+            jac = nd.Jacobian(self.__unscl_theta_calc_obj)(x)
+        #Otherwise use the unscaled x values
+        else:
+            jac = nd.Jacobian(self.one_output_calc_obj)(x)
 
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
@@ -809,38 +888,7 @@ class Analyze_opt_res(Problem_Setup):
             
         return jac
     
-    def approx_jac_many(self, x, save_data = False, x_label=None):
-        """
-        Builds Jacobian Approximation
-
-        Parameters
-        ----------
-        x: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
-
-        Returns
-        -------
-        jac: np.ndarray, the jacobian approximation
-        """
-        assert isinstance(x, np.ndarray), "x must be an np.ndarray"
-        assert isinstance(save_data, bool), "save_data must be a bool"
-        assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
-        num_points = x.shape[0]
-        m = x.shape[1]
-        jacobians = np.zeros((num_points, m))
-        for i in range(num_points):
-            jac = nd.Jacobian(self.one_output_calc_obj)(x)
-            jacobians[i,:] = jac.flatten()
-
-        if save_data:
-            x_label = x_label if x_label is not None else "param_guess"
-            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            os.makedirs(dir_name, exist_ok=True) 
-            save_path = os.path.join(dir_name, x_label + "_jac_many_approx.npy")
-            np.save(save_path, jacobians)
-            
-        return jacobians
-    
-    def hess_scl_calc_obj(self, theta_guess):
+    def __unscl_theta_calc_obj(self, theta_guess):
         """
         Wrapper function converting scaled x values from 0 to 1 to nm and kj/mol values before inputting to calc_obj
         """
@@ -853,7 +901,7 @@ class Analyze_opt_res(Problem_Setup):
         return obj
 
 
-    def approx_hess(self, x, save_data = False, x_label=None):
+    def approx_hess(self, x, scale_theta = True, save_data = False, x_label=None):
         '''
         Calculate gradient of function my_f using central difference formula and my_grad
         
@@ -868,11 +916,15 @@ class Analyze_opt_res(Problem_Setup):
         assert isinstance(x, np.ndarray), "x must be an np.ndarray"
         assert isinstance(save_data, bool), "save_data must be a bool"
         assert isinstance(x_label, (str, type(None))), "x_label must be a string or None"
-        
-        # H = nd.Hessian(self.one_output_calc_obj)(x) #Use this if you don't want params scaled between 0 and 1 for calculation of Hessian
-        #Scale x values between 0 and 1 to get Hessian scaled w.r.t parameter differences
-        x = values_real_to_scaled(x.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
-        H = nd.Hessian(self.hess_scl_calc_obj)(x)
+    
+        #If we want to scale parameters
+        if scale_theta:
+            #Scale x values between 0 and 1 to get Hessian scaled w.r.t parameter differences
+            x = values_real_to_scaled(x.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
+            H = nd.Hessian(self.__unscl_theta_calc_obj)(x)
+        #Otherwise use the unscaled x values
+        else:
+            H = nd.Hessian(self.one_output_calc_obj)(x)
 
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
@@ -949,7 +1001,6 @@ class Analyze_opt_res(Problem_Setup):
             molec_object = self.all_train_molec_data[molec]
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
-
             test_params = self.get_best_results(self.molec_data_dict, molec)
             
             #Loop over gps (1 per property)
@@ -997,7 +1048,7 @@ class Opt_ATs(Problem_Setup):
     optimize_ats: Optimizes the atom type parameters
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, repeats, seed, obj_choice):
+    def __init__(self, molec_names, at_number, repeats, seed, obj_choice):
         """
         Parameters:
         -----------
@@ -1010,7 +1061,7 @@ class Opt_ATs(Problem_Setup):
         """
 
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice)
+        super().__init__(molec_names, at_number, obj_choice)
         assert isinstance(repeats, int) and repeats > 0, "repeats must be int > 0"
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.repeats = repeats
@@ -1055,76 +1106,6 @@ class Opt_ATs(Problem_Setup):
 
         return obj
     
-    def rank_parameters(self, theta_guess, save_data = False):
-        """
-        Ranks parameter estimability according to the alogithm in Table 2 Yao, K.Z., et al. (2003), Polym. React. Eng.
-
-        Parameters
-        ----------
-        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
-
-        Returns
-        -------
-        ranked_indices: np.ndarray, the ranked indices of the parameters
-        n_data: int, the number of data points
-        """
-        at_bounds_real = self.at_class.at_bounds_nm_kjmol
-        theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), at_bounds_real)
-
-        #Get Sensitivity Matrix
-        fun = lambda x: self.calc_fxn(x)
-        dfun = nd.Gradient(fun)
-        #Use standardized scaled values
-        Z = dfun([theta_scl])
-
-        # Step 1: Calculate the magnitude of each column in Z
-        column_magnitudes = np.linalg.norm(Z, axis=0)
-        
-        # Initialize variables
-        ranked_indices = []  # To keep track of ranked parameter indices
-        k = 1
-        n_data, m = Z.shape
-
-        while k <= m:
-            if k == 1:
-                # Step 2: Identify the most estimable parameter
-                max_index = np.argmax(column_magnitudes)
-                ranked_indices.append(max_index)
-            else:
-                # Step 3: Build X_k with the k most estimable columns
-                X_k = Z[:, ranked_indices]
-
-                # Predict Z using ordinary least-squares
-                #Note that this value is reporting Z_hat, without scaling by Xk
-                Z_hat, _, _, _ = scipy.linalg.lstsq(X_k, Z)
-
-                # Calculate the residual matrix R_k, scaling Z_hat by Xk
-                R_k = Z - X_k @ Z_hat
-
-                # Step 4: Calculate the magnitude of each column in R_k
-                residual_magnitudes = np.linalg.norm(R_k, axis=0)
-
-                # Step 5: Determine the next most estimable parameter
-                # Ensure we pick a column that hasn't been ranked yet
-                for idx in np.argsort(-residual_magnitudes):
-                    if idx not in ranked_indices:
-                        ranked_indices.append(idx)
-                        break
-            
-            k += 1  # Step 6: Increase k and repeat
-
-        if save_data:
-            #Write ranked indices and n_data to a csv on separate lines
-            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "ranked_indices.csv")
-            save_csv_path2 = os.path.join(dir_name, "n_data.csv")
-            save_csv_path3 = os.path.join(dir_name, "Z_matrix.csv")
-            np.savetxt(save_csv_path1, ranked_indices, delimiter=",")
-            np.savetxt(save_csv_path2, np.array([n_data]), delimiter=",")
-            np.savetxt(save_csv_path3, Z, delimiter=",")
-
-        return np.array(ranked_indices), n_data
-
     def estimate_opt(self, theta_guess, ranked_indices, n_data, save_data = False):
         """
         Determines the optimal number of parameters to estimate based on algorithm in Wu, S., et al. (2011). Int. J. Advanced Mechatronic Systems
@@ -1398,16 +1379,17 @@ class Opt_ATs(Problem_Setup):
         #     best_runs.to_csv(save_path3, index = False)
 
         return ls_results, sort_ls_res, best_runs   
-class Vis_Results(Problem_Setup):
+class Vis_Results:
     """
     Class For vizualizing GP and Optimization Results
     """
 
     #Inherit objects from General_Analysis
-    def __init__(self, molec_data_dict, all_gp_dict, at_class, obj_choice):
+    def __init__(self, Analysis_class):
         #Asserts
-        super().__init__(molec_data_dict, all_gp_dict, at_class, obj_choice)
-        
+        assert isinstance(Analysis_class, Analyze_opt_res), "Analysis_class must be an instance of Analyze_opt_res"
+        self.save_dir = Analysis_class.use_dir_name
+        molecules = list(Analysis_class.molec_data_dict.keys())
 
     #Define function to check GP Accuracy
     def check_GPs(self):
