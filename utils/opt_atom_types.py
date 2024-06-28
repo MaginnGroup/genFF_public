@@ -8,6 +8,7 @@ import time
 import pandas as pd
 import pickle
 import gpflow
+
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real, generate_lhs
 from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params, plot_model_vs_exp, plot_obj_contour
 from fffit.fffit.pareto import find_pareto_set, is_pareto_efficient
@@ -21,6 +22,7 @@ from itertools import combinations
 import numdifftools as nd
 from sklearn.metrics import mean_absolute_percentage_error
 from .molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+from pathlib import Path
 
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 # print(mpl_is_inline)
@@ -44,12 +46,17 @@ def get_gp_data_from_pkl(key_list):
     assert all(key in valid_keys for key in key_list) == True, "all key in key_list must be valid keys"
     #Make a dict of the gp dictionaries for each molecule
     all_gp_dict = {}
+    #Ensure we are working out of generalizedFF
+    if Path(os.getcwd()).parent.name == "generalizedFF":
+        path_use = Path(Path(os.getcwd()).parent)
+    else:
+        path_use = Path(os.getcwd())
     #loop over molecules
     for key in key_list:
         #Get dict of vle gps
         #OPTIONAL append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-        file = os.path.join("molec_gp_data", key +"-vlegp/vle-gps.pkl")
-        assert os.path.isfile(file), f"{file} does not exist. Check file path carefully."
+        file = path_use / "molec_gp_data" / (key +"-vlegp/vle-gps.pkl")
+        assert file.exists(), f"{os.path.abspath(file)} does not exist. Check file path carefully."
         with open(file, 'rb') as pickle_file:
             all_gp_dict[key] = pickle.load(pickle_file)
 
@@ -141,6 +148,13 @@ class Problem_Setup:
         self.at_class = at_class
         self.seed = 1
 
+        #Ensure we are working out of generalizedFF
+        if Path(os.getcwd()).parent.name == "generalizedFF":
+            self.use_root = Path(Path(os.getcwd()).parent)
+        else:
+            self.use_root = Path(os.getcwd())
+            
+
         #If using ExpValPrior, check that you can calculate the average value of the pareto set of ExpVal
         if obj_choice == "ExpValPrior":
             assert hasattr(at_class, "gaff_params"), "at_class must have attribute gaff_params"
@@ -148,6 +162,7 @@ class Problem_Setup:
             assert len(at_class.gaff_params) == len(at_class.at_weights) == len(at_class.at_names), "at_class gaff_params must have same length as at_weights"
             #Get g_avg from Exp Val pareto_info.csv
             best_info = self.__get_ExpVal_info()
+            print("best_info: ", best_info)
             if best_info is None:
                 warnings.warn("ExpValPrior requires ExpVal best_per_run.csv to exist. Setting obj_choice to ExpVal")
                 obj_choice = "ExpVal"
@@ -158,6 +173,7 @@ class Problem_Setup:
 
         #set obj_choice
         self.obj_choice = obj_choice
+        self.use_dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice=obj_choice)
 
     def __get_ExpVal_info(self):
         """
@@ -168,11 +184,13 @@ class Problem_Setup:
         best_run_info: pd.DataFrame, dataframe of info for the best runs of ExpVal
         """
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice="ExpVal")
-        file = "/best_per_run.csv" #/pareto_info.csv
+        file_end = "best_per_run.csv" #pareto_info.csv
         prop_names = ["sim_liq_density","sim_vap_density","sim_Pvap","sim_Hvap"]
         best_info = None
-        if os.path.exists(dir_name + file):
-            best_info = pd.read_csv(dir_name + file, index_col=False, header=0)
+        file = dir_name / (file_end)
+        print(file)
+        if file.exists():
+            best_info = pd.read_csv(file, index_col=False, header=0)
             if not "Min Obj" in best_info.columns:
                 best_info = None
                 
@@ -205,7 +223,12 @@ class Problem_Setup:
         else:
             molecule_str = molecules[0]
 
-        dir_name = os.path.join("Results" ,scheme_name, molecule_str, obj_choice)
+        if Path(os.getcwd()).parent.name == "generalizedFF":
+            use_dir_name = Path(Path(os.getcwd()).parent)
+        else:
+            use_dir_name = Path(os.getcwd())
+        
+        dir_name = use_dir_name / "Results" / (scheme_name) / (molecule_str) / (obj_choice)
 
         return dir_name
     
@@ -327,14 +350,14 @@ class Problem_Setup:
         train_data = {}
         for strng in ["train", "test"]:
             #OPTIONAL (but not implemented here) append the MD density gp to the VLE density gp dictionary w/ key "MD Density"
-            file_x = os.path.join("molec_gp_data/" + molec_key +"-vlegp/x_" + strng +".csv")
-            assert os.path.isfile(file_x), "molec_gp_data/key-vlegp/x_****.csv does not exist. Check key list carefully"
+            file_x = self.use_root / "molec_gp_data" / (molec_key +"-vlegp/x_" + strng +".csv")
+            assert file_x.exists(), "molec_gp_data/key-vlegp/x_****.csv does not exist. Check key list carefully"
             x = np.loadtxt(file_x, delimiter=",",skiprows=1)
             dict = train_data if strng == "train" else test_data
             dict["x"]=x
 
             for prop_key in prop_keys:
-                file_y = os.path.join("molec_gp_data/" + molec_key +"-vlegp/" + prop_key + "_y_" +strng+ ".csv")
+                file_y = self.use_root / "molec_gp_data" / (molec_key +"-vlegp/" + prop_key + "_y_" +strng+ ".csv")
                 prop_data = np.loadtxt(file_y, delimiter=",",skiprows=1)
                 dict[prop_key]=prop_data
 
@@ -911,8 +934,7 @@ class Problem_Setup:
         
         #Save pareto info
         if save_data == True:
-            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
+            save_csv_path1 = self.use_dir_name / "pareto_info.csv"
             pareto_info.to_csv(save_csv_path1, index = False, header = True)
         
         return pareto_info
@@ -1151,7 +1173,7 @@ class Opt_ATs(Problem_Setup):
         return opt_num_params, rcc, loss_k, loss_k_params
 
 
-    def get_param_inits(self):
+    def get_param_inits(self, method = "pareto"):
         """
         Gets parameter guesses and sets up bounds for optimization
 
@@ -1163,41 +1185,41 @@ class Opt_ATs(Problem_Setup):
         if self.seed is not None:
             np.random.seed(self.seed)
 
-        #Try to load from csv params if it exists
-        dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-        save_csv_path1 = os.path.join(dir_name, "pareto_info.csv")
-        if os.path.exists(save_csv_path1):
-            all_pareto_info = pd.read_csv(save_csv_path1, header = 0)
-        #Otherwise generate 10**5 pareto sets, and save the data
+        if method == "pareto":
+            #Try to load from csv params if it exists
+            save_csv_path1 = self.use_dir_name / "pareto_info.csv"
+            if save_csv_path1.exists():
+                all_pareto_info = pd.read_csv(save_csv_path1, header = 0)
+            #Otherwise generate 10**5 pareto sets, and save the data
+            else:
+                warnings.warn("No Pareto info found. Generating 10^5 LHS to find Pareto sets", UserWarning)
+                all_pareto_info = self.gen_pareto_sets(int(10**5), self.at_class.at_bounds_nm_kjmol, save_data= True)
+            #Get dominated vs nondominated points
+            pareto_data = all_pareto_info[all_pareto_info["is_pareto"] == True]
+            dominated_data = all_pareto_info[all_pareto_info["is_pareto"] == False]
+            pareto_points = pareto_data[self.at_class.at_names].copy()
+            dom_points = dominated_data[self.at_class.at_names].copy()
+            #Ensure we are using less repeats than pareto optimal points
+            if len(pareto_points) < self.repeats:
+                #Could opt to use more repeats than # of pareto sets
+                warnings.warn(f"More repeats ({self.repeats}) than Pareto optimal sets ({len(pareto_points)}). Generating repeats for number of Paerto sets", UserWarning)
+                self.repeats = len(pareto_points)
+                # num_false = self.repeats - len(pareto_points)
+                # pareto_data_false = dom_points.sample(n=num_false, random_state=self.seed)
+                # restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
+            #Randomly sample pareto points without replacement
+            restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
+            param_inits = restart_data.to_numpy()
+        elif method == "lhs":
+            #Could also sample with LHS
+            param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
+                                        self.seed, labels = None)
+            param_inits = param_sets.to_numpy()
         else:
-            warnings.warn("No Pareto info found. Generating 10^5 LHS to find Pareto sets", UserWarning)
-            all_pareto_info = self.gen_pareto_sets(int(10**5), self.at_class.at_bounds_nm_kjmol, save_data= True)
-        #Get dominated vs nondominated points
-        pareto_data = all_pareto_info[all_pareto_info["is_pareto"] == True]
-        dominated_data = all_pareto_info[all_pareto_info["is_pareto"] == False]
-        pareto_points = pareto_data[self.at_class.at_names].copy()
-        dom_points = dominated_data[self.at_class.at_names].copy()
-        #Ensure we are using less repeats than pareto optimal points
-        if len(pareto_points) < self.repeats:
-            #Could opt to use more repeats than # of pareto sets
-            warnings.warn(f"More repeats ({self.repeats}) than Pareto optimal sets ({len(pareto_points)}). Generating repeats for number of Paerto sets", UserWarning)
-            self.repeats = len(pareto_points)
-            # num_false = self.repeats - len(pareto_points)
-            # pareto_data_false = dom_points.sample(n=num_false, random_state=self.seed)
-            # restart_data = pd.concat([pareto_points, pareto_data_false], ignore_index=True)
-        #Randomly sample pareto points without replacement
-        restart_data = pareto_points.sample(n=self.repeats, random_state=self.seed)
-        param_inits = restart_data.to_numpy()
-
-        #Could also sample with LHS
-        # param_sets = generate_lhs(self.repeats, self.at_class.at_bounds_nm_kjmol, 
-        #                             self.seed, labels = None)
-        # param_inits = param_sets.to_numpy()
-
-        # Could also sample randomly
-        # lb = self.at_class.at_bounds_nm_kjmol[:,0].T
-        # ub = self.at_class.at_bounds_nm_kjmol[:,1].T
-        # param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
+            #Could also sample randomly
+            lb = self.at_class.at_bounds_nm_kjmol[:,0].T
+            ub = self.at_class.at_bounds_nm_kjmol[:,1].T
+            param_inits = np.random.uniform(low=lb, high=ub, size=(self.repeats, len(lb)) )
         
         return param_inits
     
