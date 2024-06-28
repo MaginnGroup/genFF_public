@@ -78,6 +78,10 @@ def run_obj_alg(job):
     all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
     driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, total_repeats, seed, obj_choice)
 
+    if job.sp.obj_choice == "ExpValPrior":
+            #Save Esse average
+            job.doc["Esse_avg"] = driver.Esse_avg
+
     #Create param sets for the AT optimization based on seed and such
     param_inits = driver.get_param_inits()
 
@@ -109,6 +113,7 @@ def run_obj_alg(job):
         #Save sorted results
         save_path2 =  job.fn("sorted_at_res.csv")
         sort_ls_res.to_csv(save_path2, index = False)
+
     #If the repeat number is greater than the number of param_inits, then we have already done all the repeats. Delete the job
     else:
         job.remove()
