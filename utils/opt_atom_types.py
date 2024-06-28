@@ -1170,6 +1170,7 @@ class Opt_ATs(Problem_Setup):
             all_pareto_info = pd.read_csv(save_csv_path1, header = 0)
         #Otherwise generate 10**5 pareto sets, and save the data
         else:
+            warnings.warn("No Pareto info found. Generating 10^5 LHS to find Pareto sets", UserWarning)
             all_pareto_info = self.gen_pareto_sets(int(10**5), self.at_class.at_bounds_nm_kjmol, save_data= True)
         #Get dominated vs nondominated points
         pareto_data = all_pareto_info[all_pareto_info["is_pareto"] == True]
