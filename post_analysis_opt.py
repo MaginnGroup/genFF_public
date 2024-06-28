@@ -8,6 +8,8 @@ import os
 import copy
 import scipy 
 import signac
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 #Set params for what you want to analyze
 save_data = True #Data to save
@@ -67,3 +69,15 @@ if save_data == True:
 
 #Plot optimization result heat maps
 visual.plot_obj_hms(best_set, x_label)
+
+#Plot atom_type scheme results
+at_schemes = [11,12,13,14]
+if len(at_schemes) > 1 and isinstance(at_schemes, (list,np.ndarray)):
+    at_str = '-'.join(at_schemes.sort())
+else:
+    at_str = at_schemes[0]
+pdf = PdfPages('Results/at_schemes_' + at_str + '.pdf')
+pdf.savefig(visual.plot_at_MSE(molec_names, at_schemes), bbox_inches='tight')
+#Close figures 
+plt.close()
+pdf.close()   

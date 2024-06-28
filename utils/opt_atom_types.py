@@ -200,7 +200,7 @@ class Problem_Setup:
                 
         return best_info
     
-    def make_results_dir(self, molecules, obj_choice=None):
+    def make_results_dir(self, molecules, obj_choice=None, at_choice = None):
         """
         Makes a directory for results based on the scheme name, optimization method, and molecule names
         
@@ -214,9 +214,12 @@ class Problem_Setup:
         """
         if obj_choice == None:
             obj_choice = self.obj_choice
+        if at_choice == None:
+            scheme_name = self.at_class.scheme_name
+        else:
+            scheme_name = "at_" + str(at_choice) 
         assert isinstance(obj_choice, str) and obj_choice in ["ExpVal", "SSE", "ExpValPrior"], "obj_choice must be a string or None"
         assert isinstance(molecules, (str, list, np.ndarray)), "molecules must be a string or list/np.ndarray of strings"
-        scheme_name = self.at_class.scheme_name
         if isinstance(molecules, str):
             molecule_str = molecules
         elif len(molecules) > 1 and isinstance(molecules, (list,np.ndarray)):
@@ -1704,6 +1707,65 @@ class Vis_Results(Analyze_opt_res):
             obj_dict[key] = obj_arr
 
         return param_dict, obj_dict
+    
+    
+    def plot_at_MSE(self, molec_names, at_schemes):
+        x = np.arange(len(molec_names))  # the label locations
+        width = 0.2 #1/len(x+1)  # the width of the bars
+        multiplier = 0
+
+        fig, ax = plt.subplots()
+        for i, at in enumerate(at_schemes):
+            dir_name = self.make_results_dir(molec_names, at_choice=at)
+            df = pd.read_csv(dir_name / "MAPD_best_set.csv", header = 0)
+
+            #Get literature data from 1st at scheme
+            if i==0:
+                litdf = df[df['Model'] == "Literature"]
+                litdf = litdf.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
+                litdf.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
+                offset = width * multiplier
+                rects2 = ax.bar(x + offset, litdf["Avg MAPD"], width, label="Literature")
+                maxy = litdf["Max MAPD"] - litdf["Avg MAPD"]
+                miny = litdf["Avg MAPD"] - litdf["Min MAPD"]
+                ax.errorbar(x + offset, litdf["Avg MAPD"], yerr=[miny, maxy], fmt=".k")
+                multiplier += 1
+
+            #Get only best opt values
+            if isinstance(molec_names, str):
+                molecule_str = molec_names
+            elif len(molec_names) > 1 and isinstance(molec_names, (list,np.ndarray)):
+                #Assure list in correct order
+                desired_order = list(self.all_train_molec_data.keys())
+                molec_sort = sorted(molec_names, key=lambda x: desired_order.index(x))
+                molecule_str = '-'.join(molec_sort)
+            else:
+                molecule_str = molec_names[0]
+
+            filtered_df = df[df['Model'] == 'Opt ' + molecule_str]
+            sorted_df = filtered_df.sort_values(by='MAPD', ascending = False).reset_index(drop = True)
+            average_df = sorted_df.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
+            average_df.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
+            offset = width * multiplier
+            rects = ax.bar(x + offset, average_df["Avg MAPD"], width, label="at_" + str(at))
+            maxy = average_df["Max MAPD"] - average_df["Avg MAPD"]
+            miny = average_df["Avg MAPD"] - average_df["Min MAPD"]
+            ax.errorbar(x + offset, average_df["Avg MAPD"],yerr=[miny, maxy], fmt=".k")
+            # ax.bar_label(rects, padding=3)
+            multiplier += 1
+            
+
+        ax.axhline(y=5, label="5% MAPD", color = "black", linestyle = "--")
+            
+        #Filter out non-full atscheme results
+        #Plot
+        # ax.set_xticks(x + width )
+        ax.set_xticks(x + width, list(average_df["Molecule"]))
+        ax.set_ylabel("Average MAPD")
+        ax.grid()
+        plt.legend(loc='upper left')
+
+        return fig
     
     def plot_obj_hms(self, theta_guess, set_label = None):
         """
