@@ -21,6 +21,7 @@ for i in range(0, repeats):
         "total_repeats": repeats,
         "repeat_number": i+1,
         "training_molecules": training_molecules_all,
+        "num_train_molec": len(training_molecules),
         "obj_choice": Objective,
         "save_data": save_data,
         "seed": seed}
@@ -36,6 +37,7 @@ if len(training_molecules) > 1:
                 "total_repeats": repeats_ind,
                 "repeat_number": j+1,
                 "training_molecules": molec_dump,
+                "num_train_molec": 1,
                 "obj_choice": Objective,
                 "save_data": save_data,
                 "seed": seed}
