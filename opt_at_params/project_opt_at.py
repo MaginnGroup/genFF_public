@@ -1,32 +1,27 @@
-# project.py
-import signac
+#Import dependencies
+from flow import FlowProject, directives
+import templates.ndcrc
+import warnings
 from pathlib import Path
 import os
 import json
-import flow
-from flow import FlowProject, directives
+import sys
 
-#Import dependencies
-import numpy as np
-import templates.ndcrc
-from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170
+# simulation_length must be consistent with the "units" field in custom args below
+# For instance, if the "units" field is "sweeps" and simulation_length = 1000, 
+# This will run a total of 1000 sweeps 
+# (1 sweep = N steps, where N is the total number of molecules (job.sp.N_vap + job.sp.N_liq)
+sys.path.append("..")
+from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 from utils import atom_type, opt_atom_types
-import numpy as np
-import unyt as u
-import pandas as pd
-from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
-from fffit.fffit.plot import plot_obj_contour
-import pickle
-import gzip
-import os
+sys.path.remove("..")
 
 #Ignore warnings caused by "nan" values
 import warnings
+from warnings import simplefilter
 warnings.simplefilter("ignore", category=RuntimeWarning)
 warnings.simplefilter("ignore", category=UserWarning)
-
 #Ignore warning from scikit learn hp tuning
-from warnings import simplefilter
 from sklearn.exceptions import ConvergenceWarning
 simplefilter("ignore", category=ConvergenceWarning)
 
