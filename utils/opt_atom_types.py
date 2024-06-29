@@ -178,6 +178,8 @@ class Problem_Setup:
         #set obj_choice
         self.obj_choice = obj_choice
         self.use_dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice=obj_choice)
+        #Make results directory if it doesn't exist
+        os.makedirs(self.use_dir_name, exist_ok=True)
 
     def __get_ExpVal_info(self):
         """
@@ -704,6 +706,7 @@ class Problem_Setup:
         
         #Save pareto info
         if save_data == True:
+            os.makedirs(self.use_dir_name, exist_ok=True)
             save_csv_path1 = self.use_dir_name / "pareto_info.csv"
             pareto_info.to_csv(save_csv_path1, index = False, header = True)
         
