@@ -69,7 +69,7 @@ def run_obj_alg(job):
         ls_results, sort_ls_res, best_runs = driver.optimize_ats(param_guess, repeat_num-1)
         
         dir_name = driver.use_dir_name
-        job.document.dir_name = dir_name
+        job.document.dir_name = str(dir_name)
 
         # if job.sp.save_data == True:
         #     #Save results for best set for each run and iter to a csv file in Results
