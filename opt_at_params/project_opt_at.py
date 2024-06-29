@@ -91,8 +91,6 @@ def run_obj_alg(job):
         #Save sorted results
         save_path2 =  job.fn("sorted_at_res.csv")
         sort_ls_res.to_csv(save_path2, index = False)
-        
-
     #If the repeat number is greater than the number of param_inits, then we have already done all the repeats. Delete the job
     else:
         job.remove()
