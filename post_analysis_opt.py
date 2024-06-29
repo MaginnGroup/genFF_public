@@ -29,8 +29,11 @@ for statepoint_value, group in grouped_jobs.items():
         #On the 1st iteration, save the path to the job directory
         if i == 0:
             save_path = job.document.dir_name
-        df_best_run = pd.read_csv(job.fn("best_run.csv"), header = 0, index_col=False)
-        all_df = pd.concat([all_df, df_best_run], ignore_index=True)
+        if os.path.exists(job.fn("best_run.csv")):
+            df_best_run = pd.read_csv(job.fn("best_run.csv"), header = 0, index_col=False)
+            all_df = pd.concat([all_df, df_best_run], ignore_index=True)
+        else:
+            pass
     all_df = unsorted_df.sort_values(by='Min Obj', ascending = True).reset_index(drop = True)
     #Save all the best sets in appropriate folder for each set of training molecules
     all_df.to_csv(os.path.join(save_path, "best_per_run.csv"), index=False)
