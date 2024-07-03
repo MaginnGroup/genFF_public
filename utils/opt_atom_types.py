@@ -850,8 +850,8 @@ class Analyze_opt_res(Problem_Setup):
 
         #Get best_per_run.csv for all molecules
         all_molec_dir = self.make_results_dir(all_molec_list)
-        if os.path.exists(all_molec_dir+"/best_per_run.csv"):
-            unsorted_df = pd.read_csv(all_molec_dir+"/best_per_run.csv", header = 0)
+        if os.path.exists(all_molec_dir / "best_per_run.csv"):
+            unsorted_df = pd.read_csv(all_molec_dir / "best_per_run.csv", header = 0)
             all_df = unsorted_df.sort_values(by = "Min Obj")
             first_param_name = self.at_class.at_names[0] + "_min"
             last_param_name = self.at_class.at_names[-1] + "_min"
@@ -870,8 +870,8 @@ class Analyze_opt_res(Problem_Setup):
         param_dict["Opt " + molecule_str] = all_best_gp
 
         molec_dir = self.make_results_dir([molec_ind])
-        if os.path.exists(molec_dir+"/best_per_run.csv"):
-            unsorted_molec_df = pd.read_csv(molec_dir+"/best_per_run.csv", header = 0)
+        if os.path.exists(molec_dir / "best_per_run.csv"):
+            unsorted_molec_df = pd.read_csv(molec_dir / "best_per_run.csv", header = 0)
             molec_df = unsorted_molec_df.sort_values(by = "Min Obj")
             first_param_name = self.at_class.at_names[0] + "_min"
             last_param_name = self.at_class.at_names[-1] + "_min"
@@ -1040,7 +1040,7 @@ class Analyze_opt_res(Problem_Setup):
             molec_object = self.all_train_molec_data[molec]
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
-            test_params = self.get_best_results(self.molec_data_dict, molec)
+            test_params = self.get_best_results(molec)
             
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
@@ -1424,7 +1424,7 @@ class Vis_Results(Analyze_opt_res):
     """
 
     #Inherit objects from General_Analysis
-    def __init__(mol_name_train, at_number, seed, obj_choice):
+    def __init__(self, mol_name_train, at_number, seed, obj_choice):
         #Asserts
         super().__init__(mol_name_train, at_number, seed, obj_choice)
 
@@ -1526,7 +1526,7 @@ class Vis_Results(Analyze_opt_res):
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         save_label = save_label if save_label is not None else "best_set"
-        pdf = PdfPages(dir_name + '/prop_pred_' + save_label + '.pdf')
+        pdf = PdfPages(dir_name / ('prop_pred_' + save_label + '.pdf'))
         
         #Loop over molecules
         for molec in all_molec_list:
@@ -1535,7 +1535,7 @@ class Vis_Results(Analyze_opt_res):
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_train_gp_dict[molec]
 
-            test_params = self.get_best_results(self.molec_data_dict, molec)
+            test_params = self.get_best_results(molec)
             
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
@@ -1720,7 +1720,12 @@ class Vis_Results(Analyze_opt_res):
         fig, ax = plt.subplots()
         for i, at in enumerate(at_schemes):
             dir_name = self.make_results_dir(molec_names, at_choice=at)
-            df = pd.read_csv(dir_name / "MAPD_best_set.csv", header = 0)
+            if os.path.exists(dir_name / "MAPD_best_set.csv"):
+                dir_use = dir_name
+            else:
+                if self.obj_choice == "ExpValPrior":
+                    dir_use = self.make_results_dir(molec_names, at_choice=at, obj_choice = "ExpVal")
+            df = pd.read_csv(dir_use / "MAPD_best_set.csv", header = 0)
 
             #Get literature data from 1st at scheme
             if i==0:
@@ -1784,7 +1789,7 @@ class Vis_Results(Analyze_opt_res):
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         set_label = set_label if set_label is not None else "best"
-        pdf = PdfPages(dir_name + '/obj_cont_' + set_label + '.pdf')
+        pdf = PdfPages(dir_name / ('obj_cont_' + set_label + '.pdf'))
         #Loop over keys
         for key in list(param_dict.keys()):
             #Get parameter and sse data

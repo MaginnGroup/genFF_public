@@ -21,18 +21,19 @@ molec_names = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"] #Training 
 #Get best_run data saved in one csv from all jobs
 project = signac.get_project("opt_at_params")
 filtered_jobs = project.find_jobs({"obj_choice": obj_choice, "atom_type": at_number})
-grouped_jobs = filtered_jobs.groupby(statepoint="training_molecules")
-for statepoint_value, group in grouped_jobs.items():
-    #For each group of training molecules, get the first job to get the path to the directory
-    jobs_in_group = list(grouped_jobs[group])
-    save_path = jobs_in_group[0].document.dir_name
+grouped_jobs = filtered_jobs.groupby("training_molecules")
+for statepoint_value, group in grouped_jobs:
+    unsorted_df = None
     for i,job in enumerate(group):
+        #For each group of training molecules, get the first job to get the path to the directory 
+        if i == 0:
+            save_path = job.document.dir_name
         #If the best run file exists
         if os.path.exists(job.fn("best_run.csv")):
             #Read the file and concatenate the data
             df_best_run = pd.read_csv(job.fn("best_run.csv"), header = 0, index_col=False)
-            #On the 1st iteration, create the df
-            if i ==0:
+            #On the 1st iteration where we have data, create the df
+            if unsorted_df is None:
                 unsorted_df = df_best_run
             #Otherwise append to it
             else:
