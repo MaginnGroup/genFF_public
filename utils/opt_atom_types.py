@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as optimize
+from scipy.spatial.distance import pdist, squareform
 from sklearn.preprocessing import MinMaxScaler
 import warnings
 import scipy
@@ -287,10 +288,20 @@ class Problem_Setup:
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        midpoint = len(theta_guess) //2
-        sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
-        epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
-        theta_guess = np.array(sigmas + epsilons)
+
+        if len(theta_guess.shape) == 1:
+            theta_guess = theta_guess.reshape(1,-1)
+        midpoint = theta_guess.shape[1] // 2
+        sigmas = (theta_guess[:, :midpoint]) * float((1.0*u.Angstrom).in_units(u.nm).value)
+        epsilons = (theta_guess[:, midpoint:]) * float((1.0*u.K * u.kb).in_units("kJ/mol"))
+        theta_guess = np.hstack((sigmas, epsilons))
+        # sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:, :midpoint]]
+        # sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
+        # epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        # theta_guess = np.array(sigmas + epsilons)
+
+        if theta_guess.shape[0] == 1:
+            theta_guess = theta_guess.flatten()
         
         return theta_guess
     
@@ -1072,6 +1083,42 @@ class Analyze_opt_res(Problem_Setup):
             df.to_csv(save_csv_path, index = False, header = True)
             
         return df
+    
+    def get_unique_sets(self, all_param_sets, save_data = False, save_label = None):
+        """
+        Gets unique sets of parameters from an array of parameters
+        
+        """
+        assert isinstance(save_data, bool), "save_data must be a bool"
+        assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
+        #Scale values from preferred to real units
+        all_param_sets_real = self.values_pref_to_real(all_param_sets)
+        #Scale values between 0 and 1 with minmax scaler
+        scaler = MinMaxScaler()
+        scaler.fit(self.at_class.at_bounds_nm_kjmol.T)
+        all_param_sets_scaled = scaler.transform(all_param_sets_real)
+        #Calculate the scaled euclidean distance between each pair of scaled points
+        dist = pdist(all_param_sets_scaled)/np.sqrt(all_param_sets.shape[1])
+        #Convert the condensed distance matrix to square form
+        dist_sq = squareform(dist)
+        #Fill diagonals w/ infinity
+        np.fill_diagonal(dist_sq, np.inf)
+        # Find the indices of points where all distances to other points (excluding diagonal) are greater than 0.01
+        valid_indices = np.where(np.all(dist_sq > 0.01, axis=1))[0]
+        if len(valid_indices) > 0:
+            unique_param_sets = all_param_sets[valid_indices]
+        else:
+            unique_param_sets = all_param_sets[0].reshape(1,-1)
+
+        data_df = pd.DataFrame(unique_param_sets, columns=self.at_class.at_names)
+
+        if save_data == True:
+            save_label = save_label if save_label is not None else "test_set"
+            save_csv_path = os.path.join(self.use_dir_name, "unique_" + save_label + ".csv")
+            data_df.to_csv(save_csv_path, index = False, header = True)
+
+        return data_df
+
 
 class Opt_ATs(Problem_Setup):
     """
