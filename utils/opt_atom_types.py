@@ -9,6 +9,7 @@ import time
 import pandas as pd
 import pickle
 import gpflow
+import json
 
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real, generate_lhs
 from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params, plot_model_vs_exp, plot_obj_contour
@@ -89,7 +90,7 @@ class Problem_Setup:
     calc_MAPD_best: Calculate the mean absolute percentage deviation for each training data prediction
     """
     #Inherit objects from General_Analysis
-    def __init__(self, molec_names, at_number, obj_choice):
+    def __init__(self, molec_names, at_number, obj_choice, weight_sclr = None):
         """
         Parameters:
         -----------
@@ -160,25 +161,60 @@ class Problem_Setup:
             self.use_root = Path(os.getcwd())
             
 
-        #If using ExpValPrior, check that you can calculate the average value of the pareto set of ExpVal
-        if obj_choice == "ExpValPrior":
-            assert hasattr(self.at_class, "gaff_params"), "at_class must have attribute gaff_params"
-            assert hasattr(self.at_class, "at_weights"), "at_class must have attribute at_weights"
-            assert len(self.at_class.gaff_params) == len(self.at_class.at_weights) == len(self.at_class.at_names), "at_class gaff_params must have same length as at_weights"
-            #Get g_avg from Exp Val pareto_info.csv
-            best_info = self.__get_ExpVal_info()
-            # print("best_info: ", best_info)
-            if best_info is None:
-                warnings.warn("ExpValPrior requires ExpVal best_per_run.csv to exist. Setting obj_choice to ExpVal")
-                obj_choice = "ExpVal"
-            else:
-                #Get average value of pareto set for each parameter
-                Esse_avg = best_info["Min Obj"].mean()
-                self.Esse_avg = Esse_avg              
-
         #set obj_choice
         self.obj_choice = obj_choice
         self.use_dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice=obj_choice)
+
+        #If using ExpValPrior, check that you can calculate the average value of the pareto set of ExpVal
+        if obj_choice == "ExpValPrior":
+            #If a weight value is not set
+            if weight_sclr == None:
+                calc_Esse_avg = True
+                molecule_str = self.molec_names_to_str(molec_names)
+                #See if a calculated weight exists
+                weight_sclr_file = self.use_root / ("Results") / ("at_" + str(at_number)) / ("weight_sclrs.json")
+                if weight_sclr_file.exists():
+                    #If the file exists, load the data
+                    with open(weight_sclr_file, 'r') as json_file:
+                        weight_sclr_data = json.load(json_file)
+                    
+                    if molecule_str in weight_sclr_data:
+                        self.weight_sclr = weight_sclr_data[molecule_str]
+                        calc_Esse_avg = False
+
+                #If the data doesn't exist, create it using the results from ExpVal Data
+                if calc_Esse_avg:
+                    assert hasattr(self.at_class, "gaff_params"), "at_class must have attribute gaff_params"
+                    assert hasattr(self.at_class, "at_weights"), "at_class must have attribute at_weights"
+                    assert len(self.at_class.gaff_params) == len(self.at_class.at_weights) == len(self.at_class.at_names), "at_class gaff_params must have same length as at_weights"
+                    #Get g_avg from average ExpVal Data if it exists
+                    best_info = self.__get_ExpVal_info()
+                    # print("best_info: ", best_info)
+                    if best_info is None:
+                        raise ValueError("No best info found for ExpVal. Cannot calculate weight_sclr")
+                    else:
+                        #Get average value of best sets for each parameter
+                        Esse_avg = best_info["Min Obj"].mean()
+                        #Set scaler to 2 significant figures
+                        self.weight_sclr = float('{:g}'.format(float('{:.2g}'.format(Esse_avg))))
+                        weight_sclr_data = {molecule_str: self.weight_sclr}
+
+                #Add it to the Json dictionary
+                if calc_Esse_avg:
+                    if weight_sclr_file.exists():
+                        # load it
+                        with open(weight_sclr_file , "r") as json_file:
+                            file_data = json.loads(json_file.read())
+                        # change it
+                        file_data[molecule_str] = self.weight_sclr
+                    else:
+                        file_data = weight_sclr_data
+                    # write it all back
+                    with open(weight_sclr_file , "w") as json_file:
+                        json_file.write(json.dumps(file_data))
+            else:
+                self.weight_sclr = weight_sclr
+                     
         #Make results directory if it doesn't exist
         os.makedirs(self.use_dir_name, exist_ok=True)
 
@@ -203,6 +239,18 @@ class Problem_Setup:
                 
         return best_info
     
+    def molec_names_to_str(self, molecules):
+        if isinstance(molecules, str):
+            molecule_str = molecules
+        elif len(molecules) > 1 and isinstance(molecules, (list,np.ndarray)):
+            #Assure list in correct order
+            desired_order = list(self.all_train_molec_data.keys())
+            molec_sort = sorted(molecules, key=lambda x: desired_order.index(x))
+            molecule_str = '-'.join(molec_sort)
+        else:
+            molecule_str = molecules[0]
+
+        return molecule_str
     def make_results_dir(self, molecules, obj_choice=None, at_choice = None):
         """
         Makes a directory for results based on the scheme name, optimization method, and molecule names
@@ -223,15 +271,7 @@ class Problem_Setup:
             scheme_name = "at_" + str(at_choice) 
         assert isinstance(obj_choice, str) and obj_choice in ["ExpVal", "SSE", "ExpValPrior"], "obj_choice must be a string or None"
         assert isinstance(molecules, (str, list, np.ndarray)), "molecules must be a string or list/np.ndarray of strings"
-        if isinstance(molecules, str):
-            molecule_str = molecules
-        elif len(molecules) > 1 and isinstance(molecules, (list,np.ndarray)):
-            #Assure list in correct order
-            desired_order = list(self.all_train_molec_data.keys())
-            molec_sort = sorted(molecules, key=lambda x: desired_order.index(x))
-            molecule_str = '-'.join(molec_sort)
-        else:
-            molecule_str = molecules[0]
+        molecule_str = self.molec_names_to_str(molecules)
 
         if Path(os.getcwd()).parent.name == "generalizedFF":
             use_dir_name = Path(Path(os.getcwd()).parent)
@@ -641,7 +681,7 @@ class Problem_Setup:
         if self.obj_choice == "ExpValPrior":
             #Calculate weights for each parameter
             #A difference from GAFF parameters are weighted % increase of ExpVal best objective
-            inv_w2 = self.Esse_avg*self.at_class.at_weights
+            inv_w2 = self.weight_sclr*self.at_class.at_weights
             #Get scaled parameter values
             theta_scl = values_real_to_scaled(theta_guess.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
             gaff_params_2D = self.at_class.gaff_params.flatten()

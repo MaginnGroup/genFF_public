@@ -54,8 +54,8 @@ def run_obj_alg(job):
     driver = opt_atom_types.Opt_ATs(training_molecules, job.sp.atom_type, total_repeats, seed, obj_choice)
 
     if job.sp.obj_choice == "ExpValPrior":
-        #Save Esse average
-        job.doc["Esse_avg"] = driver.Esse_avg
+        #Save weight scaler to job document
+        job.doc["weight_sclr"] = driver.weight_sclr
 
     #Create param sets for the AT optimization based on seed. 
     # Save these to the Results folder in the directory above for reuse
@@ -70,17 +70,6 @@ def run_obj_alg(job):
         
         dir_name = driver.use_dir_name
         job.document.dir_name = str(dir_name)
-
-        # if job.sp.save_data == True:
-        #     #Save results for best set for each run and iter to a csv file in Results
-        #     #Ensure directory exists
-        #     os.makedirs(dir_name, exist_ok=True) 
-        #     save_path3 = os.path.join(dir_name, "best_per_run.csv")
-        #     #Save results. Append to file if it already exists
-        #     if os.path.exists(save_path3):
-        #         best_runs.to_csv(save_path3, mode = "a", index = False, header = False)
-        #     else:
-        #         best_runs.to_csv(save_path3, index = False)
 
         #Store intermediate results in job directory
         #Save original results

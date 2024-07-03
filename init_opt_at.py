@@ -5,8 +5,8 @@ project = signac.init_project("opt_at_params")
 
 #Set Initial Parameters
 Atom_Type = 11
-repeats  = 22 #Repeats for full optimization
-repeats_ind = 22 #Repats for individual molecule optimization
+repeats  = 25 #Repeats for full optimization
+repeats_ind = 25 #Repats for individual molecule optimization
 seed = 1
 save_data = True
 training_molecules = list(["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"])

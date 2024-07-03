@@ -67,18 +67,18 @@ for i in range(unique_best_sets.shape[0]):
 
     #Get Property Predictions for all training molecules
     molec_names_all = list(visual.all_train_molec_data.keys())
-    visual.comp_paper_full_ind(molec_names_all, save_label=x_label)
+    visual.comp_paper_full_ind(molec_names_all, save_label=x_label_set)
 
     #Calculate MAPD for predictions and save results
-    df = visual.calc_MAPD_best(molec_names_all, save_data, save_label=x_label)
+    df = visual.calc_MAPD_best(molec_names_all, save_data, save_label=x_label_set)
 
     #Plot optimization result heat maps
-    visual.plot_obj_hms(best_set, x_label)
+    visual.plot_obj_hms(best_set, x_label_set)
 
     #Gat Jac and Hess Approximations
     scale_theta = True
-    jac = visual.approx_jac(best_real, scale_theta, save_data, x_label=x_label)
-    hess = visual.approx_hess(best_real, scale_theta, save_data, x_label=x_label)
+    jac = visual.approx_jac(best_real, scale_theta, save_data, x_label=x_label_set)
+    hess = visual.approx_hess(best_real, scale_theta, save_data, x_label=x_label_set)
     eigval, eigvec = scipy.linalg.eig(hess)
     if save_data == True:
         eig_val_path = os.path.join(all_molec_dir, "Hess_EigVals")
