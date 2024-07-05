@@ -1294,14 +1294,18 @@ class Opt_ATs(Problem_Setup):
             save_csv_path1 = os.path.join(dir_name, "opt_num_params.csv")
             save_csv_path2 = os.path.join(dir_name, "rcc.csv")
             save_csv_path3 = os.path.join(dir_name, "loss_data.csv")
+            save_csv_path4 = os.path.join(dir_name, "opt_params.csv")
             loss_matrix = np.hstack((loss_k_params, loss_k[:, np.newaxis]))
             loss_df = pd.DataFrame(loss_matrix) 
             loss_df.columns = [self.at_class.at_names] + [self.obj_choice]
             loss_df.to_csv(save_csv_path3, index = False, header = True)
             np.savetxt(save_csv_path1, np.array([opt_num_params]), delimiter=",")
             np.savetxt(save_csv_path2, rcc, delimiter=",")
+            opt_k_params = loss_k_params[opt_num_params-1].reshape(1,-1)
+            df_opt_k_params = pd.DataFrame(opt_k_params, columns=self.at_class.at_names)
+            df_opt_k_params.to_csv(save_csv_path4, index=False, header=True)
 
-        return opt_num_params, rcc, loss_k, loss_k_params
+        return opt_num_params, rcc, loss_matrix, opt_k_params
 
 
     def get_param_inits(self, method = "pareto"):
