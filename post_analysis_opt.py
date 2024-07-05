@@ -43,9 +43,6 @@ for statepoint_value, group in grouped_jobs:
     #Save all the best sets in appropriate folder for each set of training molecules
     all_df.to_csv(os.path.join(save_path, "best_per_run.csv"), index=False, header=True)
 
-
-
-
 #Create visualization object
 visual = opt_atom_types.Vis_Results(molec_names, at_number, seed, obj_choice)
 #Set parameter set of interest (in this case get the best parameter set)
@@ -70,7 +67,7 @@ for i in range(unique_best_sets.shape[0]):
     visual.comp_paper_full_ind(molec_names_all, save_label=x_label_set)
 
     #Calculate MAPD for predictions and save results
-    df = visual.calc_MAPD_best(molec_names_all, save_data, save_label=x_label_set)
+    df = visual.calc_MAPD_best(molec_names_all, save_data = save_data, save_label=x_label_set)
 
     #Plot optimization result heat maps
     visual.plot_obj_hms(best_set, x_label_set)

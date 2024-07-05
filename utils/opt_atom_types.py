@@ -784,7 +784,7 @@ class Problem_Setup:
 
         return df_needed, list(sums_by_prop.keys())
     
-    def rank_parameters(self, theta_guess, save_data = False):
+    def rank_parameters(self, theta_guess, save_data = False, save_label = None):
         """
         Ranks parameter estimability according to the alogithm in Table 2 Yao, K.Z., et al. (2003), Polym. React. Eng.
 
@@ -844,10 +844,11 @@ class Problem_Setup:
 
         if save_data:
             #Write ranked indices and n_data to a csv on separate lines
+            save_label = "_" + save_label if save_label is not None else ""
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "ranked_indices.csv")
-            save_csv_path2 = os.path.join(dir_name, "n_data.csv")
-            save_csv_path3 = os.path.join(dir_name, "Z_matrix.csv")
+            save_csv_path1 = os.path.join(dir_name, "ranked_indices" + save_label + ".csv")
+            save_csv_path2 = os.path.join(dir_name, "n_data" + save_label + ".csv")
+            save_csv_path3 = os.path.join(dir_name, "Z_matrix" + save_label + ".csv")
             np.savetxt(save_csv_path1, ranked_indices, delimiter=",")
             np.savetxt(save_csv_path2, np.array([n_data]), delimiter=",")
             np.savetxt(save_csv_path3, Z, delimiter=",")
@@ -875,7 +876,7 @@ class Analyze_opt_res(Problem_Setup):
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.seed = seed
 
-    def get_best_results(self, molec_ind):
+    def get_best_results(self, molec_ind, theta_guess = None):
         """
         Get the best optimization results. Pulls best parameter set from:
             1) Literature (stored in molecule objects)
@@ -885,6 +886,7 @@ class Analyze_opt_res(Problem_Setup):
         Parameters
         ----------
         molec_ind: str, the molecule name to consider
+        theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
         
         Returns
         -------
@@ -899,21 +901,26 @@ class Analyze_opt_res(Problem_Setup):
         all_molec_list = list(self.molec_data_dict.keys())
         param_matrix = self.at_class.get_transformation_matrix({molec_ind: self.all_train_molec_data[molec_ind]})
 
-        #Get best_per_run.csv for all molecules
-        all_molec_dir = self.make_results_dir(all_molec_list)
-        if os.path.exists(all_molec_dir / "best_per_run.csv"):
-            unsorted_df = pd.read_csv(all_molec_dir / "best_per_run.csv", header = 0)
-            all_df = unsorted_df.sort_values(by = "Min Obj")
-            first_param_name = self.at_class.at_names[0] + "_min"
-            last_param_name = self.at_class.at_names[-1] + "_min"
-            full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
-            all_best_real = self.values_pref_to_real(full_opt_best)
-            all_best_nec = all_best_real.reshape(-1,1).T@param_matrix
+        #If no theta_guess is provided, get the best parameter set for the optimization scheme
+        if theta_guess is None:
+            #Get best_per_run.csv for all molecules
+            all_molec_dir = self.make_results_dir(all_molec_list)
+            if os.path.exists(all_molec_dir / "best_per_run.csv"):
+                unsorted_df = pd.read_csv(all_molec_dir / "best_per_run.csv", header = 0)
+                all_df = unsorted_df.sort_values(by = "Min Obj")
+                first_param_name = self.at_class.at_names[0] + "_min"
+                last_param_name = self.at_class.at_names[-1] + "_min"
+                full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+                theta_guess = self.values_pref_to_real(full_opt_best)
+
+        #If we have a GP parameter set, get the values in the necessary form
+        if theta_guess is not None:
+            all_best_nec = theta_guess.reshape(-1,1).T@param_matrix
             all_best_gp = values_real_to_scaled(all_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
             all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
         else:
             all_best_gp = None
-        
+
         if len(all_molec_list) > 1 and isinstance(all_molec_list, (list,np.ndarray)):
             molecule_str = '-'.join(all_molec_list)
         else:
@@ -1075,7 +1082,7 @@ class Analyze_opt_res(Problem_Setup):
             df.to_csv(save_csv_path, index = False, header = True)
         return df
     
-    def calc_MAPD_best(self, all_molec_list, save_data = False, save_label = None):
+    def calc_MAPD_best(self, all_molec_list, theta_guess = None, save_data = False, save_label = None):
         """
         Calculate the mean absolute percentage deviation for each training data prediction
         """
@@ -1091,7 +1098,7 @@ class Analyze_opt_res(Problem_Setup):
             molec_object = self.all_train_molec_data[molec]
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
-            test_params = self.get_best_results(molec)
+            test_params = self.get_best_results(molec, theta_guess)
             
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
@@ -1232,7 +1239,7 @@ class Opt_ATs(Problem_Setup):
 
         return obj
     
-    def estimate_opt(self, theta_guess, ranked_indices, n_data, save_data = False):
+    def estimate_opt(self, theta_guess, ranked_indices, n_data, save_data = False, save_label = None):
         """
         Determines the optimal number of parameters to estimate based on algorithm in Wu, S., et al. (2011). Int. J. Advanced Mechatronic Systems
 
@@ -1290,22 +1297,23 @@ class Opt_ATs(Problem_Setup):
         #Save data
         if save_data:
             #Write ranked indices and n_data to a csv on separate lines
+            save_label = "_" + save_label if save_label is not None else ""
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "opt_num_params.csv")
-            save_csv_path2 = os.path.join(dir_name, "rcc.csv")
-            save_csv_path3 = os.path.join(dir_name, "loss_data.csv")
-            save_csv_path4 = os.path.join(dir_name, "opt_params.csv")
+            save_csv_path1 = os.path.join(dir_name, "opt_num_params" + save_label + ".csv")
+            save_csv_path2 = os.path.join(dir_name, "rcc" + save_label + ".csv")
+            save_csv_path3 = os.path.join(dir_name, "loss_data" + save_label + ".csv")
+            save_csv_path4 = os.path.join(dir_name, "opt_params_rcc" + save_label + ".csv")
             loss_matrix = np.hstack((loss_k_params, loss_k[:, np.newaxis]))
             loss_df = pd.DataFrame(loss_matrix) 
             loss_df.columns = [self.at_class.at_names] + [self.obj_choice]
             loss_df.to_csv(save_csv_path3, index = False, header = True)
             np.savetxt(save_csv_path1, np.array([opt_num_params]), delimiter=",")
             np.savetxt(save_csv_path2, rcc, delimiter=",")
-            opt_k_params = loss_k_params[opt_num_params-1].reshape(1,-1)
-            df_opt_k_params = pd.DataFrame(opt_k_params, columns=self.at_class.at_names)
+            opt_k_param_data = loss_matrix[opt_num_params-1].reshape(1,-1)
+            df_opt_k_params = pd.DataFrame(opt_k_param_data, columns=self.at_class.at_names + [self.obj_choice])
             df_opt_k_params.to_csv(save_csv_path4, index=False, header=True)
 
-        return opt_num_params, rcc, loss_matrix, opt_k_params
+        return opt_num_params, rcc, loss_matrix, opt_k_param_data[0,:-1]
 
 
     def get_param_inits(self, method = "pareto"):
@@ -1603,7 +1611,7 @@ class Vis_Results(Analyze_opt_res):
 
         return
     
-    def comp_paper_full_ind(self, all_molec_list, save_label=None):
+    def comp_paper_full_ind(self, all_molec_list, theta_guess=None, save_label=None):
         """
         Plots T vs Property for the best individual molecule param set, the best overall optimization param set,
         the experimental data, and the param set from the paper
@@ -1611,6 +1619,7 @@ class Vis_Results(Analyze_opt_res):
         Parameters
         ----------
         all_molec_list: list, list of all molecules to generate predictions for
+        theta_guess: np.ndarray, the atom type scheme parameter set of interest (sigma in nm, epsilon in kJ/mol)
         """
         assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
         assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
@@ -1626,7 +1635,7 @@ class Vis_Results(Analyze_opt_res):
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_train_gp_dict[molec]
 
-            test_params = self.get_best_results(molec)
+            test_params = self.get_best_results(molec, theta_guess)
             
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
