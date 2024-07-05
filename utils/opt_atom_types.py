@@ -849,9 +849,13 @@ class Problem_Setup:
             save_csv_path1 = os.path.join(dir_name, "ranked_indices" + save_label + ".csv")
             save_csv_path2 = os.path.join(dir_name, "n_data" + save_label + ".csv")
             save_csv_path3 = os.path.join(dir_name, "Z_matrix" + save_label + ".csv")
-            np.savetxt(save_csv_path1, ranked_indices, delimiter=",")
-            np.savetxt(save_csv_path2, np.array([n_data]), delimiter=",")
-            np.savetxt(save_csv_path3, Z, delimiter=",")
+            #Transform to Pandas df and save to csv
+            df_ranked_indices = pd.DataFrame(ranked_indices)
+            df_ndata = pd.DataFrame([n_data])
+            df_Z = pd.DataFrame(Z)
+            df_ranked_indices.to_csv(save_csv_path1, index = False, header = False)
+            df_ndata.to_csv(save_csv_path2, index = False, header = False)
+            df_Z.to_csv(save_csv_path3, index = False, header = False)
 
         return np.array(ranked_indices), n_data
     
@@ -1304,11 +1308,17 @@ class Opt_ATs(Problem_Setup):
             save_csv_path3 = os.path.join(dir_name, "loss_data" + save_label + ".csv")
             save_csv_path4 = os.path.join(dir_name, "opt_params_rcc" + save_label + ".csv")
             loss_matrix = np.hstack((loss_k_params, loss_k[:, np.newaxis]))
+            #Save loss data to csv
             loss_df = pd.DataFrame(loss_matrix) 
             loss_df.columns = [self.at_class.at_names] + [self.obj_choice]
             loss_df.to_csv(save_csv_path3, index = False, header = True)
-            np.savetxt(save_csv_path1, np.array([opt_num_params]), delimiter=",")
-            np.savetxt(save_csv_path2, rcc, delimiter=",")
+            #Save opt_num_params to csv
+            df_opt_num_params = pd.DataFrame([opt_num_params])
+            df_opt_num_params.to_csv(save_csv_path1, index = False, header = False)
+            #Save rcc to csv
+            df_rcc = pd.DataFrame(rcc)
+            df_rcc.to_csv(save_csv_path2, header = False, index = False)
+            #Save optimal parameter set to csv
             opt_k_param_data = loss_matrix[opt_num_params-1].reshape(1,-1)
             df_opt_k_params = pd.DataFrame(opt_k_param_data, columns=self.at_class.at_names + [self.obj_choice])
             df_opt_k_params.to_csv(save_csv_path4, index=False, header=True)
