@@ -1310,7 +1310,7 @@ class Opt_ATs(Problem_Setup):
             loss_matrix = np.hstack((loss_k_params, loss_k[:, np.newaxis]))
             #Save loss data to csv
             loss_df = pd.DataFrame(loss_matrix) 
-            loss_df.columns = [self.at_class.at_names] + [self.obj_choice]
+            loss_df.columns = self.at_class.at_names + [self.obj_choice]
             loss_df.to_csv(save_csv_path3, index = False, header = True)
             #Save opt_num_params to csv
             df_opt_num_params = pd.DataFrame([opt_num_params])
