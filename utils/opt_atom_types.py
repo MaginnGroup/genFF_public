@@ -331,11 +331,11 @@ class Problem_Setup:
 
         if len(theta_guess.shape) == 1:
             theta_guess = theta_guess.reshape(1,-1)
+
         midpoint = theta_guess.shape[1] // 2
         sigmas = (theta_guess[:, :midpoint]) * float((1.0*u.Angstrom).in_units(u.nm).value)
         epsilons = (theta_guess[:, midpoint:]) * float((1.0*u.K * u.kb).in_units("kJ/mol"))
         theta_guess = np.hstack((sigmas, epsilons))
-        # sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:, :midpoint]]
         # sigmas = [float((x * u.Angstrom).in_units(u.nm).value) for x in theta_guess[:midpoint]]
         # epsilons = [float(x * (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
         # theta_guess = np.array(sigmas + epsilons)
@@ -359,10 +359,20 @@ class Problem_Setup:
         theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in A, epsilon in K)
         """
         assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
-        midpoint = len(theta_guess) //2
-        sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
-        epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
-        theta_guess = np.array(sigmas + epsilons)
+
+        if len(theta_guess.shape) == 1:
+            theta_guess = theta_guess.reshape(1,-1)
+
+        midpoint = theta_guess.shape[1] // 2
+        sigmas = (theta_guess[:, :midpoint]) * float((1.0*u.nm).in_units(u.Angstrom).value)
+        epsilons = (theta_guess[:, midpoint:]) * float((1.0 / (u.K * u.kb)).in_units("kJ/mol"))
+        theta_guess = np.hstack((sigmas, epsilons))
+        # sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
+        # epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
+        # theta_guess = np.array(sigmas + epsilons)
+        
+        if theta_guess.shape[0] == 1:
+            theta_guess = theta_guess.flatten()
 
         return theta_guess
 
@@ -1266,12 +1276,20 @@ class Opt_ATs(Problem_Setup):
         # Calculate the loss for the full parameter set with no guesses
         loss_k[0] = self.one_output_calc_obj(theta_guess)
         loss_k_params[0,:] = theta_guess
+
+        #Set obj_choice to ExpVal if ExpValPrior for this operation
+        #Cannot do ExpVal Prior because of scaled weights based on objective
+        obj_changed = False
+        if self.obj_choice == "ExpValPrior":
+            self.obj_choice = "ExpVal"
+            obj_changed = True
+
         for i in range(1, len(ranked_indices)+1):
             # Create a mask to identify which parameters are being optimized
-            #Note that the indices are 1-based
-            theta_estim = theta_guess[ranked_indices[:i]-1]
+            #Note that ranked_indices is 0-based
+            theta_estim = theta_guess[ranked_indices[:i]]
             mask = np.zeros(len(theta_guess), dtype=bool)
-            mask[ranked_indices[:i]-1] = True
+            mask[ranked_indices[:i]] = True
 
             def obj_wrapper(x_estim, *args):
                 # Reconstruct the full parameter list
@@ -1279,7 +1297,7 @@ class Opt_ATs(Problem_Setup):
                 theta_full[mask] = x_estim
                 return self.__scipy_min_fxn(theta_full, *args)
 
-            solution = optimize.minimize(obj_wrapper, theta_estim, bounds=self.at_class.at_bounds_nm_kjmol[ranked_indices[:i]-1,:],
+            solution = optimize.minimize(obj_wrapper, theta_estim, bounds=self.at_class.at_bounds_nm_kjmol[ranked_indices[:i],:],
                                         method='L-BFGS-B', options = {'disp':False, 'eps' : 1e-10, 'ftol':1e-10})
             
             # Reconstruct the full parameter list with optimized values
@@ -1288,42 +1306,53 @@ class Opt_ATs(Problem_Setup):
             loss_k_params[i,:] = theta_opt
             loss_k[i] = solution.fun
 
-        #Compute critical ratio. Note that the last rcc is 0 by definition
-        rcc = np.zeros(len(ranked_indices))
+        #Reset obj_choice to original value
+        if obj_changed:
+            self.obj_choice = "ExpValPrior"
+
+        #Compute critical ratio. 
+        rcc = np.zeros(len(ranked_indices) + 1)
+        #Set the 1st rcc as nan (if nothing is optimized rcc is undefined)
+        rcc[0] = np.nan 
+        #Loop over subgroups. Note that the last rcc is 0 by definition
         for k in range(1, len(ranked_indices)):
             p = len(ranked_indices)
             rck = (loss_k[k] - loss_k[-1])/(p-k)
             rc_kub = max(rck -1, 2*rck/(p-k+2))
-            rcc[k-1] = (p-k)*(rc_kub-1)/n_data
+            rcc[k] = (p-k)*(rc_kub-1)/n_data
 
-        opt_num_params = np.argmin(rcc) + 1
+        opt_num_params = np.nanargmin(rcc)
+
+        #Make loss matrix
+        #Get parameters from real to preferred units
+        loss_k_params_pref = self.values_real_to_pref(loss_k_params)
+        #Append loss and rcc columns
+        loss_matrix = np.hstack((loss_k_params_pref, loss_k[:, np.newaxis]), rcc[:, np.newaxis])
+        col_names = self.at_class.at_names + [self.obj_choice, "rcc"]
+        #Make dataframe
+        loss_df = pd.DataFrame(loss_matrix, columns = col_names) 
+        #Add number of params optimized
+        loss_df['num params opt'] = loss_df.index
+
+        #Optimal params to df
+        df_opt_k_params = loss_df.iloc[[opt_num_params]]
+        opt_k_params = df_opt_k_params.loc[0, self.at_class.at_names].to_numpy()
 
         #Save data
         if save_data:
             #Write ranked indices and n_data to a csv on separate lines
             save_label = "_" + save_label if save_label is not None else ""
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "opt_num_params" + save_label + ".csv")
-            save_csv_path2 = os.path.join(dir_name, "rcc" + save_label + ".csv")
-            save_csv_path3 = os.path.join(dir_name, "loss_data" + save_label + ".csv")
-            save_csv_path4 = os.path.join(dir_name, "opt_params_rcc" + save_label + ".csv")
-            loss_matrix = np.hstack((loss_k_params, loss_k[:, np.newaxis]))
+            save_csv_path1 = os.path.join(dir_name, "loss_data" + save_label + ".csv")
+            save_csv_path2 = os.path.join(dir_name, "opt_params_rcc" + save_label + ".csv")
+           
             #Save loss data to csv
-            loss_df = pd.DataFrame(loss_matrix) 
-            loss_df.columns = self.at_class.at_names + [self.obj_choice]
-            loss_df.to_csv(save_csv_path3, index = False, header = True)
-            #Save opt_num_params to csv
-            df_opt_num_params = pd.DataFrame([opt_num_params])
-            df_opt_num_params.to_csv(save_csv_path1, index = False, header = False)
-            #Save rcc to csv
-            df_rcc = pd.DataFrame(rcc)
-            df_rcc.to_csv(save_csv_path2, header = False, index = False)
-            #Save optimal parameter set to csv
-            opt_k_param_data = loss_matrix[opt_num_params-1].reshape(1,-1)
-            df_opt_k_params = pd.DataFrame(opt_k_param_data, columns=self.at_class.at_names + [self.obj_choice])
-            df_opt_k_params.to_csv(save_csv_path4, index=False, header=True)
+            loss_df.to_csv(save_csv_path1, index = False, header = True)
 
-        return opt_num_params, rcc, loss_matrix, opt_k_param_data[0,:-1]
+            #Save optimal parameter set to csv
+            df_opt_k_params.to_csv(save_csv_path2, index=False, header=True)
+
+        return opt_num_params, rcc, loss_matrix, opt_k_params
 
 
     def get_param_inits(self, method = "pareto"):

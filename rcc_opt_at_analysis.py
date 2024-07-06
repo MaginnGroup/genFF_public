@@ -52,4 +52,4 @@ for i in range(unique_best_sets.shape[0]):
     visual.comp_paper_full_ind(molec_names_all, opt_params, save_label=x_label_rcc)
 
     #Calculate MAPD for predictions and save results
-    MAPD_rcc = visual.calc_MAPD_best(molec_names_all, best_real, save_data, x_label_set)
+    MAPD_rcc = visual.calc_MAPD_best(molec_names_all, best_real, save_data, x_label_rcc)
