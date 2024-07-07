@@ -365,7 +365,7 @@ class Problem_Setup:
 
         midpoint = theta_guess.shape[1] // 2
         sigmas = (theta_guess[:, :midpoint]) * float((1.0*u.nm).in_units(u.Angstrom).value)
-        epsilons = (theta_guess[:, midpoint:]) * float((1.0 / (u.K * u.kb)).in_units("kJ/mol"))
+        epsilons = (theta_guess[:, midpoint:]) / float((1.0 * u.K * u.kb).in_units("kJ/mol"))
         theta_guess = np.hstack((sigmas, epsilons))
         # sigmas = [float((x * u.nm).in_units(u.Angstrom).value) for x in theta_guess[:midpoint]]
         # epsilons = [float(x / (u.K * u.kb).in_units("kJ/mol")) for x in theta_guess[midpoint:]]
