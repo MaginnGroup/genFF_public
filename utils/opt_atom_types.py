@@ -1279,10 +1279,10 @@ class Opt_ATs(Problem_Setup):
 
         #Set obj_choice to ExpVal if ExpValPrior for this operation
         #Cannot do ExpVal Prior because of scaled weights based on objective
-        obj_changed = False
-        if self.obj_choice == "ExpValPrior":
-            self.obj_choice = "ExpVal"
-            obj_changed = True
+        # obj_changed = False
+        # if self.obj_choice == "ExpValPrior":
+        #     self.obj_choice = "ExpVal"
+        #     obj_changed = True
 
         for i in range(1, len(ranked_indices)+1):
             # Create a mask to identify which parameters are being optimized
@@ -1307,8 +1307,8 @@ class Opt_ATs(Problem_Setup):
             loss_k[i] = solution.fun
 
         #Reset obj_choice to original value
-        if obj_changed:
-            self.obj_choice = "ExpValPrior"
+        # if obj_changed:
+        #     self.obj_choice = "ExpValPrior"
 
         #Compute critical ratio. 
         rcc = np.zeros(len(ranked_indices) + 1)
@@ -1336,7 +1336,6 @@ class Opt_ATs(Problem_Setup):
 
         #Optimal params to df
         df_opt_k_params = loss_df.iloc[[opt_num_params]]
-        opt_k_params = df_opt_k_params.loc[0, self.at_class.at_names].to_numpy()
 
         #Save data
         if save_data:
@@ -1351,6 +1350,9 @@ class Opt_ATs(Problem_Setup):
 
             #Save optimal parameter set to csv
             df_opt_k_params.to_csv(save_csv_path2, index=False, header=True)
+
+        col_locs = [df_opt_k_params.columns.get_loc(c) for c in self.at_class.at_names]
+        opt_k_params = df_opt_k_params.iloc[0, col_locs].to_numpy()
 
         return opt_num_params, rcc, loss_matrix, opt_k_params
 

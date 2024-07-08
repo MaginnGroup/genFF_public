@@ -47,7 +47,7 @@ for i in range(unique_best_sets.shape[0]):
                                                                    n_data, save_data, x_label_set)
 
     #Get Property Predictions for all training molecules
-    x_label_rcc = "rcc_Exp_set_" + str(i+1)
+    x_label_rcc = "rcc_set_" + str(i+1)
     molec_names_all = list(visual.all_train_molec_data.keys())
     visual.comp_paper_full_ind(molec_names_all, opt_params, save_label=x_label_rcc)
 
