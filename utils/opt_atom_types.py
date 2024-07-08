@@ -1327,7 +1327,7 @@ class Opt_ATs(Problem_Setup):
         #Get parameters from real to preferred units
         loss_k_params_pref = self.values_real_to_pref(loss_k_params)
         #Append loss and rcc columns
-        loss_matrix = np.hstack((loss_k_params_pref, loss_k[:, np.newaxis]), rcc[:, np.newaxis])
+        loss_matrix = np.hstack((loss_k_params_pref, loss_k[:, np.newaxis], rcc[:, np.newaxis]))
         col_names = self.at_class.at_names + [self.obj_choice, "rcc"]
         #Make dataframe
         loss_df = pd.DataFrame(loss_matrix, columns = col_names) 
