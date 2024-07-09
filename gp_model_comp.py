@@ -105,8 +105,11 @@ for molec in list(setup.molec_data_dict.keys()):
                 best_models.append(models[min_mapd_key])
                 break
             elif i == len(mapd_dict) - 1:
-                if np.all(cond3 & cond4):
+                if np.all(cond3 & cond4) or np.all(cond1 & cond2):
                     warnings.warn("No good hyperparameters found for " + molec + " " + prop, UserWarning)
+                    min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
+                    best_models.append(models[min_mapd_key])
+                else:
                     min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
                     best_models.append(models[min_mapd_key])
 
