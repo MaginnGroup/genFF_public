@@ -1573,6 +1573,10 @@ class Vis_Results(Analyze_opt_res):
         """
         Makes GP validation figures for each training molecule
         """
+
+        dir_name = "Results/gp_val_figs/"
+        os.makedirs(dir_name, exist_ok=True)
+        
         #Loop over molecules
         for molec in list(self.all_train_molec_data.keys()):
             #Get constants for molecule
@@ -1582,8 +1586,8 @@ class Vis_Results(Analyze_opt_res):
             #Get testing data for that molecule
             train_data, test_data = self.get_train_test_data(molec, list(molec_gps_dict.keys()))
             #Make pdf
-            dir_name = self.make_results_dir(molec) 
-            pdf = PdfPages(dir_name + '/gp_val_figs.pdf')
+            
+            pdf = PdfPages(dir_name + "/" + molec +  '.pdf')
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Set label
@@ -1595,7 +1599,6 @@ class Vis_Results(Analyze_opt_res):
                 #Plot model performance
                 pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
                 plt.close()
-
                 #Plot temperature slices
                 figs = plot_slices_temperature(
                     {label:gp_model},
@@ -1627,7 +1630,7 @@ class Vis_Results(Analyze_opt_res):
                         pdf.savefig(fig)
                     del figs
 
-                #Plot test vs train for each parameter set
+                # #Plot test vs train for each parameter set
                 for test_params in test_data["x"][:,:molec_object.n_params]:
                     #Find points in test set with correct param value
                     # Locate rows where parameter set == test parameter set
@@ -1640,7 +1643,7 @@ class Vis_Results(Analyze_opt_res):
                                                   train_data[key][match_trn].reshape(-1,1)), axis = 1)
 
                     pdf.savefig(plot_model_vs_test({label:gp_model}, 
-                                                test_params, 
+                                                {"params": test_params}, 
                                                 train_points, 
                                                 test_points, 
                                                 molec_object.temperature_bounds,

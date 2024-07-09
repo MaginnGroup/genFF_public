@@ -1,22 +1,11 @@
-from utils import r14, r32, r50, r125, r134a, r143a, r170, atom_type, opt_atom_types
-import numpy as np
-import unyt as u
+from utils import opt_atom_types
 
-r14_class = r14.R14Constants()
-r32_class = r32.R32Constants()
-r50_class = r50.R50Constants()
-r125_class = r125.R125Constants()
-r134a_class = r134a.R134aConstants()
-r143a_class = r143a.R143aConstants()
-r170_class = r170.R170Constants()
+save_data = False #Data to save
+obj_choice = "ExpValPrior" #Objective to consider
+at_number = 11 #atom type to consider
+seed = 1 #Seed to use
+molec_names = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"] #Training data to consider
 
-repeats = 1
-seed = 1
-save_data = False
-at_class = atom_type.AT_Scheme_7()
-
-molec_data_dict = {"R14":r14_class, "R32":r32_class, "R50":r50_class, "R170":r170_class, "R125":r125_class, 
-                   "R134a":r134a_class, "R143a":r143a_class}
-all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
-driver = opt_atom_types.Opt_ATs(molec_data_dict, all_gp_dict, at_class, repeats, seed, save_data)
-driver.check_GPs()
+#Create visualization object
+visual = opt_atom_types.Vis_Results(molec_names, at_number, seed, obj_choice)
+visual.check_GPs()
