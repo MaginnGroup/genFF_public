@@ -9,7 +9,7 @@ from .utils import variances_scaled_to_real
 mpl_is_inline = 'inline' in matplotlib.get_backend()
 
 
-def plot_model_performance(
+def calc_model_mapd(
     models, x_data, y_data, property_bounds, xylim=None
 ):
     """Plot the predictions vs. result for one or more GP models
@@ -38,6 +38,58 @@ def plot_model_performance(
     max_xylim = np.max(y_data_physical)
 
     fig, ax = plt.subplots()
+    mapd_dict = {}
+    for (label, model) in models.items():
+        gp_mu, gp_var = model.predict_f(x_data)
+        gp_mu_physical = values_scaled_to_real(gp_mu, property_bounds)
+        gp_var_physical = variances_scaled_to_real(gp_var, property_bounds)
+        gp_std_physical = np.sqrt(abs(gp_var_physical))
+        ax.scatter(y_data_physical, gp_mu_physical, label=label, zorder=2.5, alpha=0.4)
+        ax.errorbar(y_data_physical.flatten(), gp_mu_physical.flatten(), yerr = 1.96*gp_std_physical.flatten(), fmt = 'o', alpha=0.4)
+        meansqerr = np.mean(
+            (gp_mu_physical - y_data_physical.reshape(-1, 1)) ** 2
+        )
+        # print("Model: {}. Mean squared err: {:.2e}".format(label, meansqerr))
+        mape = np.mean(
+            np.abs((gp_mu_physical - y_data_physical.reshape(-1, 1))/y_data_physical.reshape(-1, 1) )
+        )
+        mapd_dict[label] = mape*100 
+        # print("Model: {}. MAPE: {:.6e}".format(label, mape))
+    
+    return mapd_dict
+    
+def plot_model_performance(
+    models, x_data, y_data, property_bounds, xylim=None, title = None
+):
+    """Plot the predictions vs. result for one or more GP models
+
+    Parameters
+    ----------
+    models : dict { label : model }
+        Each model to be plotted (value, GPFlow model) is provided
+        with a label (key, string)
+    x_data : np.array
+        data to create model predictions for
+    y_data : np.ndarray
+        correct answer
+    property_bounds : array-like
+        bounds for scaling density between physical
+        and dimensionless values
+    xylim : array-like, shape=(2,), optional
+        lower and upper x and y limits of the plot
+
+    title: str, optional
+        title of the plot
+
+    Returns
+    -------
+    matplotlib.Figure.figure
+    """
+    y_data_physical = values_scaled_to_real(y_data, property_bounds)
+    min_xylim = np.min(y_data_physical)
+    max_xylim = np.max(y_data_physical)
+
+    fig, ax = plt.subplots()
 
     for (label, model) in models.items():
         gp_mu, gp_var = model.predict_f(x_data)
@@ -49,11 +101,11 @@ def plot_model_performance(
         meansqerr = np.mean(
             (gp_mu_physical - y_data_physical.reshape(-1, 1)) ** 2
         )
-        print("Model: {}. Mean squared err: {:.2e}".format(label, meansqerr))
+        # print("Model: {}. Mean squared err: {:.2e}".format(label, meansqerr))
         mape = np.mean(
             np.abs((gp_mu_physical - y_data_physical.reshape(-1, 1))/y_data_physical.reshape(-1, 1) )
         )
-        print("Model: {}. MAPE: {:.6e}".format(label, mape))
+        # print("Model: {}. MAPE: {:.6e}".format(label, mape))
         if np.min(gp_mu_physical) < min_xylim:
             min_xylim = np.min(gp_mu_physical)
         if np.max(gp_mu_physical) > max_xylim:
@@ -73,6 +125,8 @@ def plot_model_performance(
     ax.set_ylim(xylim[0], xylim[1])
     ax.set_xlabel("Actual")
     ax.set_ylabel("Model Prediction")
+    if title is not None:
+        ax.set_title(title)
     ax.legend()
     ax.set_aspect("equal", "box")
 
