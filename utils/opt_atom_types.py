@@ -1862,11 +1862,13 @@ class Vis_Results(Analyze_opt_res):
         for i, at in enumerate(at_schemes):
             dir_name = self.make_results_dir(molec_names, at_choice=at)
             if os.path.exists(dir_name / "MAPD_best_set.csv"):
-                dir_use = dir_name
+                dir_use = dir_name / "MAPD_best_set.csv"
+            elif os.path.exists(dir_name / "MAPD_best_set_1.csv"):
+                dir_use = dir_name / "MAPD_best_set_1.csv"
             else:
-                if self.obj_choice == "ExpValPrior":
-                    dir_use = self.make_results_dir(molec_names, at_choice=at, obj_choice = "ExpVal")
-            df = pd.read_csv(dir_use / "MAPD_best_set.csv", header = 0)
+                dir_use = self.make_results_dir(molec_names, at_choice=at, obj_choice = "ExpVal")  / "MAPD_best_set.csv"
+
+            df = pd.read_csv(dir_use, header = 0)
 
             #Get literature data from 1st at scheme
             if i==0:
@@ -1897,6 +1899,69 @@ class Vis_Results(Analyze_opt_res):
             average_df.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
             offset = width * multiplier
             rects = ax.bar(x + offset, average_df["Avg MAPD"], width, label="at_" + str(at))
+            maxy = average_df["Max MAPD"] - average_df["Avg MAPD"]
+            miny = average_df["Avg MAPD"] - average_df["Min MAPD"]
+            ax.errorbar(x + offset, average_df["Avg MAPD"],yerr=[miny, maxy], fmt=".k")
+            # ax.bar_label(rects, padding=3)
+            multiplier += 1
+            
+
+        ax.axhline(y=5, label="5% MAPD", color = "black", linestyle = "--")
+            
+        #Filter out non-full atscheme results
+        #Plot
+        # ax.set_xticks(x + width )
+        ax.set_xticks(x + width, list(average_df["Molecule"]))
+        ax.set_ylabel("Average MAPD")
+        ax.grid()
+        plt.legend(loc='upper left')
+
+        return fig
+    
+    def plot_obj_MSE(self, molec_names, obj_choices, labels):
+        x = np.arange(len(molec_names))  # the label locations
+        width = 0.2 #1/len(x+1)  # the width of the bars
+        multiplier = 0
+
+        fig, ax = plt.subplots()
+        for i, (obj, label) in enumerate(zip(obj_choices,labels)):
+            dir_name = self.make_results_dir(molec_names, obj_choice = obj)
+            try_dir = dir_name / ("MAPD_" + label + ".csv")
+            if os.path.exists(try_dir):
+                dir_use = try_dir
+            else:
+                raise FileNotFoundError("No file found for " + dir_name / ("MAPD_" + label + ".csv"))
+            df = pd.read_csv(dir_use, header = 0)
+
+            #Get literature data from 1st at scheme
+            if i==0:
+                litdf = df[df['Model'] == "Literature"]
+                litdf = litdf.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
+                litdf.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
+                offset = width * multiplier
+                rects2 = ax.bar(x + offset, litdf["Avg MAPD"], width, label="Literature")
+                maxy = litdf["Max MAPD"] - litdf["Avg MAPD"]
+                miny = litdf["Avg MAPD"] - litdf["Min MAPD"]
+                ax.errorbar(x + offset, litdf["Avg MAPD"], yerr=[miny, maxy], fmt=".k")
+                multiplier += 1
+
+            #Get only best opt values
+            if isinstance(molec_names, str):
+                molecule_str = molec_names
+            elif len(molec_names) > 1 and isinstance(molec_names, (list,np.ndarray)):
+                #Assure list in correct order
+                desired_order = list(self.all_train_molec_data.keys())
+                molec_sort = sorted(molec_names, key=lambda x: desired_order.index(x))
+                molecule_str = '-'.join(molec_sort)
+            else:
+                molecule_str = molec_names[0]
+
+            filtered_df = df[df['Model'] == 'Opt ' + molecule_str]
+            sorted_df = filtered_df.sort_values(by='MAPD', ascending = False).reset_index(drop = True)
+            average_df = sorted_df.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
+            average_df.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
+            offset = width * multiplier
+            rects = ax.bar(x + offset, average_df["Avg MAPD"], width, label=obj + " " + label)
             maxy = average_df["Max MAPD"] - average_df["Avg MAPD"]
             miny = average_df["Avg MAPD"] - average_df["Min MAPD"]
             ax.errorbar(x + offset, average_df["Avg MAPD"],yerr=[miny, maxy], fmt=".k")
