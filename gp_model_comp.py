@@ -90,6 +90,7 @@ for molec in list(setup.molec_data_dict.keys()):
             mapd_dict = calc_model_mapd(models, x_test, y_test, bounds)
         print(mapd_dict)
         found_best = False
+
         #Get best model with good hyperparameter values
         for i in range(len(mapd_dict)):
             #Get the key of the model with the i lowest MAPD
@@ -145,7 +146,11 @@ for molec in list(setup.molec_data_dict.keys()):
         'likelihood_variance': models[min_mapd_key].likelihood.variance.numpy()
     }                      
 
-        print("Lowest MAPD valid model hypers: ", hyperparameters)
+        # print("Lowest MAPD valid model hypers: ", hyperparameters)
+        #Instead take the Matern5/2 model for the vapor density or Pvap and RBF for the rest
+        #Switch to RBF for Pvap and vapor density or Matern5/2 for the rest if kernel variance > 10.0
+        #Save this model to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
+
 
         for mod_key in models.keys():
             new_row = pd.DataFrame({"Molecule": [molec], 
