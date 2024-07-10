@@ -91,7 +91,10 @@ def plot_model_performance(
 
     fig, ax = plt.subplots()
 
+    count=0
+    cycle_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     for (label, model) in models.items():
+        count+= 1
         gp_mu, gp_var = model.predict_f(x_data)
         gp_mu_physical = values_scaled_to_real(gp_mu, property_bounds)
         gp_var_physical = variances_scaled_to_real(gp_var, property_bounds)
@@ -105,6 +108,12 @@ def plot_model_performance(
         mape = np.mean(
             np.abs((gp_mu_physical - y_data_physical.reshape(-1, 1))/y_data_physical.reshape(-1, 1) )
         )
+
+        ax.text(0.97,0.06*count,
+            label + ' MAPD = '+'{:.2f} '.format(mape*100)+"%",
+            horizontalalignment='right',
+            transform=plt.gca().transAxes, c = cycle_colors[count-1])
+        
         # print("Model: {}. MAPE: {:.6e}".format(label, mape))
         if np.min(gp_mu_physical) < min_xylim:
             min_xylim = np.min(gp_mu_physical)

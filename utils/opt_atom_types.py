@@ -1569,7 +1569,7 @@ class Vis_Results(Analyze_opt_res):
         super().__init__(mol_name_train, at_number, seed, obj_choice)
 
     #Define function to check GP Accuracy
-    def check_GPs(self):
+    def check_GPs(self, get_slices = False, get_train_test = False):
         """
         Makes GP validation figures for each training molecule
         """
@@ -1599,58 +1599,59 @@ class Vis_Results(Analyze_opt_res):
                 #Plot model performance
                 pdf.savefig(plot_model_performance({label:gp_model}, test_data["x"], test_data[key], y_bounds))
                 plt.close()
-                #Plot temperature slices
-                figs = plot_slices_temperature(
-                    {label:gp_model},
-                    molec_object.n_params,
-                    molec_object.temperature_bounds,
-                    y_bounds,
-                    plot_bounds = molec_object.temperature_bounds,
-                    property_name= y_names
-                )
-
-                for fig in figs:
-                    pdf.savefig(fig)
-                del figs
-
-                #Plot Parameter slices
-                for param_name in molec_object.param_names:
-                    figs = plot_slices_params(
+                if get_slices:
+                    #Plot temperature slices
+                    figs = plot_slices_temperature(
                         {label:gp_model},
-                        param_name,
-                        molec_object.param_names,
-                        list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
+                        molec_object.n_params,
                         molec_object.temperature_bounds,
                         y_bounds,
-                        property_name=y_names
+                        plot_bounds = molec_object.temperature_bounds,
+                        property_name= y_names
                     )
-                    plt.close()
-                    
+
                     for fig in figs:
                         pdf.savefig(fig)
                     del figs
 
-                # #Plot test vs train for each parameter set
-                for test_params in test_data["x"][:,:molec_object.n_params]:
-                    #Find points in test set with correct param value
-                    # Locate rows where parameter set == test parameter set
-                    match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
-                    test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
-                                                  test_data[key][match_test].reshape(-1,1)), axis = 1)
-                    #Find points in train set with correct param value
-                    match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
-                    train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
-                                                  train_data[key][match_trn].reshape(-1,1)), axis = 1)
+                    #Plot Parameter slices
+                    for param_name in molec_object.param_names:
+                        figs = plot_slices_params(
+                            {label:gp_model},
+                            param_name,
+                            molec_object.param_names,
+                            list(exp_data.keys())[2], #Use the 3rd temp to plot param slices
+                            molec_object.temperature_bounds,
+                            y_bounds,
+                            property_name=y_names
+                        )
+                        plt.close()
+                        
+                        for fig in figs:
+                            pdf.savefig(fig)
+                        del figs
+                if get_train_test:
+                    # #Plot test vs train for each parameter set
+                    for test_params in test_data["x"][:,:molec_object.n_params]:
+                        #Find points in test set with correct param value
+                        # Locate rows where parameter set == test parameter set
+                        match_test = np.unique(np.where((test_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                        test_points = np.concatenate((test_data["x"][match_test,-1].reshape(-1,1), 
+                                                    test_data[key][match_test].reshape(-1,1)), axis = 1)
+                        #Find points in train set with correct param value
+                        match_trn = np.unique(np.where((train_data["x"][:,:molec_object.n_params] == test_params).all(axis=1))[0])
+                        train_points = np.concatenate((train_data["x"][match_trn,-1].reshape(-1,1), 
+                                                    train_data[key][match_trn].reshape(-1,1)), axis = 1)
 
-                    pdf.savefig(plot_model_vs_test({label:gp_model}, 
-                                                {"params": test_params}, 
-                                                train_points, 
-                                                test_points, 
-                                                molec_object.temperature_bounds,
-                                                y_bounds,
-                                                plot_bounds = molec_object.temperature_bounds,
-                                                property_name =  y_names ))
-                    plt.close()
+                        pdf.savefig(plot_model_vs_test({label:gp_model}, 
+                                                    {"params": test_params}, 
+                                                    train_points, 
+                                                    test_points, 
+                                                    molec_object.temperature_bounds,
+                                                    y_bounds,
+                                                    plot_bounds = molec_object.temperature_bounds,
+                                                    property_name =  y_names ))
+                        plt.close()
             pdf.close()
 
         return

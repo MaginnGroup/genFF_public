@@ -19,7 +19,7 @@ import matplotlib
 
 repeats = 3
 seed = 2
-mode = "test"
+mode = "train"
 #Get obj from a set of parameters
 at_class = 11
 save_data = False
