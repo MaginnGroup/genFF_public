@@ -19,15 +19,17 @@ import matplotlib
 
 repeats = 3
 seed = 2
-mode = "train"
+mode = "test"
 #Get obj from a set of parameters
 at_class = 11
 save_data = False
 obj_choice = "ExpVal"
 obj_choice_p = "ExpValPrior"
-molec_names = ["R14", "R32"] #, "R50", "R125", "R134a", "R143a", "R170"]
+molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170"]
 setup = opt_atom_types.Problem_Setup(molec_names, at_class, obj_choice)
 property_names = ["sim_liq_density", "sim_vap_density", "sim_Pvap", "sim_Hvap"]
+# property_names = ["sim_Pvap"]
+
 
 dir_name = "Results/gp_val_figs/"
 os.makedirs(dir_name, exist_ok=True)
@@ -83,8 +85,8 @@ for molec in list(setup.molec_data_dict.keys()):
 
         # # Plot model performance on train and test points
         mapd_dict = calc_model_mapd(models, x_test, y_test, bounds)
-        
-        best_found = True
+        print(mapd_dict)
+    
         #Get best model with good hyperparameter values
         for i in range(len(mapd_dict)):
             #Get the key of the model with the i lowest MAPD
@@ -104,12 +106,16 @@ for molec in list(setup.molec_data_dict.keys()):
             if np.all(cond1 & cond2 & cond3 & cond4):
                 best_models.append(models[min_mapd_key])
                 break
+            elif np.all(cond3 & cond4) or np.all(cond1 & cond2) and i == 0:
+                best_models.append(models[min_mapd_key])
+                break
             elif i == len(mapd_dict) - 1:
                 if np.all(cond3 & cond4) or np.all(cond1 & cond2):
-                    warnings.warn("No good hyperparameters found for " + molec + " " + prop, UserWarning)
+                    warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
                     min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
                     best_models.append(models[min_mapd_key])
                 else:
+                    warnings.warn("No hyperparam sets meet any criteria", UserWarning)
                     min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
                     best_models.append(models[min_mapd_key])
 
@@ -133,9 +139,10 @@ for molec in list(setup.molec_data_dict.keys()):
         title = molec + " " + prop + " " + mode + " Model Performance"
         if mode == "train":
             pdf.savefig(plot_model_performance(models, x_train, y_train, bounds, title = title))
+            # plt.close()
         else:
             pdf.savefig(plot_model_performance(models, x_test, y_test, bounds, title = title))
-        plt.close()
+            # plt.close()
 pdf.close()
 
 df_mapd.to_csv(dir_name + "/" + "gp_models_eval_" +  mode + ".csv", index=False, header=True)

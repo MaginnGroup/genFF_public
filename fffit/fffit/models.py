@@ -3,8 +3,9 @@ import numpy as np
 import tensorflow as tf
 from gpflow.utilities import print_summary
 import warnings
+import copy
 
-def buildGP(x_train, y_train, kernel, mean_function="linear", fmt="notebook", seed = None):
+def buildGP(x_train, y_train, kernel, mean_function="linear", fmt="notebook", seed = None, lenscls = None):
 
     """Create and train a GPFlow model
 
@@ -22,7 +23,10 @@ def buildGP(x_train, y_train, kernel, mean_function="linear", fmt="notebook", se
     fmt : string, optional, default="notebook"
         The formatting type for the GPFlow print_summary
     """
-
+    kernel_use = copy.deepcopy(kernel)
+    if lenscls is not None:
+        kernel_use.lengthscales.assign(lenscls)
+    # print_summary(kernel)
     if seed != None:
         np.random.seed(seed)
         tf.compat.v1.get_default_graph()
@@ -43,7 +47,7 @@ def buildGP(x_train, y_train, kernel, mean_function="linear", fmt="notebook", se
     # Create the model
     model = gpflow.models.GPR(
         data=(x_train, y_train.reshape(-1, 1)),
-        kernel=kernel,
+        kernel=kernel_use,
         mean_function=mean_function
     )
 
@@ -54,14 +58,15 @@ def buildGP(x_train, y_train, kernel, mean_function="linear", fmt="notebook", se
     return model, aux
 
 def init_hyper_parameters(count_fix, args):
-    kernel = args[2]
-    if count_fix != 0:
-        # Randomize the hyperparameters after 1st opt
-        x_train = args[0]
-        kernel.variance.assign(np.random.uniform(low=1e-2, high=10.0))
-        lenscls = np.random.uniform(low=1e-2, high=10.0, size=x_train.shape[1])
-        kernel.lengthscales.assign(lenscls)
-    return kernel
+    # kernel = args[2]
+    # if count_fix != 0:
+        # Randomize the lengthscales after 1st opt
+        # x_train = args[0]
+        # kernel.variance.assign((1.0))
+        # lenscls = np.random.uniform(low=1e-2, high=5.0, size=x_train.shape[1])
+        # kernel.lengthscales.assign(lenscls)
+    lenscls = np.random.uniform(low=1e-2, high=5.0, size=args[0].shape[1]) if count_fix != 0 else None
+    return lenscls
 
 def fit_GP(count_fix, retrain_GP, args):
     """
@@ -82,16 +87,18 @@ def fit_GP(count_fix, retrain_GP, args):
     #Initialize fit_sucess as true
     fit_successed = True   
     #Get hyperparam guess list
-    kernel = init_hyper_parameters(count_fix, args)
-    args[2] = kernel
+    lenscls = init_hyper_parameters(count_fix, args)
+    # print(args[2])
+    # print_summary(args[2])
+    # print("count_fix: ", count_fix)
     try:
         #Make model and optimizer and get results
-        model, res = buildGP(*args)
+        model, res = buildGP(*args, lenscls)
 
         #If result isn't successful, remake and retrain model w/ different hyperparameters
         if not(res.success):
             if count_fix < retrain_GP:
-                print('model failed to optimize, fix it by random initialization.')
+                # print('model failed to optimize, fix it by random initialization.')
                 count_fix += 1 
                 fit_successed,model,count_fix = fit_GP(count_fix, retrain_GP, args)
             else:
@@ -99,7 +106,7 @@ def fit_GP(count_fix, retrain_GP, args):
     #If an error is thrown becauuse of bad hyperparameters, reoptimize them
     except tf.errors.InvalidArgumentError as e:
         if count_fix < retrain_GP:
-            print('bad initial hyperparameters, fix it by random initialization.')
+            # print('bad initial hyperparameters, fix it by random initialization.')
             count_fix += 1
             fit_successed,model,count_fix = fit_GP(count_fix, retrain_GP, args)
         else:
@@ -114,39 +121,40 @@ def fit_GP(count_fix, retrain_GP, args):
         #If the kernel parameters are too large or too small, reoptimize them
         if not good_params:
             if count_fix < retrain_GP:
-                print('bad final hyperparameters, fix it by random initialization.')
+                # print('bad final hyperparameters, fix it by random initialization.')
                 count_fix = count_fix + 1 
                 fit_successed, model, count_fix = fit_GP(count_fix, retrain_GP, args)
             else:
                 fit_successed = False
-        # #Otherwise check fit
-        else:    
-            X_Train = args[0]
-            Y_Train = args[1]
-            min_values = np.min(X_Train, axis=0)
-            max_values = np.max(X_Train, axis=0)
-            # Generate random data points within these ranges for each feature
-            num_samples = 100
-            random_values = np.random.uniform(0, 1, size=(num_samples, X_Train.shape[1]))
-            xtest = min_values + random_values * (max_values - min_values)
-            mean, var = model.predict_y(xtest)
-            mean = mean.numpy()
-            var = var.numpy()
+        # #Otherwise check fit. Not using check fit because using the mean isn't a good way to check fit in these cases
+        # else:    
+        #     X_Train = args[0]
+        #     Y_Train = args[1]
+        #     min_values = np.min(X_Train, axis=0)
+        #     max_values = np.max(X_Train, axis=0)
+        #     # Generate random data points within these ranges for each feature
+        #     num_samples = 100
+        #     random_values = np.random.uniform(0, 1, size=(num_samples, X_Train.shape[1]))
+        #     xtest = min_values + random_values * (max_values - min_values)
+        #     mean, var = model.predict_y(xtest)
+        #     mean = mean.numpy()
+        #     var = var.numpy()
 
-            y_mean = np.mean(Y_Train)
-            mean_mean = np.mean(mean)
-            y_max = np.max(Y_Train)
-            mean_max = np.max(mean)
-            y_min = np.abs(np.min(Y_Train))
-            mean_min = np.abs(np.min(mean))
+        #     y_mean = np.mean(Y_Train)
+        #     mean_mean = np.mean(mean)
+        #     y_max = np.max(Y_Train)
+        #     mean_max = np.max(mean)
+        #     y_min = np.abs(np.min(Y_Train))
+        #     mean_min = np.abs(np.min(mean))
             
-            #If fit is bad, reoptimize
-            if y_mean > 1e-7 and (mean_max > y_max or mean_min < y_min):
-                if abs(round((mean_mean-y_mean)/y_mean)) > 1e-2 or np.isclose(mean_mean, 0.0, 1e-7):
-                    if count_fix < retrain_GP:
-                        print('bad solution, fix it by random initialization.')
-                        count_fix = count_fix + 1 
-                        fit_successed, model, count_fix = fit_GP(count_fix, retrain_GP, args)
+        #     #If fit is bad, reoptimize
+        #     if y_mean > 1e-7 and (mean_max > y_max or mean_min < y_min):
+        #         if abs(((mean_mean-y_mean)/y_mean)) > 0.5 or np.isclose(mean_mean, 0.0, 1e-7):
+        #             print(abs(((mean_mean-y_mean)/y_mean)))
+        #             if count_fix < retrain_GP:
+        #                 print('bad solution, fix it by random initialization.')
+        #                 count_fix = count_fix + 1 
+        #                 fit_successed, model, count_fix = fit_GP(count_fix, retrain_GP, args)
 
     return fit_successed, model, count_fix
 
@@ -176,17 +184,24 @@ def run_gpflow_scipy(x_train, y_train, kernel, mean_function="linear", fmt="note
     args = [x_train, y_train, kernel, mean_function, fmt, seed]
     #Initialize number of counters
     count_fix_tot = 0
+    
+    #Initialize everything with vanilla parameters
+    first_mod_succ, first_model, count_fix = fit_GP(0, 0, args)
+    best_minimum_loss = first_model.training_loss().numpy()
+    # print('First model training loss: ', best_minimum_loss)
+    best_model = first_model
+
     #While you still have retrains left
     while count_fix_tot <= restarts:
         #Create and fit the model
         fit_successed, gp_model, count_fix = fit_GP(count_fix_tot, restarts, args)
         #The new counter total is the number of counters used + 1
         count_fix_tot += count_fix + 1
-        if first_model is None:
-            first_model = gp_model
+        
         if fit_successed:
             # Compute the training loss of the model
             training_loss = gp_model.training_loss().numpy()
+            # print("training loss", training_loss)
             # Check if this model has the best minimum training loss
             if training_loss < best_minimum_loss:
                 #If the 1st model succeeds it will be a backup plan
