@@ -148,14 +148,30 @@ for molec in list(setup.molec_data_dict.keys()):
         print("Lowest MAPD valid model hypers: ", hyperparameters)
 
         for mod_key in models.keys():
-            new_row = pd.DataFrame({"Molecule": [molec], "Property": [prop], "Model": [mod_key], "MAPD": [mapd_dict[mod_key]]})
+            new_row = pd.DataFrame({"Molecule": [molec], 
+                                    "Property": [prop], 
+                                    "Model": [mod_key], 
+                                    "MAPD": [mapd_dict[mod_key]],
+                                    "Mean Fxn A": [models[mod_key].mean_function.A.numpy().flatten()],
+                                    "Mean Fxn B": [models[mod_key].mean_function.b.numpy()],
+                                    "kernel_variance": [models[mod_key].kernel.variance.numpy()],
+                                    "kernel_lengthscale": [models[mod_key].kernel.lengthscales.numpy()],
+                                    "likelihood_variance": [models[mod_key].likelihood.variance.numpy()]})
             if df_mapd is None:
                 df_mapd = new_row
             else:
                 df_mapd = pd.concat([df_mapd, new_row], ignore_index=True)
 
             if mod_key == min_mapd_key:
-                new_b_row = pd.DataFrame({"Molecule": [molec], "Property": [prop], "Model": [mod_key], "MAPD": [mapd_dict[mod_key]]})
+                new_b_row = pd.DataFrame({"Molecule": [molec], 
+                                    "Property": [prop], 
+                                    "Model": [mod_key], 
+                                    "MAPD": [mapd_dict[mod_key]],
+                                    "Mean Fxn A": [models[mod_key].mean_function.A.numpy().flatten()],
+                                    "Mean Fxn B": [models[mod_key].mean_function.b.numpy()],
+                                    "kernel_variance": [models[mod_key].kernel.variance.numpy()],
+                                    "kernel_lengthscale": [models[mod_key].kernel.lengthscales.numpy()],
+                                    "likelihood_variance": [models[mod_key].likelihood.variance.numpy()]})
                 best_models.append(models[mod_key])
                 if df_mapd_b is None:
                     df_mapd_b = new_b_row
