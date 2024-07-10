@@ -84,9 +84,12 @@ for molec in list(setup.molec_data_dict.keys()):
         )
 
         # # Plot model performance on train and test points
-        mapd_dict = calc_model_mapd(models, x_test, y_test, bounds)
+        if mode == "train":
+            mapd_dict = calc_model_mapd(models, x_train, y_train, bounds)
+        else:
+            mapd_dict = calc_model_mapd(models, x_test, y_test, bounds)
         print(mapd_dict)
-    
+        found_best = False
         #Get best model with good hyperparameter values
         for i in range(len(mapd_dict)):
             #Get the key of the model with the i lowest MAPD
@@ -105,19 +108,42 @@ for molec in list(setup.molec_data_dict.keys()):
             #If the lengthscales are good values, then save the model
             if np.all(cond1 & cond2 & cond3 & cond4):
                 best_models.append(models[min_mapd_key])
+                found_best = True
                 break
-            elif np.all(cond3 & cond4) or np.all(cond1 & cond2) and i == 0:
-                best_models.append(models[min_mapd_key])
-                break
-            elif i == len(mapd_dict) - 1:
+
+        if not found_best:
+            for i in range(len(mapd_dict)):
+                #Get the key of the model with the i lowest MAPD
+                min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[i]
+                hyperparameters = {
+            'Mean Fxn A': models[min_mapd_key].mean_function.A.numpy(),
+            'Mean Fxn B': models[min_mapd_key].mean_function.b.numpy(),
+            'kernel_variance': models[min_mapd_key].kernel.variance.numpy(),
+            'kernel_lengthscale': models[min_mapd_key].kernel.lengthscales.numpy(),
+            'likelihood_variance': models[min_mapd_key].likelihood.variance.numpy()
+        }       
+                cond1 = (hyperparameters['kernel_lengthscale'] >= 1e-2)
+                cond2 = (hyperparameters['kernel_lengthscale'] <= 1e2)
+                cond3 = (hyperparameters['kernel_variance'] >= 1e-2)
+                cond4 = (hyperparameters['kernel_variance'] <= 10)
+                #If the lengthscales are good values, then save the model
                 if np.all(cond3 & cond4) or np.all(cond1 & cond2):
                     warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
-                    min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
                     best_models.append(models[min_mapd_key])
-                else:
-                    warnings.warn("No hyperparam sets meet any criteria", UserWarning)
-                    min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
-                    best_models.append(models[min_mapd_key])
+                    found_best = True
+                    break
+
+        if not found_best:
+            warnings.warn("No hyperparam sets meet any criteria", UserWarning)
+            min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
+            best_models.append(models[min_mapd_key])
+            hyperparameters =  {
+        'Mean Fxn A': models[min_mapd_key].mean_function.A.numpy(),
+        'Mean Fxn B': models[min_mapd_key].mean_function.b.numpy(),
+        'kernel_variance': models[min_mapd_key].kernel.variance.numpy(),
+        'kernel_lengthscale': models[min_mapd_key].kernel.lengthscales.numpy(),
+        'likelihood_variance': models[min_mapd_key].likelihood.variance.numpy()
+    }                      
 
         print("Lowest MAPD valid model hypers: ", hyperparameters)
 
@@ -142,7 +168,7 @@ for molec in list(setup.molec_data_dict.keys()):
             # plt.close()
         else:
             pdf.savefig(plot_model_performance(models, x_test, y_test, bounds, title = title))
-            # plt.close()
+        # plt.close()
 pdf.close()
 
 df_mapd.to_csv(dir_name + "/" + "gp_models_eval_" +  mode + ".csv", index=False, header=True)

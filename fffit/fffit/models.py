@@ -65,7 +65,7 @@ def init_hyper_parameters(count_fix, args):
         # kernel.variance.assign((1.0))
         # lenscls = np.random.uniform(low=1e-2, high=5.0, size=x_train.shape[1])
         # kernel.lengthscales.assign(lenscls)
-    lenscls = np.random.uniform(low=1e-2, high=5.0, size=args[0].shape[1]) if count_fix != 0 else None
+    lenscls = np.random.uniform(low=1e-2, high=10.0, size=args[0].shape[1]) if count_fix != 0 else None
     return lenscls
 
 def fit_GP(count_fix, retrain_GP, args):
@@ -117,7 +117,7 @@ def fit_GP(count_fix, retrain_GP, args):
         kern_lensc = model.kernel.lengthscales.numpy()
         #Check that all params are withing 1e-3 and 1e3
         all_params = [kern_var, kern_lensc]
-        good_params = np.all((kern_lensc >= 1e-2) & (kern_lensc <= 1e2) & (kern_var >= 1e-2) & (kern_var <= 10.0))
+        good_params = np.all((kern_lensc >= 1e-2) & (kern_lensc <= 1e3) & (kern_var >= 1e-2) & (kern_var <= 1e3))
         #If the kernel parameters are too large or too small, reoptimize them
         if not good_params:
             if count_fix < retrain_GP:
