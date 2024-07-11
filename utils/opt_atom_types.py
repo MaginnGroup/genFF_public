@@ -318,7 +318,10 @@ class Problem_Setup:
                 iter_df = pd.DataFrame([df_vals], columns = df.columns)
                 iter_df = iter_df.apply(lambda col: col.explode(), axis=0).reset_index(drop=True).copy(deep =True)
                 df = pd.concat([df, iter_df], ignore_index=True)
-        df.to_csv("molecule_exp_unc_data.csv", index = False, header = True)
+        save_dir = self.use_root / "Results" / "gp_val_figs"
+        os.makedirs(save_dir, exist_ok=True)
+        file_name = save_dir / ("molecule_exp_unc_data.csv")
+        df.to_csv(file_name, index = False, header = True)
         return df
     
     def values_pref_to_real(self, theta_guess):
