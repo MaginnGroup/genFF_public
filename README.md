@@ -17,19 +17,11 @@ To run LJ parameter optimization, follow the following steps:
    ```  
 5. Generate pareto sets for 1st repeats
    ```
-     python project_opt_at.py submit -o gen_pareto_sets -f obj_choice ExpVal atom_type 11 repeat_number 1
+     python project_opt_at.py submit -o gen_pareto_sets -f obj_choice [val] atom_type [val] repeat_number [val]
    ```   
-6. ONLY once these finish, run the rest
-   ```
-     python project_opt_at.py submit -o gen_pareto_sets -f obj_choice ExpVal atom_type 11
-   ```
-7. Run the optimization algorithm with repeats
-   ```
-     python project_opt_at.py submit -o run_obj_alg -f obj_choice ExpVal atom_type 11
-   ```
 8. Run the optimization algorithm with repeats
    ```
-     python project_opt_at.py submit -o run_obj_alg -f obj_choice ExpVal atom_type 11
+     python project_opt_at.py submit -o run_obj_alg -f obj_choice [val] atom_type [val]
    ```
 9. Run the post analysis algorithm
    ```
