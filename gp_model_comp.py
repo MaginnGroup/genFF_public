@@ -29,7 +29,7 @@ molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170"]
 setup = opt_atom_types.Problem_Setup(molec_names, at_class, obj_choice)
 property_names = ["sim_liq_density", "sim_vap_density", "sim_Pvap", "sim_Hvap"]
 kernels = ["RBF", "Matern32", "Matern52"]
-# property_names = ["sim_Pvap"]
+# property_names = ["sim_Pvap", "sim_Hvap"]
 
 def get_hyperparams(model):
     """
@@ -38,7 +38,6 @@ def get_hyperparams(model):
     Parameters:
     model: GP model w/ linear mean fxn, likelihood variance, and anisotropic kernel lengthscale and variance
     """
-
     hyperparameters = {
         'Mean Fxn A': model.mean_function.A.numpy(),
         'Mean Fxn B': model.mean_function.b.numpy(),
@@ -71,6 +70,7 @@ best_models = []
 for molec in list(setup.molec_data_dict.keys()):
     print(molec)
     molec_object = setup.molec_data_dict[molec]
+    vle_models = {}
     for prop in property_names:
         print(prop)
         # Get the data and bounds for the property
@@ -83,10 +83,13 @@ for molec in list(setup.molec_data_dict.keys()):
         elif "Hvap" in prop:
             bounds = molec_object.Hvap_bounds
         train_data, test_data = setup.get_train_test_data(molec, property_names)
-        x_train = train_data["x"]
-        y_train = train_data[prop]
-        x_test = test_data["x"]
-        y_test = test_data[prop]
+        x_train, y_train = train_data["x"], train_data[prop]
+        x_test, y_test = test_data["x"], test_data[prop]
+
+        if mode == "train":
+            x_anal, y_anal = x_train, y_train
+        else:
+            x_anal, y_anal = x_test, y_test
 
         # Fit models
         models = {}
@@ -101,39 +104,50 @@ for molec in list(setup.molec_data_dict.keys()):
 
             models[kernel] = run_gpflow_scipy(x_train, y_train, kernel_obj, seed = seed,restarts = repeats)
     
-        # Get MAPD for each model
-        if mode == "train":
-            mapd_dict = calc_model_mapd(models, x_train, y_train, bounds)
-        else:
-            mapd_dict = calc_model_mapd(models, x_test, y_test, bounds)
-        print(mapd_dict)
-        #Sort models by MAPD
+        # Get MAPD for each model + sort by lowest MAPD
+        mapd_dict = calc_model_mapd(models, x_anal, y_anal, bounds)
         min_mapd_keys = sorted(mapd_dict, key=mapd_dict.get)
 
         #Initialize dictionaries to store if the hyperparameters meet the criteria
         cond_dict_all = {}
         cond_dict_half = {}
         cond_dict_var = {}
-        #Get best model with good hyperparameter values
+        model_data = {}
+
         #Loop over models in order of accuracy
         for i in range(len(mapd_dict)):
             #Get the key of the model with the i lowest MAPD
             min_mapd_key = min_mapd_keys[i]
             #Get the hyperparameters for the model
-            hyperparameters = get_hyperparams(models[min_mapd_key])
+            hypers = get_hyperparams(models[min_mapd_key])
             #Check conditions for the hyperparameters + save results
-            met_all, met_two, met_var = check_conditions(hyperparameters)
+            met_all, met_two, met_var = check_conditions(hypers)
             cond_dict_all[min_mapd_key] = met_all
             cond_dict_half[min_mapd_key] = met_two
             cond_dict_var[min_mapd_key] = met_var
 
+            #Save data to a dataframe
+            new_row = pd.DataFrame({"Molecule": [molec], 
+                                    "Property": [prop], 
+                                    "Model": [min_mapd_key], 
+                                    "MAPD": [mapd_dict[min_mapd_key]],
+                                    "Mean Fxn A": [hypers["Mean Fxn A"].flatten()],
+                                    "Mean Fxn B": [hypers["Mean Fxn B"]],
+                                    "kernel_variance": [hypers["kernel_variance"]],
+                                    "kernel_lengthscale": [hypers["kernel_lengthscale"]],
+                                    "likelihood_variance": [hypers["likelihood_variance"]],
+                                    "best_model": [False]})
+            model_data[min_mapd_key] = new_row
+            if df_mapd is None:
+                df_mapd = new_row
+            else:
+                df_mapd = pd.concat([df_mapd, new_row], ignore_index=True)
+
         #Define default models
         if prop == "sim_vap_density" or prop == "sim_Pvap":
-            default = "Matern52"
-            backup = "RBF"
+            default, backup = "Matern52", "RBF"
         else:
-            default = "RBF"
-            backup = "Matern52"
+            default, backup = "RBF", "Matern52"
 
         #If the default model does not meet the criteria, but the backup does save the backup model
         if cond_dict_var[default] == False and cond_dict_all[backup] == True:
@@ -141,11 +155,7 @@ for molec in list(setup.molec_data_dict.keys()):
         #Otherwise save the default model
         else:
             save_model=models[default]
-
-        #Save this model to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
-        # dir_name = "molec_gp_data/" + molec + "-vlegp"
-        # os.makedirs(dir_name, exist_ok=True)
-        # pickle.dump(save_model, open(dir_name + "/" + 'vle-gps.pkl', 'wb'))
+        vle_models[prop]=save_model
 
         #Get the best model that meets the criteria
         if any(cond_dict_all.values()):
@@ -159,44 +169,33 @@ for molec in list(setup.molec_data_dict.keys()):
             warnings.warn("No hyperparameters meet any criteria " + molec + " " + prop, UserWarning)
             min_mapd_key = min_mapd_keys[0]
             best_models.append(models[min_mapd_key])
+
+        #Save which model was the best
+        df_mapd.loc[(df_mapd['Molecule'] == molec) & 
+                    (df_mapd['Property'] == prop) & 
+                    (df_mapd['Model'] == min_mapd_key), 'best_model'] = True
         
-        #Get hypers associated with model with lowest MAPD
-        hyperparameters = get_hyperparams(models[min_mapd_key])
-
-        # print("Lowest MAPD valid model hypers: ", hyperparameters)
-
-        for mod_key in models.keys():
-            hypers = get_hyperparams(models[mod_key])
-            new_row = pd.DataFrame({"Molecule": [molec], 
-                                    "Property": [prop], 
-                                    "Model": [mod_key], 
-                                    "MAPD": [mapd_dict[mod_key]],
-                                    "Mean Fxn A": [hypers["Mean Fxn A"].flatten()],
-                                    "Mean Fxn B": [hypers["Mean Fxn B"]],
-                                    "kernel_variance": [hypers["kernel_variance"]],
-                                    "kernel_lengthscale": [hypers["kernel_lengthscale"]],
-                                    "likelihood_variance": [hypers["likelihood_variance"]]})
-            if df_mapd is None:
-                df_mapd = new_row
-            else:
-                df_mapd = pd.concat([df_mapd, new_row], ignore_index=True)
-
-            if mod_key == min_mapd_key:
-                best_models.append(models[mod_key])
-                if df_mapd_b is None:
-                    df_mapd_b = new_row
-                else:
-                    df_mapd_b = pd.concat([df_mapd_b, new_row], ignore_index=True)
-
+        #Save the model predictions to a pdf
         title = molec + " " + prop + " " + mode + " Model Performance"
-        if mode == "train":
-            pdf.savefig(plot_model_performance(models, x_train, y_train, bounds, title = title))
-            # plt.close()
-        else:
-            pdf.savefig(plot_model_performance(models, x_test, y_test, bounds, title = title))
-        # plt.close()
+        fig = plot_model_performance(models, x_anal, y_anal, bounds, title = title)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+    #Save models to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
+    gp_mod_dir = "molec_gp_data/" + molec + "-vlegp"
+    save_path_gp = gp_mod_dir + "/" + 'vle-gps.pkl'
+    if not os.path.exists(save_path_gp) and mode == "test":
+        os.makedirs(gp_mod_dir, exist_ok=True)
+        print("Saving model to: ", save_path_gp)
+        pickle.dump(vle_models, open(save_path_gp, 'wb'))
 pdf.close()
 
+#Sort lists by molecule, property, and kernel
+df_mapd['Molecule'] = pd.Categorical(df_mapd['Molecule'], categories=molec_names, ordered=True)
+df_mapd['Property'] = pd.Categorical(df_mapd['Property'], categories=property_names, ordered=True)
+df_mapd['Model'] = pd.Categorical(df_mapd['Model'], categories=kernels, ordered=True)
+df_mapd = df_mapd.sort_values(by=['Molecule', 'Property', 'Model'])
 df_mapd.to_csv(dir_name + "/" + "gp_models_eval_" +  mode + ".csv", index=False, header=True)
 #Shorten df to only include the lowest MAPD for each molecule and property
-df_mapd_b.to_csv(dir_name + "/" + "gp_models_eval_min_" + mode + ".csv", index=False, header=True)
+optimal_df = df_mapd[df_mapd['best_model'] == True]
+optimal_df.to_csv(dir_name + "/" + "gp_models_eval_min_" + mode + ".csv", index=False, header=True)
