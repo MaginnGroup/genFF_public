@@ -29,14 +29,11 @@ class ProjectOPT(FlowProject):
     def __init__(self):
         current_path = Path(os.getcwd()).absolute()
         #Set Project Path to be that of the current working directory
-        super().__init__(path = current_path)
-
+        super().__init__(path = current_path) 
 
 @ProjectOPT.label
-def pareto_set_gen(job):
-    if job.sp.atom_type != 11:
-        return True
-    else:
+def pareto_set_exists(job):
+    if job.sp.atom_type == 11:
         #Define driver class
         training_molecules = job.sp.training_molecules
         training_molecules = list(json.loads(training_molecules))
@@ -44,26 +41,29 @@ def pareto_set_gen(job):
         pareto_save = driver.use_dir_name / "pareto_info.csv"
         #Check if pareto info exists
         return pareto_save.exists()
+    else:
+        return True
 
-@ProjectOPT.post(pareto_set_gen)
+#Only run this operation for the first repeat job
+@ProjectOPT.pre(lambda job: job.sp.repeat_number ==1 and job.sp.atom_type == 11)
+@ProjectOPT.post(pareto_set_exists)
 @ProjectOPT.operation()
 def gen_pareto_sets(job):
-    if job.statepoint.repeat_number == 1:
-        #Define method, ep_enum classes, indecies to consider, and kernel
-        training_molecules = job.sp.training_molecules
-        training_molecules = list(json.loads(training_molecules))
-        #Get all gp data and make driver class
-        driver = opt_atom_types.Problem_Setup(training_molecules, job.sp.atom_type, job.sp.obj_choice)
-        # For the 1st repeat for any job, we will generate the pareto sets
-        #Genrate and pareto set info
-        pareto_info = driver.gen_pareto_sets(job.sp.lhs_pts, driver.at_class.at_bounds_nm_kjmol, save_data=True)
+    #Define method, ep_enum classes, indecies to consider, and kernel
+    training_molecules = job.sp.training_molecules
+    training_molecules = list(json.loads(training_molecules))
+    #Get all gp data and make driver class
+    driver = opt_atom_types.Problem_Setup(training_molecules, job.sp.atom_type, job.sp.obj_choice)
+    # For the 1st repeat for any job, we will generate the pareto sets
+    #Genrate and pareto set info
+    pareto_info = driver.gen_pareto_sets(job.sp.lhs_pts, driver.at_class.at_bounds_nm_kjmol, save_data=True)
     
 @ProjectOPT.label
 def results_computed(job):
     #Write script that checks whether the intermediate job files are there
     return job.isfile("opt_at_results.csv") and job.isfile("sorted_at_res.csv")
 
-@ProjectOPT.pre.after(gen_pareto_sets)
+@ProjectOPT.pre(pareto_set_exists)
 @ProjectOPT.post(results_computed)
 @ProjectOPT.operation()
 def run_obj_alg(job):
