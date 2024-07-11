@@ -166,7 +166,6 @@ class Problem_Setup:
         else:
             self.use_root = Path(os.getcwd())
             
-
         #set obj_choice
         self.obj_choice = obj_choice
         self.use_dir_name = self.make_results_dir(list(self.molec_data_dict.keys()), obj_choice=obj_choice)
@@ -197,16 +196,18 @@ class Problem_Setup:
                     best_info = self.__get_ExpVal_info()
                     # print("best_info: ", best_info)
                     if best_info is None:
-                        raise ValueError("No best info found for ExpVal. Cannot calculate weight_sclr")
+                        warnings.warn("No best info found for ExpVal. Cannot calculate weight_sclr. Setting all weights to 0")
+                        #If no data is available, set weight to 0, this is equivalent to the ExpVal method
+                        Esse_avg = 0
                     else:
                         #Get average value of best sets for each parameter
                         Esse_avg = best_info["Min Obj"].mean()
-                        #Set scaler to 2 significant figures
-                        self.weight_sclr = float('{:g}'.format(float('{:.2g}'.format(Esse_avg))))
-                        weight_sclr_data = {molecule_str: self.weight_sclr}
+                    #Set scaler to 2 significant figures
+                    self.weight_sclr = float('{:g}'.format(float('{:.2g}'.format(Esse_avg))))
+                    weight_sclr_data = {molecule_str: self.weight_sclr}
 
                 #Add it to the Json dictionary
-                if calc_Esse_avg:
+                if calc_Esse_avg and best_info is not None:
                     if weight_sclr_file.exists():
                         # load it
                         with open(weight_sclr_file , "r") as json_file:

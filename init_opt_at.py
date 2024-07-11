@@ -7,13 +7,14 @@ project = signac.init_project("opt_at_params")
 Atom_Type = 11
 repeats  = 25 #Repeats for full optimization
 repeats_ind = 25 #Repeats for individual molecule optimization
+lhs_pts = int(1e5) #Number of LHS points to generate
 seed = 1
 save_data = True
 training_molecules = list(["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"])
 
 if isinstance(training_molecules, list):
     training_molecules_all = json.dumps(training_molecules)
-Objective = "ExpValPrior"
+Objective = "ExpVal"
 
 #Create job parameter dict
 for i in range(0, repeats):
@@ -25,6 +26,8 @@ for i in range(0, repeats):
         "obj_choice": Objective,
         "save_data": save_data,
         "seed": seed}
+    if i == 0:
+        sp["lhs_pts"] = lhs_pts
     #Create jobs for exploration bias study
     job = project.open_job(sp).init()
 
@@ -41,5 +44,7 @@ if len(training_molecules) > 1:
                 "obj_choice": Objective,
                 "save_data": save_data,
                 "seed": seed}
+            if j == 0:
+                sp["lhs_pts"] = lhs_pts
             #Create jobs for exploration bias study
             job = project.open_job(sp).init()

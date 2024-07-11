@@ -1,6 +1,41 @@
 # generalizedFF
 Generalized force field for one- and two-carbon single-bonded refrigerants with elements of C, F, and H
 
+### LJ Parameter Optimization (OptFF)
+To run LJ parameter optimization, follow the following steps:
+1. Make weight dictionary in Results/at_zz/Rxx/weight_sclrs.json. Use form {"Rxx": wt1, "Ryy": wt2}
+2. Use init_optff_ms.py to initialize files for simulation use. Change init_opt_at.py as necessary
+   ```
+     cd generalizedFF
+     python init_opt_at.py
+   ```  
+3. Do the following in opt_at_params directory:
+4. Use init_optff_ms.py to initialize files for simulation use. Change init_opt_at.py as necessary
+   ```
+     cd generalizedFF
+     python init_opt_at.py
+   ```  
+5. Generate pareto sets for 1st repeats
+   ```
+     python project_opt_at.py submit -o gen_pareto_sets -f obj_choice ExpVal atom_type 11 repeat_number 1
+   ```   
+6. ONLY once these finish, run the rest
+   ```
+     python project_opt_at.py submit -o gen_pareto_sets -f obj_choice ExpVal atom_type 11
+   ```
+7. Run the optimization algorithm with repeats
+   ```
+     python project_opt_at.py submit -o run_obj_alg -f obj_choice ExpVal atom_type 11
+   ```
+8. Run the optimization algorithm with repeats
+   ```
+     python project_opt_at.py submit -o run_obj_alg -f obj_choice ExpVal atom_type 11
+   ```
+9. Run the post analysis algorithm
+   ```
+     cd generalizedFF
+     python post_analysis_opt.py
+   ```
 ### VLE Optimization (OptFF)
 To run vapor-liquid-equilibrium iterations, follow the following steps:
 1. Use init_optff_ms.py to initialize files for simulation use
