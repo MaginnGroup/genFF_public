@@ -160,15 +160,13 @@ for molec in list(setup.molec_data_dict.keys()):
         #Get the best model that meets the criteria
         if any(cond_dict_all.values()):
             min_mapd_key = next(key for key, value in cond_dict_all.items() if value)
-            best_models.append(models[min_mapd_key])
         elif any(cond_dict_half.values()):
             warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
-            min_mapd_key = next(key for key, value in cond_dict_half.items() if value)
-            best_models.append(models[min_mapd_key])  
+            min_mapd_key = next(key for key, value in cond_dict_half.items() if value) 
         else:
             warnings.warn("No hyperparameters meet any criteria " + molec + " " + prop, UserWarning)
             min_mapd_key = min_mapd_keys[0]
-            best_models.append(models[min_mapd_key])
+        best_models.append(models[min_mapd_key])
 
         #Save which model was the best
         df_mapd.loc[(df_mapd['Molecule'] == molec) & 

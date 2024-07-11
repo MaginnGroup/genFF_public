@@ -133,7 +133,10 @@ class Problem_Setup:
                    "R143":r143_class,
                    "R116": r116_class}
 
-        self.all_train_gp_dict = get_gp_data_from_pkl(list(self.all_train_molec_data.keys()))
+        try:
+            self.all_train_gp_dict = get_gp_data_from_pkl(list(self.all_train_molec_data.keys()))
+        except:
+            warnings.warn("No gp data found. Many functions will not work without GP Data")
         self.valid_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170", "R23", "R41", "R161", "R152a", "R152", "R134", "R143", "R116"]
         self.valid_train_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
         self.valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
@@ -150,7 +153,10 @@ class Problem_Setup:
             else:
                 self.test_data_dict[molec] = self.all_test_molec_data[molec]
         
-        self.all_gp_dict = get_gp_data_from_pkl(list(self.molec_data_dict.keys()))
+        try:
+            self.all_gp_dict = get_gp_data_from_pkl(list(self.molec_data_dict.keys()))
+        except:
+            warnings.warn("No gp data found. Many functions will not work without GP Data")
         self.at_class = make_atom_type_class(at_number)
         self.seed = 1
 
