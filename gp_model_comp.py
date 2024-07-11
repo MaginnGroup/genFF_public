@@ -10,7 +10,7 @@ import os
 import gpflow
 from gpflow.utilities import print_summary
 import warnings
-
+import pickle
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib
@@ -28,8 +28,39 @@ obj_choice_p = "ExpValPrior"
 molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170"]
 setup = opt_atom_types.Problem_Setup(molec_names, at_class, obj_choice)
 property_names = ["sim_liq_density", "sim_vap_density", "sim_Pvap", "sim_Hvap"]
+kernels = ["RBF", "Matern32", "Matern52"]
 # property_names = ["sim_Pvap"]
 
+def get_hyperparams(model):
+    """
+    Get hyperparameters for the GP model
+    
+    Parameters:
+    model: GP model w/ linear mean fxn, likelihood variance, and anisotropic kernel lengthscale and variance
+    """
+
+    hyperparameters = {
+        'Mean Fxn A': model.mean_function.A.numpy(),
+        'Mean Fxn B': model.mean_function.b.numpy(),
+        'kernel_variance': model.kernel.variance.numpy(),
+        'kernel_lengthscale': model.kernel.lengthscales.numpy(),
+        'likelihood_variance': model.likelihood.variance.numpy()
+    }
+    return hyperparameters
+
+def check_conditions(hypers):
+    """
+    Check if the hyperparameters meet the criteria for the lengthscales and kernel variance
+    """
+    cond1 = (hypers['kernel_lengthscale'] >= 1e-2)
+    cond2 = (hypers['kernel_lengthscale'] <= 1e2)
+    cond3 = (hypers['kernel_variance'] >= 1e-2)
+    cond4 = (hypers['kernel_variance'] <= 10)
+
+    met_all = np.all(cond1 & cond2 & cond3 & cond4)
+    met_two = np.all(cond1 & cond2) or np.all(cond3 & cond4)
+    met_var = np.all(cond3 & cond4)
+    return met_all, met_two, met_var
 
 dir_name = "Results/gp_val_figs/"
 os.makedirs(dir_name, exist_ok=True)
@@ -42,7 +73,7 @@ for molec in list(setup.molec_data_dict.keys()):
     molec_object = setup.molec_data_dict[molec]
     for prop in property_names:
         print(prop)
-        # Get the data
+        # Get the data and bounds for the property
         if "liq_density" in prop:
             bounds = molec_object.liq_density_bounds
         elif "vap_density" in prop:
@@ -51,137 +82,111 @@ for molec in list(setup.molec_data_dict.keys()):
             bounds = molec_object.Pvap_bounds
         elif "Hvap" in prop:
             bounds = molec_object.Hvap_bounds
-
         train_data, test_data = setup.get_train_test_data(molec, property_names)
         x_train = train_data["x"]
         y_train = train_data[prop]
         x_test = test_data["x"]
         y_test = test_data[prop]
 
-        # Fit model
+        # Fit models
         models = {}
-        models["RBF"] = run_gpflow_scipy(
-            x_train,
-            y_train,
-            gpflow.kernels.RBF(lengthscales=np.ones(molec_object.n_params + 1)),
-            seed = seed,
-            restarts= repeats
-        )
-        models["Matern32"] = run_gpflow_scipy(
-            x_train,
-            y_train,
-            gpflow.kernels.Matern32(lengthscales=np.ones(molec_object.n_params + 1)),
-            seed = seed,
-            restarts= repeats
-        )
+        lenscls = np.ones(molec_object.n_params + 1)
+        for kernel in kernels:
+            if kernel == "RBF":
+                kernel_obj = gpflow.kernels.RBF(lengthscales=lenscls)
+            elif kernel == "Matern32":
+                kernel_obj = gpflow.kernels.Matern32(lengthscales=lenscls)
+            elif kernel == "Matern52":
+                kernel_obj = gpflow.kernels.Matern52(lengthscales=lenscls)
 
-        models["Matern52"] = run_gpflow_scipy(
-            x_train,
-            y_train,
-            gpflow.kernels.Matern52(lengthscales=np.ones(molec_object.n_params + 1)),
-            seed = seed,
-            restarts= repeats
-        )
-
-        # # Plot model performance on train and test points
+            models[kernel] = run_gpflow_scipy(x_train, y_train, kernel_obj, seed = seed,restarts = repeats)
+    
+        # Get MAPD for each model
         if mode == "train":
             mapd_dict = calc_model_mapd(models, x_train, y_train, bounds)
         else:
             mapd_dict = calc_model_mapd(models, x_test, y_test, bounds)
         print(mapd_dict)
-        found_best = False
+        #Sort models by MAPD
+        min_mapd_keys = sorted(mapd_dict, key=mapd_dict.get)
 
+        #Initialize dictionaries to store if the hyperparameters meet the criteria
+        cond_dict_all = {}
+        cond_dict_half = {}
+        cond_dict_var = {}
         #Get best model with good hyperparameter values
+        #Loop over models in order of accuracy
         for i in range(len(mapd_dict)):
             #Get the key of the model with the i lowest MAPD
-            min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[i]
-            hyperparameters = {
-        'Mean Fxn A': models[min_mapd_key].mean_function.A.numpy(),
-        'Mean Fxn B': models[min_mapd_key].mean_function.b.numpy(),
-        'kernel_variance': models[min_mapd_key].kernel.variance.numpy(),
-        'kernel_lengthscale': models[min_mapd_key].kernel.lengthscales.numpy(),
-        'likelihood_variance': models[min_mapd_key].likelihood.variance.numpy()
-    }       
-            cond1 = (hyperparameters['kernel_lengthscale'] >= 1e-2)
-            cond2 = (hyperparameters['kernel_lengthscale'] <= 1e2)
-            cond3 = (hyperparameters['kernel_variance'] >= 1e-2)
-            cond4 = (hyperparameters['kernel_variance'] <= 10)
-            #If the lengthscales are good values, then save the model
-            if np.all(cond1 & cond2 & cond3 & cond4):
-                best_models.append(models[min_mapd_key])
-                found_best = True
-                break
+            min_mapd_key = min_mapd_keys[i]
+            #Get the hyperparameters for the model
+            hyperparameters = get_hyperparams(models[min_mapd_key])
+            #Check conditions for the hyperparameters + save results
+            met_all, met_two, met_var = check_conditions(hyperparameters)
+            cond_dict_all[min_mapd_key] = met_all
+            cond_dict_half[min_mapd_key] = met_two
+            cond_dict_var[min_mapd_key] = met_var
 
-        if not found_best:
-            for i in range(len(mapd_dict)):
-                #Get the key of the model with the i lowest MAPD
-                min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[i]
-                hyperparameters = {
-            'Mean Fxn A': models[min_mapd_key].mean_function.A.numpy(),
-            'Mean Fxn B': models[min_mapd_key].mean_function.b.numpy(),
-            'kernel_variance': models[min_mapd_key].kernel.variance.numpy(),
-            'kernel_lengthscale': models[min_mapd_key].kernel.lengthscales.numpy(),
-            'likelihood_variance': models[min_mapd_key].likelihood.variance.numpy()
-        }       
-                cond1 = (hyperparameters['kernel_lengthscale'] >= 1e-2)
-                cond2 = (hyperparameters['kernel_lengthscale'] <= 1e2)
-                cond3 = (hyperparameters['kernel_variance'] >= 1e-2)
-                cond4 = (hyperparameters['kernel_variance'] <= 10)
-                #If the lengthscales are good values, then save the model
-                if np.all(cond3 & cond4) or np.all(cond1 & cond2):
-                    warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
-                    best_models.append(models[min_mapd_key])
-                    found_best = True
-                    break
+        #Define default models
+        if prop == "sim_vap_density" or prop == "sim_Pvap":
+            default = "Matern52"
+            backup = "RBF"
+        else:
+            default = "RBF"
+            backup = "Matern52"
 
-        if not found_best:
-            warnings.warn("No hyperparam sets meet any criteria", UserWarning)
-            min_mapd_key = sorted(mapd_dict, key=mapd_dict.get)[0]
+        #If the default model does not meet the criteria, but the backup does save the backup model
+        if cond_dict_var[default] == False and cond_dict_all[backup] == True:
+            save_model=models[backup]
+        #Otherwise save the default model
+        else:
+            save_model=models[default]
+
+        #Save this model to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
+        # dir_name = "molec_gp_data/" + molec + "-vlegp"
+        # os.makedirs(dir_name, exist_ok=True)
+        # pickle.dump(save_model, open(dir_name + "/" + 'vle-gps.pkl', 'wb'))
+
+        #Get the best model that meets the criteria
+        if any(cond_dict_all.values()):
+            min_mapd_key = next(key for key, value in cond_dict_all.items() if value)
             best_models.append(models[min_mapd_key])
-            hyperparameters =  {
-        'Mean Fxn A': models[min_mapd_key].mean_function.A.numpy(),
-        'Mean Fxn B': models[min_mapd_key].mean_function.b.numpy(),
-        'kernel_variance': models[min_mapd_key].kernel.variance.numpy(),
-        'kernel_lengthscale': models[min_mapd_key].kernel.lengthscales.numpy(),
-        'likelihood_variance': models[min_mapd_key].likelihood.variance.numpy()
-    }                      
+        elif any(cond_dict_half.values()):
+            warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
+            min_mapd_key = next(key for key, value in cond_dict_half.items() if value)
+            best_models.append(models[min_mapd_key])  
+        else:
+            warnings.warn("No hyperparameters meet any criteria " + molec + " " + prop, UserWarning)
+            min_mapd_key = min_mapd_keys[0]
+            best_models.append(models[min_mapd_key])
+        
+        #Get hypers associated with model with lowest MAPD
+        hyperparameters = get_hyperparams(models[min_mapd_key])
 
         # print("Lowest MAPD valid model hypers: ", hyperparameters)
-        #Instead take the Matern5/2 model for the vapor density or Pvap and RBF for the rest
-        #Switch to RBF for Pvap and vapor density or Matern5/2 for the rest if kernel variance > 10.0
-        #Save this model to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
-
 
         for mod_key in models.keys():
+            hypers = get_hyperparams(models[mod_key])
             new_row = pd.DataFrame({"Molecule": [molec], 
                                     "Property": [prop], 
                                     "Model": [mod_key], 
                                     "MAPD": [mapd_dict[mod_key]],
-                                    "Mean Fxn A": [models[mod_key].mean_function.A.numpy().flatten()],
-                                    "Mean Fxn B": [models[mod_key].mean_function.b.numpy()],
-                                    "kernel_variance": [models[mod_key].kernel.variance.numpy()],
-                                    "kernel_lengthscale": [models[mod_key].kernel.lengthscales.numpy()],
-                                    "likelihood_variance": [models[mod_key].likelihood.variance.numpy()]})
+                                    "Mean Fxn A": [hypers["Mean Fxn A"].flatten()],
+                                    "Mean Fxn B": [hypers["Mean Fxn B"]],
+                                    "kernel_variance": [hypers["kernel_variance"]],
+                                    "kernel_lengthscale": [hypers["kernel_lengthscale"]],
+                                    "likelihood_variance": [hypers["likelihood_variance"]]})
             if df_mapd is None:
                 df_mapd = new_row
             else:
                 df_mapd = pd.concat([df_mapd, new_row], ignore_index=True)
 
             if mod_key == min_mapd_key:
-                new_b_row = pd.DataFrame({"Molecule": [molec], 
-                                    "Property": [prop], 
-                                    "Model": [mod_key], 
-                                    "MAPD": [mapd_dict[mod_key]],
-                                    "Mean Fxn A": [models[mod_key].mean_function.A.numpy().flatten()],
-                                    "Mean Fxn B": [models[mod_key].mean_function.b.numpy()],
-                                    "kernel_variance": [models[mod_key].kernel.variance.numpy()],
-                                    "kernel_lengthscale": [models[mod_key].kernel.lengthscales.numpy()],
-                                    "likelihood_variance": [models[mod_key].likelihood.variance.numpy()]})
                 best_models.append(models[mod_key])
                 if df_mapd_b is None:
-                    df_mapd_b = new_b_row
+                    df_mapd_b = new_row
                 else:
-                    df_mapd_b = pd.concat([df_mapd_b, new_b_row], ignore_index=True)
+                    df_mapd_b = pd.concat([df_mapd_b, new_row], ignore_index=True)
 
         title = molec + " " + prop + " " + mode + " Model Performance"
         if mode == "train":
