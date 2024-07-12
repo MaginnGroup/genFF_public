@@ -35,22 +35,23 @@ unique_best_sets = visual.get_unique_sets(all_sets, save_data, save_label=x_labe
 
 #Loop over unique parameter sets
 for i in range(unique_best_sets.shape[0]):
-    x_label_rcc = "rcc_set_" + str(i+1)
+    x_label_unique = x_label + "_" + str(i+1)
+    # x_label_rcc = "rcc_set_" + str(i+1)
     best_set = unique_best_sets.iloc[i,:].values
     best_real = opt_ats.values_pref_to_real(copy.copy(best_set))
 
     #Get sensitivity analysis results for each best set
-    ranked_indices, n_data = opt_ats.rank_parameters(best_real, save_data, x_label_rcc)
+    ranked_indices, n_data = opt_ats.rank_parameters(best_real, save_data, x_label_unique)
 
     #Get RCC Analysis
-    opt_num_param, rcc, loss_data, opt_params =opt_ats.estimate_opt(best_real, ranked_indices, 
-                                                                   n_data, save_data, x_label_rcc)
+    # opt_num_param, rcc, loss_data, opt_params =opt_ats.estimate_opt(best_real, ranked_indices, 
+    #                                                                n_data, save_data, x_label_rcc)
 
-    #Opt params pref to real
-    opt_params = opt_ats.values_pref_to_real(opt_params)
-    #Get Property Predictions for all training molecules
-    molec_names_all = list(visual.all_train_molec_data.keys())
-    visual.comp_paper_full_ind(molec_names_all, opt_params, save_label=x_label_rcc)
+    # #Opt params pref to real
+    # opt_params = opt_ats.values_pref_to_real(opt_params)
+    # #Get Property Predictions for all training molecules
+    # molec_names_all = list(visual.all_train_molec_data.keys())
+    # visual.comp_paper_full_ind(molec_names_all, opt_params, save_label=x_label_rcc)
 
-    #Calculate MAPD for predictions and save results
-    MAPD_rcc = visual.calc_MAPD_best(molec_names_all, opt_params, save_data, x_label_rcc)
+    # #Calculate MAPD for predictions and save results
+    # MAPD_rcc = visual.calc_MAPD_best(molec_names_all, opt_params, save_data, x_label_rcc)

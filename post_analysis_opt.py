@@ -69,9 +69,6 @@ for i in range(unique_best_sets.shape[0]):
     #Calculate MAPD for predictions and save results
     df = visual.calc_MAPD_best(molec_names_all, save_data = save_data, save_label=x_label_set)
 
-    #Plot optimization result heat maps
-    visual.plot_obj_hms(best_set, x_label_set)
-
     #Gat Jac and Hess Approximations
     scale_theta = True
     jac = visual.approx_jac(best_real, scale_theta, save_data, x_label=x_label_set)
@@ -83,6 +80,9 @@ for i in range(unique_best_sets.shape[0]):
         eigval = [np.real(num) for num in eigval]
         np.savetxt(eig_val_path,eigval,delimiter=",")
         np.savetxt(eig_vec_path,eigvec,delimiter=",")
+
+    #Plot optimization result heat maps
+    visual.plot_obj_hms(best_set, x_label_set)
 
 #Plot atom_type scheme results
 # at_schemes = [11,12,13,14]
