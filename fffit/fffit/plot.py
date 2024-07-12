@@ -337,6 +337,7 @@ def plot_model_vs_test(
     matplotlib.figure.Figure
     """
     linestyles = ["solid", "dashed", "dotted"]
+    cycle_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     n_samples = 100
     vals = np.linspace(plot_bounds[0], plot_bounds[1], n_samples).reshape(
@@ -352,6 +353,10 @@ def plot_model_vs_test(
             if not np.all(np.isnan(param_values[key])):
                 other = np.tile(param_values[key], (n_samples, 1))
                 xx = np.hstack((other, vals_scaled))
+                if exp_x_data is not None and exp_y_data is not None:
+                    exp_other = np.tile(param_values[key], (len(exp_x_data), 1))
+                    scld_exp_x_data = values_real_to_scaled(exp_x_data, temperature_bounds)
+                    exp_xx = np.hstack((exp_other, scld_exp_x_data))
             
             for (label, model) in models.items():
                 mean_scaled, var_scaled = model.predict_f(xx)
@@ -365,6 +370,20 @@ def plot_model_vs_test(
                     mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
                     alpha=0.25,
                 )
+
+                if exp_x_data is not None and exp_y_data is not None:
+                    exp_mean_scaled, exp_var_scaled = model.predict_f(exp_xx)
+                    exp_mean = values_scaled_to_real(exp_mean_scaled, property_bounds)
+                    mapd = np.mean(np.abs((exp_mean - exp_y_data.reshape(-1, 1))/exp_y_data.reshape(-1, 1) ))*100
+                    # meansqerr = np.mean((exp_mean - exp_y_data.reshape(-1, 1)) ** 2)
+                    if "Vapor Density" in property_name or "Pressure" in property_name:
+                        y_lab = 0.06 + 0.06*i
+                    else:
+                        y_lab = 0.94-0.06*i
+                    ax.text(0.97,y_lab,
+                        ' MAPD = '+'{:.2f} '.format(mapd)+'%',
+                        horizontalalignment='right',
+                        transform=plt.gca().transAxes, c = cycle_colors[i])
 
     if train_points.shape[0] > 0:
         md_train_temp = values_scaled_to_real(

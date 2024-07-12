@@ -305,7 +305,7 @@ class Problem_Setup:
                 elif "Pvap" in prop_key: 
                     exp_data = molec_object.expt_Pvap
                     property_bounds = molec_object.Pvap_bounds
-                    property_name = "Vapor pressure [bar]"
+                    property_name = "Vapor Pressure [bar]"
                 elif "Hvap" in prop_key:
                     exp_data = molec_object.expt_Hvap
                     property_bounds = molec_object.Hvap_bounds
@@ -419,7 +419,7 @@ class Problem_Setup:
         elif "Pvap" in prop_key: 
             exp_data = molec_object.expt_Pvap
             property_bounds = molec_object.Pvap_bounds
-            property_name = "Vapor pressure [bar]"
+            property_name = "Vapor Pressure [bar]"
         elif "Hvap" in prop_key:
             exp_data = molec_object.expt_Hvap
             property_bounds = molec_object.Hvap_bounds
