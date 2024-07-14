@@ -41,7 +41,7 @@ for i in range(unique_best_sets.shape[0]):
     best_real = opt_ats.values_pref_to_real(copy.copy(best_set))
 
     #Get sensitivity analysis results for each best set
-    ranked_indices, n_data = opt_ats.rank_parameters(best_real, save_data, x_label_unique)
+    ranked_indices, n_data, at_names_ranked = opt_ats.rank_parameters(best_real, save_data, x_label_unique)
 
     #Get RCC Analysis
     # opt_num_param, rcc, loss_data, opt_params =opt_ats.estimate_opt(best_real, ranked_indices, 

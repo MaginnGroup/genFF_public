@@ -862,6 +862,7 @@ class Problem_Setup:
             
             k += 1  # Step 6: Increase k and repeat
 
+        at_names_ranked = [self.at_class.at_names[i] for i in np.array(ranked_indices)]
         if save_data:
             #Write ranked indices and n_data to a csv on separate lines
             save_label = "_" + save_label if save_label is not None else ""
@@ -870,14 +871,16 @@ class Problem_Setup:
             save_csv_path2 = os.path.join(dir_name, "n_data" + save_label + ".csv")
             save_csv_path3 = os.path.join(dir_name, "Z_matrix" + save_label + ".csv")
             #Transform to Pandas df and save to csv
-            df_ranked_indices = pd.DataFrame(ranked_indices)
+            df_ranked_indices = pd.DataFrame({'Indices': ranked_indices, 'AT Names': at_names_ranked})
+            # df_ranked_indices = pd.DataFrame(ranked_indices)
             df_ndata = pd.DataFrame([n_data])
             df_Z = pd.DataFrame(Z)
             df_ranked_indices.to_csv(save_csv_path1, index = False, header = False)
             df_ndata.to_csv(save_csv_path2, index = False, header = False)
             df_Z.to_csv(save_csv_path3, index = False, header = False)
+        
 
-        return np.array(ranked_indices), n_data
+        return np.array(ranked_indices), n_data, at_names_ranked
     
 class Analyze_opt_res(Problem_Setup):
     """
