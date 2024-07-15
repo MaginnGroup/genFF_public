@@ -1375,12 +1375,12 @@ def _generate_r152_xml(job):
  </NonbondedForce>
 </ForceField>
 """.format(
-        sigma_C1=job.sp.sigma_C,
-        sigma_F1=job.sp.sigma_F,
-        sigma_H1=job.sp.sigma_H,
-        epsilon_C1=job.sp.epsilon_C,
-        epsilon_F1=job.sp.epsilon_F,
-        epsilon_H1=job.sp.epsilon_H,
+        sigma_C1=job.sp.sigma_C1,
+        sigma_F1=job.sp.sigma_F1,
+        sigma_H1=job.sp.sigma_H1,
+        epsilon_C1=job.sp.epsilon_C1,
+        epsilon_F1=job.sp.epsilon_F1,
+        epsilon_H1=job.sp.epsilon_H1,
         
     )
 
