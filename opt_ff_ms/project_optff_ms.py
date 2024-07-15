@@ -127,7 +127,7 @@ def calc_boxes(job):
 
 @Project.label
 def nvt_finished(job):
-    "Confirm a given simulation is completed"
+    "Confirm a given nvt simulation is completed or not necessary"
     import numpy as np
     import os 
     #If nsteps not in init, then GEMC ran without it earlier
@@ -146,6 +146,7 @@ def nvt_finished(job):
 
     return completed
 
+@Project.pre(lambda job: "nsteps_nvt" in job.sp)
 @Project.pre.after(create_forcefield, calc_boxes)
 @Project.post(nvt_finished)
 @Project.operation(directives={"omp_num_threads": 12})
@@ -238,10 +239,10 @@ def NVT_liqbox(job):
             job.doc.nvt_failed == True
             raise Exception("NVT failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
 
-
+@Project.pre(lambda job: "nsteps_nvt" in job.sp)
 @Project.pre.after(NVT_liqbox)
-@Project.post(lambda job: job.isfile("nvt.final.xyz") or "nsteps_nvt" not in job.sp)
-@Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc or "liqbox_final_dim" in job.doc)
+@Project.post(lambda job: job.isfile("nvt.final.xyz"))
+@Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc)
 @Project.operation
 def extract_final_NVT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
@@ -289,7 +290,8 @@ def npt_finished(job):
 
     return completed
 
-@Project.pre.after(extract_final_NVT_config)
+# @Project.pre.after(extract_final_NVT_config)
+@Project.pre(nvt_finished)
 @Project.post(npt_finished)
 @Project.operation(directives={"omp_num_threads": 12})
 def NPT_liqbox(job):
@@ -308,22 +310,26 @@ def NPT_liqbox(job):
     compound = mbuild.load(job.sp.smiles, smiles=True)
     compound_ff = ff.apply(compound)
 
-    with job:
-        liq_box = mbuild.formats.xyz.read_xyz(job.fn("nvt.final.xyz"))
-
-    boxl = job.doc.nvt_liqbox_final_dim
-
-    liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90., 90., 90.])
-
-    liq_box.periodicity = [True, True, True]
+    # Create box list and species list
+    #Use nvt initial box length if available, otherwise use original calculated liqboxl
+    if "nvt_liqbox_final_dim" in job.doc:
+        with job:
+            liq_box = mbuild.formats.xyz.read_xyz(job.fn("nvt.final.xyz"))
+        boxl = job.doc.nvt_liqbox_final_dim
+        liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90., 90., 90.])
+        liq_box.periodicity = [True, True, True]
+    else:
+        boxl = job.doc.liqboxl
+        liq_box = mbuild.Box(lengths=[boxl, boxl, boxl])    
 
     box_list = [liq_box]
-
     species_list = [compound_ff]
+    mols_to_add = [[job.sp.N_liq]]
 
-    mols_in_boxes = [[job.sp.N_liq]]
-
-    system = mc.System(box_list, species_list, mols_in_boxes=mols_in_boxes)
+    if "nvt_liqbox_final_dim" in job.doc:
+        system = mc.System(box_list, species_list, mols_in_boxes=mols_to_add)
+    else:
+        system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
 
     # Create a new moves object
     moves = mc.MoveSet("npt", species_list)
@@ -687,6 +693,8 @@ def run_gemc(job):
         else:
             #Otherwise, try with critical conditions
             job.doc.use_crit = True
+            #Ensure that you will do an nvt simulation before the next gemc simulation
+            job.sp.nsteps_nvt = 2500000
             #If GEMC fails, remove files in post conditions of previous operations
             del job.doc["vapboxl"] #calc_boxes
             del job.doc["liqboxl"] #calc_boxes
