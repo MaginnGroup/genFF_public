@@ -369,17 +369,34 @@ def NPT_liqbox(job):
     custom_args["properties"] = thermo_props
 
     # Move into the job dir and start doing things
-    with job:
-        # Run equilibration
-        mc.run(
-            system=system,
-            moveset=moves,
-            run_type="equilibration",
-            run_length=job.sp.nsteps_liqeq,
-            temperature=job.sp.T * u.K,
-            pressure=job.sp.P * u.bar,
-            **custom_args
-        )
+    try:
+        with job:
+            # Run equilibration
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_liqeq,
+                temperature=job.sp.T * u.K,
+                pressure=job.sp.P * u.bar,
+                **custom_args
+            )
+
+    except:
+        #Otherwise, try with critical conditions
+        job.doc.use_crit = True
+        #Ensure that you will do an nvt simulation before the next gemc simulation
+        job.sp.nsteps_nvt = 2500000
+        #If GEMC fails, remove files in post conditions of previous operations
+        del job.doc["vapboxl"] #calc_boxes
+        del job.doc["liqboxl"] #calc_boxes
+        with job:
+            if job.isfile("nvt.eq.out.prp"): 
+                os.remove("nvt.eq.out.prp") #NVT_liqbox
+                os.remove("nvt.final.xyz") #extract_final_NVT_config
+            if "liqbox_final_dim" in job.doc:
+                del job.doc["liqbox_final_dim"] #extract_final_NPT_config
+                os.remove("liqbox.xyz") #extract_final_NPT_config
 
 
 # @Project.label
@@ -701,10 +718,11 @@ def run_gemc(job):
             with job:
                 if job.isfile("nvt.eq.out.prp"): 
                     os.remove("nvt.eq.out.prp") #NVT_liqbox
-                    os.remove("npt.eq.out.prp") #NPT_liqbox
                     os.remove("nvt.final.xyz") #extract_final_NVT_config
+                if job.isfile("npt.eq.out.prp"):
+                    os.remove("npt.eq.out.prp") #NPT_liqbox
                     os.remove("npt.final.xyz") #extract_final_NPT_config
-                else:
+                if "liqbox_final_dim" in job.doc:
                     del job.doc["liqbox_final_dim"] #extract_final_NPT_config
                     os.remove("liqbox.xyz") #extract_final_NPT_config
 
