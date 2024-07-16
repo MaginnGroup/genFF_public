@@ -903,6 +903,81 @@ class Analyze_opt_res(Problem_Setup):
         assert isinstance(seed, int) or seed is None, "seed must be int or None"
         self.seed = seed
 
+    # def get_best_results(self, molec_ind, theta_guess = None):
+    #     """
+    #     Get the best optimization results. Pulls best parameter set from:
+    #         1) Literature (stored in molecule objects)
+    #         2) The algorithm trained for one training molecule (molec_ind)
+    #         3) The algorithm trained for all training molecules (molec_data_dict.values())
+
+    #     Parameters
+    #     ----------
+    #     molec_ind: str, the molecule name to consider
+    #     theta_guess: np.ndarray, the atom type scheme parameter set to start optimization at (sigma in nm, epsilon in kJ/mol)
+        
+    #     Returns
+    #     -------
+    #     param_dict: dict, dictionary of the best optimization results overall, for each molecule, and literature comparison
+    #     """
+    #     assert isinstance(molec_ind, str), "molec_ind must be a string"
+    #     assert molec_ind in list(self.all_train_molec_data.keys()), "molec_ind must be a key in all_train_molec_data"
+
+    #     #Initialize Dict
+    #     param_dict = {}
+    #     #Get names and transformation matrix
+    #     all_molec_list = list(self.molec_data_dict.keys())
+    #     param_matrix = self.at_class.get_transformation_matrix({molec_ind: self.all_train_molec_data[molec_ind]})
+
+    #     #If no theta_guess is provided, get the best parameter set for the optimization scheme
+    #     if theta_guess is None:
+    #         #Get best_per_run.csv for all molecules
+    #         all_molec_dir = self.make_results_dir(all_molec_list)
+    #         if os.path.exists(all_molec_dir / "best_per_run.csv"):
+    #             unsorted_df = pd.read_csv(all_molec_dir / "best_per_run.csv", header = 0)
+    #             all_df = unsorted_df.sort_values(by = "Min Obj")
+    #             first_param_name = self.at_class.at_names[0] + "_min"
+    #             last_param_name = self.at_class.at_names[-1] + "_min"
+    #             full_opt_best = all_df.loc[0, first_param_name:last_param_name].values
+    #             theta_guess = self.values_pref_to_real(full_opt_best)
+
+    #     #If we have a GP parameter set, get the values in the necessary form
+    #     if theta_guess is not None:
+    #         all_best_nec = theta_guess.reshape(-1,1).T@param_matrix
+    #         all_best_gp = values_real_to_scaled(all_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
+    #         all_best_gp = tf.convert_to_tensor(all_best_gp, dtype=tf.float64)
+    #     else:
+    #         all_best_gp = None
+
+    #     if len(all_molec_list) > 1 and isinstance(all_molec_list, (list,np.ndarray)):
+    #         molecule_str = '-'.join(all_molec_list)
+    #     else:
+    #         molecule_str = all_molec_list[0]
+    #     param_dict["Opt " + molecule_str] = all_best_gp
+
+    #     molec_dir = self.make_results_dir([molec_ind])
+    #     if os.path.exists(molec_dir / "best_per_run.csv"):
+    #         unsorted_molec_df = pd.read_csv(molec_dir / "best_per_run.csv", header = 0)
+    #         molec_df = unsorted_molec_df.sort_values(by = "Min Obj")
+    #         first_param_name = self.at_class.at_names[0] + "_min"
+    #         last_param_name = self.at_class.at_names[-1] + "_min"
+    #         molec_best = molec_df.loc[0, first_param_name:last_param_name].values
+    #         ind_best_real = self.values_pref_to_real(molec_best)
+    #         ind_best_nec = ind_best_real.reshape(-1,1).T@param_matrix
+    #         ind_best_gp = values_real_to_scaled(ind_best_nec.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
+    #         ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
+    #     else:
+    #         ind_best_gp = None
+    #     param_dict["Opt " + molec_ind] = ind_best_gp
+
+    #     molec_paper = np.array(list(self.molec_data_dict[molec_ind].lit_param_set.values()))
+    #     paper_real = self.values_pref_to_real(molec_paper)
+    #     paper_best_gp = values_real_to_scaled(paper_real.reshape(1,-1), self.all_train_molec_data[molec_ind].param_bounds)
+    #     paper_best_gp = tf.convert_to_tensor(paper_best_gp, dtype=tf.float64)
+
+    #     param_dict["Literature"] = paper_best_gp
+
+    #     return param_dict
+    
     def get_best_results(self, molec_ind, theta_guess = None):
         """
         Get the best optimization results. Pulls best parameter set from:
@@ -948,11 +1023,7 @@ class Analyze_opt_res(Problem_Setup):
         else:
             all_best_gp = None
 
-        if len(all_molec_list) > 1 and isinstance(all_molec_list, (list,np.ndarray)):
-            molecule_str = '-'.join(all_molec_list)
-        else:
-            molecule_str = all_molec_list[0]
-        param_dict["Opt " + molecule_str] = all_best_gp
+        param_dict["Opt_All"] = all_best_gp
 
         molec_dir = self.make_results_dir([molec_ind])
         if os.path.exists(molec_dir / "best_per_run.csv"):
@@ -967,7 +1038,7 @@ class Analyze_opt_res(Problem_Setup):
             ind_best_gp = tf.convert_to_tensor(ind_best_gp, dtype=tf.float64)
         else:
             ind_best_gp = None
-        param_dict["Opt " + molec_ind] = ind_best_gp
+        param_dict["Opt_One"] = ind_best_gp
 
         molec_paper = np.array(list(self.molec_data_dict[molec_ind].lit_param_set.values()))
         paper_real = self.values_pref_to_real(molec_paper)
@@ -1058,7 +1129,8 @@ class Analyze_opt_res(Problem_Setup):
             np.save(save_path, H)
         
         return H
-
+    
+    
     def calc_MAPD_any(self, all_molec_list, theta_guess, save_data = False, save_label = None):
         """
         Calculate the mean absolute percentage deviation for each training data prediction
@@ -1066,8 +1138,8 @@ class Analyze_opt_res(Problem_Setup):
         assert isinstance(save_data, bool), "save_data must be a bool"
         assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
         assert all(item in list(self.molec_data_dict.keys()) for item in all_molec_list), "all_molec_list must be a subset of the training molecules"
-        df = pd.DataFrame(columns = ["Molecule", "Property", "Model", "MAPD"])
-        
+
+        new_data = []
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
         #Loop over all molecules of interest
@@ -1079,6 +1151,7 @@ class Analyze_opt_res(Problem_Setup):
             #Get param matrix
             param_matrix = self.at_class.get_transformation_matrix({molec: self.all_train_molec_data[molec]})
 
+            prop_data = []
             #Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 #Get GP associated with property
@@ -1100,12 +1173,18 @@ class Analyze_opt_res(Problem_Setup):
                 mean_scaled, var_scaled = gp_model.predict_f(gp_theta_guess)
                 mean = values_scaled_to_real(mean_scaled, y_bounds)
                 mapd = mean_absolute_percentage_error(y_data, mean)*100
-                new_row = pd.DataFrame({"Molecule": [molec], "Property": [key], "Model": ["Opt"], "MAPD": [mapd]})
-                df = pd.concat([df, new_row], ignore_index=True)
+
+                prop_data.append(mapd)
+            data_to_append = [molec] + prop_data
+            new_data.append(data_to_append)
+
+        mapd_names = [s.replace("sim", "mapd") for s in list(molec_gps_dict.keys())]
+        columns = list(["molecule"]) + mapd_names
+        df = pd.DataFrame(new_data, columns=columns)
         
         if save_data == True:
-            save_label = save_label if save_label is not None else "MAPD_set"
-            save_csv_path = os.path.join(dir_name, "MAPD_" + save_label + ".csv")
+            save_label = save_label if save_label is not None else "MAPD_ind_set"
+            save_csv_path = os.path.join(dir_name, "MAPD_ind_" + save_label + ".csv")
             df.to_csv(save_csv_path, index = False, header = True)
         return df
     
@@ -1119,6 +1198,7 @@ class Analyze_opt_res(Problem_Setup):
         df = pd.DataFrame(columns = ["Molecule", "Property", "Model", "MAPD"])
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        all_data_lists = {"Opt_All": [], "Opt_One": [], "Literature": []}
         #Loop over all molecules of interest
         for molec in all_molec_list:
             #Get constants for molecule
@@ -1126,8 +1206,9 @@ class Analyze_opt_res(Problem_Setup):
             #Get GPs associated with each molecule
             molec_gps_dict = self.all_gp_dict[molec]
             test_params = self.get_best_results(molec, theta_guess)
-            
+
             #Loop over gps (1 per property)
+            mapd_vals = {"Opt_All": [], "Opt_One": [], "Literature": []}
             for key in list(molec_gps_dict.keys()):
                 #Set label
                 label = molec + "_" + key
@@ -1139,7 +1220,7 @@ class Analyze_opt_res(Problem_Setup):
                 y_data = np.array(list(exp_data.values()))
 
                 T_scaled = values_real_to_scaled(x_data, molec_object.temperature_bounds)
-                for param_set_key in list(test_params.keys()):
+                for i, param_set_key in enumerate(list(test_params.keys())):
                     param_set = test_params[param_set_key]
                     if param_set is not None:
                         parm_set_repeat = np.tile(param_set, (len(x_data), 1))
@@ -1147,16 +1228,28 @@ class Analyze_opt_res(Problem_Setup):
                         mean_scaled, var_scaled = gp_model.predict_f(gp_theta_guess)
                         mean = values_scaled_to_real(mean_scaled, y_bounds)
                         mapd = mean_absolute_percentage_error(y_data, mean)*100
-                        new_row = pd.DataFrame({"Molecule": [molec], "Property": [key], "Model": [param_set_key],
-                                                "MAPD": [mapd]})
-                        df = pd.concat([df, new_row], ignore_index=True)
+                        mapd_vals[param_set_key].append(mapd)
+
+            for param_set_key in list(test_params.keys()):
+                all_data_lists[param_set_key].append([molec] + mapd_vals[param_set_key])
         
+
+        mapd_names = [s.replace("sim", "mapd") for s in list(molec_gps_dict.keys())]
+        columns = list(["molecule"]) + mapd_names
+
+        dfs = {}
+        for key in list(all_data_lists.keys()):
+            df = pd.DataFrame(all_data_lists[key], columns=columns)
+            df["Type"] = key            
+            dfs[key] = df
+
+        combined_df = pd.concat(list(dfs.values()), ignore_index=True)
         if save_data == True:
             save_label = save_label if save_label is not None else "MAPD_set"
             save_csv_path = os.path.join(dir_name, "MAPD_" + save_label + ".csv")
-            df.to_csv(save_csv_path, index = False, header = True)
-            
-        return df
+            combined_df.to_csv(save_csv_path, index = False, header = True)
+
+        return dfs
     
     def get_unique_sets(self, all_param_sets, save_data = False, save_label = None):
         """
@@ -1716,7 +1809,8 @@ class Vis_Results(Analyze_opt_res):
                                             plot_bounds = molec_object.temperature_bounds,
                                             property_name =  y_names,
                                             exp_x_data = x_data,
-                                            exp_y_data = y_data ))
+                                            exp_y_data = y_data,
+                                            title = molec + " Prediction Data"))
                 plt.close()
         pdf.close()
         return 
@@ -1869,133 +1963,85 @@ class Vis_Results(Analyze_opt_res):
 
         return param_dict, obj_dict
     
-    
-    def plot_at_MSE(self, molec_names, at_schemes):
-        x = np.arange(len(molec_names))  # the label locations
-        width = 0.2 #1/len(x+1)  # the width of the bars
-        multiplier = 0
-
+    def plot_avg_MAPD(self, mapd_dfs, df_labels, df_colors, title = None):  
         fig, ax = plt.subplots()
-        for i, at in enumerate(at_schemes):
-            dir_name = self.make_results_dir(molec_names, at_choice=at)
-            if os.path.exists(dir_name / "MAPD_best_set.csv"):
-                dir_use = dir_name / "MAPD_best_set.csv"
-            elif os.path.exists(dir_name / "MAPD_best_set_1.csv"):
-                dir_use = dir_name / "MAPD_best_set_1.csv"
-            else:
-                dir_use = self.make_results_dir(molec_names, at_choice=at, obj_choice = "ExpVal")  / "MAPD_best_set.csv"
-
-            df = pd.read_csv(dir_use, header = 0)
-
-            #Get literature data from 1st at scheme
-            if i==0:
-                litdf = df[df['Model'] == "Literature"]
-                litdf = litdf.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
-                litdf.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
-                offset = width * multiplier
-                rects2 = ax.bar(x + offset, litdf["Avg MAPD"], width, label="Literature")
-                maxy = litdf["Max MAPD"] - litdf["Avg MAPD"]
-                miny = litdf["Avg MAPD"] - litdf["Min MAPD"]
-                ax.errorbar(x + offset, litdf["Avg MAPD"], yerr=[miny, maxy], fmt=".k")
-                multiplier += 1
-
-            #Get only best opt values
-            if isinstance(molec_names, str):
-                molecule_str = molec_names
-            elif len(molec_names) > 1 and isinstance(molec_names, (list,np.ndarray)):
-                #Assure list in correct order
-                desired_order = list(self.all_train_molec_data.keys())
-                molec_sort = sorted(molec_names, key=lambda x: desired_order.index(x))
-                molecule_str = '-'.join(molec_sort)
-            else:
-                molecule_str = molec_names[0]
-
-            filtered_df = df[df['Model'] == 'Opt ' + molecule_str]
-            sorted_df = filtered_df.sort_values(by='MAPD', ascending = False).reset_index(drop = True)
-            average_df = sorted_df.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
-            average_df.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
-            offset = width * multiplier
-            rects = ax.bar(x + offset, average_df["Avg MAPD"], width, label="at_" + str(at))
+        cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap"]
+        bar_width = 0.2
+        molec_names = list(mapd_dfs[0]["molecule"])
+        indices = np.arange(len(mapd_dfs[0]))
+        max_val_f = 0
+        for i, df in enumerate(mapd_dfs):
+            #Get mean max and min for MAPDs
+            df['Avg MAPD'] = df[cols].mean(axis=1)
+            df['Min MAPD'] = df[cols].min(axis=1)
+            df['Max MAPD'] = df[cols].max(axis=1)
+            average_df = df[['molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']].copy()
+            #Sort by molecule and set molecule as index
+            average_df['molecule'] = pd.Categorical(average_df['molecule'], categories=self.valid_train_mol_keys, ordered=True)
+            average_df = average_df.sort_values(by='molecule')
+            average_df.set_index("molecule")
+            #Set max value so far for bounds
+            max_val = float(average_df.max(numeric_only=True).max())
+            max_val_f = max(max_val, max_val_f)
+            #Plot min, max, and avg
+            ax.bar(indices + i*bar_width, average_df['Avg MAPD'], bar_width, label=df_labels[i], color = df_colors[i])
             maxy = average_df["Max MAPD"] - average_df["Avg MAPD"]
             miny = average_df["Avg MAPD"] - average_df["Min MAPD"]
-            ax.errorbar(x + offset, average_df["Avg MAPD"],yerr=[miny, maxy], fmt=".k")
-            # ax.bar_label(rects, padding=3)
-            multiplier += 1
-            
+            ax.errorbar(indices + i*bar_width, average_df['Avg MAPD'],yerr=[miny, maxy], fmt=".k")
 
+        ax.set_ylim(0, max_val_f*1.05)
+        ax.tick_params(axis='y', which='major', labelsize=16)
+        ax.set_ylabel("Average MAPD", fontsize = 18)
+        ax.set_xticks(indices + bar_width)
+        ax.set_xticklabels(molec_names, fontsize=14)
         ax.axhline(y=5, label="5% MAPD", color = "black", linestyle = "--")
-            
-        #Filter out non-full atscheme results
-        #Plot
-        # ax.set_xticks(x + width )
-        ax.set_xticks(x + width, list(average_df["Molecule"]))
-        ax.set_ylabel("Average MAPD")
         ax.grid()
         plt.legend(loc='upper left')
+        if title:
+            ax.set_title(title, fontsize = 18)
+        plt.tight_layout(rect=[0.01, 0.0, 1, 1])
+    
 
         return fig
     
-    def plot_obj_MSE(self, molec_names, obj_choices, labels):
-        x = np.arange(len(molec_names))  # the label locations
-        width = 0.2 #1/len(x+1)  # the width of the bars
-        multiplier = 0
+    def plot_MAPD(self, mapd_dfs, df_labels, df_colors, title):
+        cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap"]
+        names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
+        molec_names = list(mapd_dfs[0]["molecule"])
+        df_mse_list = []
+        for mapd_df in mapd_dfs:
+            df_mse_list.append(mapd_df.set_index('molecule'))
 
-        fig, ax = plt.subplots()
-        for i, (obj, label) in enumerate(zip(obj_choices,labels)):
-            dir_name = self.make_results_dir(molec_names, obj_choice = obj)
-            try_dir = dir_name / ("MAPD_" + label + ".csv")
-            if os.path.exists(try_dir):
-                dir_use = try_dir
-            else:
-                raise FileNotFoundError("No file found for " + dir_name / ("MAPD_" + label + ".csv"))
-            df = pd.read_csv(dir_use, header = 0)
-
-            #Get literature data from 1st at scheme
-            if i==0:
-                litdf = df[df['Model'] == "Literature"]
-                litdf = litdf.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
-                litdf.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
-                offset = width * multiplier
-                rects2 = ax.bar(x + offset, litdf["Avg MAPD"], width, label="Literature")
-                maxy = litdf["Max MAPD"] - litdf["Avg MAPD"]
-                miny = litdf["Avg MAPD"] - litdf["Min MAPD"]
-                ax.errorbar(x + offset, litdf["Avg MAPD"], yerr=[miny, maxy], fmt=".k")
-                multiplier += 1
-
-            #Get only best opt values
-            if isinstance(molec_names, str):
-                molecule_str = molec_names
-            elif len(molec_names) > 1 and isinstance(molec_names, (list,np.ndarray)):
-                #Assure list in correct order
-                desired_order = list(self.all_train_molec_data.keys())
-                molec_sort = sorted(molec_names, key=lambda x: desired_order.index(x))
-                molecule_str = '-'.join(molec_sort)
-            else:
-                molecule_str = molec_names[0]
-
-            filtered_df = df[df['Model'] == 'Opt ' + molecule_str]
-            sorted_df = filtered_df.sort_values(by='MAPD', ascending = False).reset_index(drop = True)
-            average_df = sorted_df.groupby('Molecule')['MAPD'].agg(['mean', 'min', 'max']).reset_index()
-            average_df.columns = ['Molecule', 'Avg MAPD', 'Min MAPD', 'Max MAPD']
-            offset = width * multiplier
-            rects = ax.bar(x + offset, average_df["Avg MAPD"], width, label=obj + " " + label)
-            maxy = average_df["Max MAPD"] - average_df["Avg MAPD"]
-            miny = average_df["Avg MAPD"] - average_df["Min MAPD"]
-            ax.errorbar(x + offset, average_df["Avg MAPD"],yerr=[miny, maxy], fmt=".k")
-            # ax.bar_label(rects, padding=3)
-            multiplier += 1
+        fig, axs = plt.subplots(2, 2, figsize=(12, 8), sharex = True)
+        # Plot each column in a subplot
+        for ax, column, name in zip(axs.flatten(), cols, names):
+            bar_width = 0.2
+            indices = np.arange(len(molec_names))
+            max_val_f = 0
+            for i in range(len(df_mse_list)):
+                df = df_mse_list[i]
+                if i < len(df_mse_list):
+                    max_val = max(df[column])
+                    max_val_f = max(max_val, max_val_f)
+                ax.bar(indices + i*bar_width, df[column], bar_width, label=df_labels[i], color = df_colors[i])
             
+            ax.set_ylim(0, max_val_f*1.05)
+            ax.tick_params(axis='y', which='major', labelsize=16)
+            ax.set_title(name, fontsize = 18) 
+            ax.set_xticks(indices + bar_width)
+            ax.set_xticklabels(molec_names, fontsize=14)
+            if name == "Liquid Density":
+                ax.legend(loc = 'upper right', fontsize = 18)
+            ax.axhline(y=5, label="5% MAPD", color = "black", linestyle = "--")
+            ax.grid()
 
-        ax.axhline(y=5, label="5% MAPD", color = "black", linestyle = "--")
-            
-        #Filter out non-full atscheme results
-        #Plot
-        # ax.set_xticks(x + width )
-        ax.set_xticks(x + width, list(average_df["Molecule"]))
-        ax.set_ylabel("Average MAPD")
-        ax.grid()
-        plt.legend(loc='upper left')
-
+        # Adjust layout
+        fig.supxlabel('Molecule', fontsize = 20)
+        fig.supylabel("MAPD", fontsize = 20)
+        if title:
+            fig.suptitle(title, fontsize = 18)
+        plt.tight_layout(rect=[0.01, 0.0, 1, 1])
+        # Show the plot
         return fig
     
     def plot_obj_hms(self, theta_guess, set_label = None):

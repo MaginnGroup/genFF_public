@@ -306,6 +306,7 @@ def plot_model_vs_test(
     property_name="property",
     exp_x_data = None,
     exp_y_data = None,
+    title = None
 ):
     """Plots the GP model(s) as a function of temperature with all other parameters
     taken as param_values. Overlays training and testing points with the same
@@ -406,7 +407,12 @@ def plot_model_vs_test(
 
     ax.set_xlabel("Temperature")
     ax.set_ylabel(property_name)
-    plt.legend(loc = "best")
+    if "Vapor Density" in property_name or "Pressure" in property_name:
+        plt.legend(loc = "upper left")
+    else:
+        plt.legend(loc = "lower left")
+    if title is not None:
+        plt.title(title, fontsize=16)
 
     if not mpl_is_inline:
         return fig

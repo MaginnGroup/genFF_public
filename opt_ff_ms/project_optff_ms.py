@@ -383,20 +383,25 @@ def NPT_liqbox(job):
             )
 
     except:
-        #Otherwise, try with critical conditions
-        job.doc.use_crit = True
-        #Ensure that you will do an nvt simulation before the next gemc simulation
-        job.sp.nsteps_nvt = 2500000
-        #If GEMC fails, remove files in post conditions of previous operations
-        del job.doc["vapboxl"] #calc_boxes
-        del job.doc["liqboxl"] #calc_boxes
-        with job:
-            if job.isfile("nvt.eq.out.prp"): 
-                os.remove("nvt.eq.out.prp") #NVT_liqbox
-                os.remove("nvt.final.xyz") #extract_final_NVT_config
-            if "liqbox_final_dim" in job.doc:
-                del job.doc["liqbox_final_dim"] #extract_final_NPT_config
-                os.remove("liqbox.xyz") #extract_final_NPT_config
+        #if GEMC failed with critical conditions as intial conditions, terminate with error
+        if "use_crit" in job.doc and job.doc.use_crit == True:
+            #If so, terminate with error and log failure in job document
+            job.doc.gemc_failed = True
+            raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
+        else:#Otherwise, try with critical conditions
+            job.doc.use_crit = True
+            #Ensure that you will do an nvt simulation before the next gemc simulation
+            job.sp.nsteps_nvt = 2500000
+            #If GEMC fails, remove files in post conditions of previous operations
+            del job.doc["vapboxl"] #calc_boxes
+            del job.doc["liqboxl"] #calc_boxes
+            with job:
+                if job.isfile("nvt.eq.out.prp"): 
+                    os.remove("nvt.eq.out.prp") #NVT_liqbox
+                    os.remove("nvt.final.xyz") #extract_final_NVT_config
+                if "liqbox_final_dim" in job.doc:
+                    del job.doc["liqbox_final_dim"] #extract_final_NPT_config
+                    os.remove("liqbox.xyz") #extract_final_NPT_config
 
 
 # @Project.label
