@@ -57,7 +57,7 @@ MSE_path_dict = {}
 for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     project = signac.get_project(project_path)
     if project_path == "opt_ff_ms":
-        project = project.find_jobs({"atom_type": at_number})
+        project = project.find_jobs({"atom_type": at_number, "restart": {"$exists": False}})
         at_num_str = "at_" + str(at_number)
     else:
         at_num_str = ""

@@ -261,7 +261,7 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
 
         #The molecule is listed as the first value in the group
         molecule = molec_dict[values["molecule"].values[0]]
-        if group[0] not in ["R134", "R152"]:
+        if group[0] not in ["R134", "R152"] and len(values) > 0:
             # Temperatures
             temps = values["temperature"].values
 
@@ -366,11 +366,12 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
 
     return new_df
 
-def get_min_max(curr_min, curr_max, new_vals):
+def get_min_max(curr_min, curr_max, new_vals, std_dev = None):
     if isinstance(new_vals, float):
         new_vals = [new_vals]
-    min_new_val = min(new_vals)
-    max_new_val = max(new_vals)
+    min_new_val = min(new_vals - 2*std_dev) if std_dev is not None else min(new_vals)
+    max_new_val = max(new_vals + 2*std_dev) if std_dev is not None else max(new_vals)
+    # print(min_new_val, max_new_val)
     if min_new_val < curr_min:
         curr_min = min_new_val
     if max_new_val > curr_max:
@@ -406,19 +407,28 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
     for i in range(len(df_ff_list)):
         df_ff = df_ff_list[i]
         if df_ff is not None:
-            #Set new max and mins
-            min_rho, max_rho = get_min_max(min_rho, max_rho, df_ff["sim_liq_density"].values)
-            min_rho, max_rho = get_min_max(min_rho, max_rho, df_ff["sim_vap_density"].values)
-            min_temp, max_temp = get_min_max(min_temp, max_temp, df_ff["sim_Tc"].values)
-            # #Plot opt_scheme_ms vle curve
-            ax2.scatter(df_ff["sim_liq_density"], df_ff["temperature"], c=df_colors[i],s=70, 
-                        marker = df_markers[i], alpha=0.7, zorder = df_z_order[i],)
-            ax2.scatter(df_ff["sim_vap_density"], df_ff["temperature"],c=df_colors[i],s=70, 
-                        marker = df_markers[i], alpha=0.7, zorder = df_z_order[i],)
+            all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
+            grouped = df_ff.groupby("temperature")[all_props]
+            
+            x_props = ["sim_liq_density", "sim_vap_density"]
+            # Calculate mean and standard deviation for each group
+            means = grouped.mean().reset_index()
+            stds = grouped.std(ddof=0).reset_index()
+
+            for x_prop in x_props:
+                #Set new max and mins
+                min_rho, max_rho = get_min_max(min_rho, max_rho, means[x_prop].values, stds[x_prop].values)
+                
+                # #Plot opt_scheme_ms vle curve
+                ax2.errorbar(means[x_prop], means["temperature"], xerr=1.96*stds[x_prop],
+                            c=df_colors[i],markersize=10, ls='none', marker = df_markers[i], alpha=0.7, 
+                            zorder = df_z_order[i],)
+
             #Plot critical points
-            ax2.scatter(df_ff["sim_rhoc"],df_ff["sim_Tc"], c=df_colors[i],s=70, 
-                        marker = df_markers[i], alpha=0.7, zorder = df_z_order[i],
-                        label = df_labels[i] )
+            min_temp, max_temp = get_min_max(min_temp, max_temp, means["sim_Tc"].values, stds["sim_Tc"].values)
+            ax2.errorbar(means["sim_rhoc"],means["sim_Tc"], xerr=1.96*stds["sim_rhoc"],
+                        c=df_colors[i],markersize=10, ls='none', marker = df_markers[i], alpha=0.7, 
+                        zorder = df_z_order[i], label = df_labels[i] )
 
     #Plot experimental data
     if molec not in ["R152", "R134"]:
@@ -504,18 +514,24 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
     for i in range(len(df_ff_list)):
         df_ff = df_ff_list[i]
         if df_ff is not None:
-            #Set new max and mins
-            min_temp, max_temp = get_min_max(min_temp, max_temp, df_ff["temperature"].values)
-            min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, np.log(df_ff["sim_Pvap"]).values)
-            min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, df_ff["sim_Hvap"].values)
+            x_props = ["sim_Pvap", "sim_Hvap"]
+            grouped = df_ff.groupby("temperature")[x_props]
+            
+            # Calculate mean and standard deviation for each group
+            means = grouped.mean().reset_index()
+            stds = grouped.std(ddof=0).reset_index()
+
+            min_temp, max_temp = get_min_max(min_temp, max_temp, means["temperature"].values)
+            min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, np.log(means["sim_Pvap"]).values)
+            min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, means["sim_Hvap"].values)
             #Plot 1/T vs log(Pvap) 
-            axs[0].scatter(1/df_ff["temperature"], np.log(df_ff["sim_Pvap"]), c=df_colors[i], 
-                           s=70,alpha=0.7, label = df_labels[i], marker = df_markers[i],
-                           zorder = df_z_order[i])
+            axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), c=df_colors[i], 
+                        s=70,alpha=0.7, label = df_labels[i], marker = df_markers[i],
+                        zorder = df_z_order[i])
             #Plot T vs Hvap
-            axs[1].scatter(df_ff["temperature"],df_ff["sim_Hvap"], c=df_colors[i], 
-                           s=70,alpha=0.7, marker = df_markers[i],
-                           zorder = df_z_order[i])
+            axs[1].scatter(means["temperature"],means["sim_Hvap"], c=df_colors[i], 
+                        s=70,alpha=0.7, marker = df_markers[i],
+                        zorder = df_z_order[i])
         
     #Plot experimental pvap
     if molec not in ["R152", "R134"]:
@@ -580,7 +596,7 @@ def plot_MAPD_each_prop(molec_names, MSE_path_dict, save_name = None):
     df_colors = ['blue', 'gray', 'green','purple']
     df_mse_list = []
     for key in list(MSE_path_dict.keys()):
-        df_mse = pd.read_csv(MSE_path_dict[key].value, header = 0, index_col = "molecule")
+        df_mse = pd.read_csv(MSE_path_dict[key], header = 0, index_col = "molecule")
         df_mse_list.append(df_mse.reindex(molec_names))
 
     fig, axs = plt.subplots(3, 2, figsize=(24, 16), sharex = True)
@@ -592,13 +608,22 @@ def plot_MAPD_each_prop(molec_names, MSE_path_dict, save_name = None):
         for i in range(len(df_mse_list)):
             df = df_mse_list[i]
             if i < len(df_mse_list):
-                max_val = max(df[column])
+                max_val = np.nanmax(df[column].values)
                 max_val_f = max(max_val, max_val_f)
             ax.bar(indices + i*bar_width, df[column], bar_width, label=df_labels[i], color = df_colors[i])
         
         ax.set_ylim(0, max_val_f*1.05)
         ax.set_title(name, fontsize = 14) 
         ax.set_xticks(indices + bar_width)
+
+        molec_names_use = []
+        for molec in molec_names:
+            if molec not in ["R14", "R50", "R170", "R116"]:
+                #Substitute mole string R w/ HFC
+                molec_names_use.append(molec.replace("R","HFC"))
+            else:
+                molec_names_use.append(molec)
+
         ax.set_xticklabels(molec_names, fontsize=14)
         if name == "Liquid Density":
             ax.legend(loc = 'upper right', fontsize = 14)
@@ -618,7 +643,7 @@ def plot_MAPD_avg_props(molec_names, MSE_path_dict, save_name = None):
     cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap", "mapd_Tc", "mapd_rhoc"]
     df_mse_list = []
     for key in list(MSE_path_dict.keys()):
-        df_mse = pd.read_csv(MSE_path_dict[key].value, header = 0, index_col = "molecule")
+        df_mse = pd.read_csv(MSE_path_dict[key], header = 0, index_col = "molecule")
         df_mse_list.append(df_mse.reindex(molec_names))
 
     # #Get Avg MAPD values for each molecule and each property + get min and max values

@@ -49,7 +49,7 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
                 if hasattr(job.sp, "restart"):
                     new_row["restart"] = job.sp.restart
                 else:
-                    new_row["restart"] = None
+                    new_row["restart"] = 1
 
                 job_fail_stat = False
                 # Extract property values. Insert N/A if not found
