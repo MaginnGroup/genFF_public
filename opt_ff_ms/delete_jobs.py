@@ -5,7 +5,8 @@ project = signac.get_project()
 
 # Iterate through all jobs in the project
 for job in project:
-    if job.sp.mol_name == "R41" and "GAFF_epsilon_C1" in job.sp.keys():
-        print(job.id)
-        # del job.doc["use_crit"]
-        job.remove()
+    if "restart" in job.sp.keys():
+        if job.sp.restart > 1:
+            print(job.id)
+            # del job.doc["use_crit"]
+            job.remove()

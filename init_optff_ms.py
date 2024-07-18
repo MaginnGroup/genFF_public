@@ -8,7 +8,7 @@ from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41
 from utils import atom_type, opt_atom_types
 
 at_number = 11 
-num_restarts = 3 #Number of restarts for replications
+num_restarts = 1 #Number of restarts for replications
 n_vap = 160 # number of molecules in vapor phase
 n_liq = 640
 
@@ -78,7 +78,7 @@ for molec_name, molec_data in molec_dict.items():
 
     # Load sample from best set using ExpVal and all training molecules
     save_data = False
-    obj_choice = "ExpValPrior"
+    obj_choice = "ExpVal"
     molec_names = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a"] #Training data to consider
     # molec_data_dict = {"R14":R14, "R32":R32, "R50":R50, "R170":R170, "R125":R125, "R134a":R134a, "R143a":R143a}
     # all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
@@ -103,6 +103,7 @@ for molec_name, molec_data in molec_dict.items():
                     # Define the initial state point
                     state_point = {
                         "atom_type": at_number,
+                        "obj_choice": obj_choice,
                         "mol_name": molec_name,
                         "mol_weight": molec_data.molecular_weight, #amu
                         "smiles": molec_data.smiles_str,

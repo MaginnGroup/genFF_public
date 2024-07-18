@@ -291,6 +291,7 @@ def npt_finished(job):
     return completed
 
 # @Project.pre.after(extract_final_NVT_config)
+@Project.pre.after(create_forcefield, calc_boxes)
 @Project.pre(nvt_finished)
 @Project.post(npt_finished)
 @Project.operation(directives={"omp_num_threads": 12})
