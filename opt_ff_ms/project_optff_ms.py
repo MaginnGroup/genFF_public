@@ -388,6 +388,10 @@ def NPT_liqbox(job):
         if "use_crit" in job.doc and job.doc.use_crit == True:
             #If so, terminate with error and log failure in job document
             job.doc.gemc_failed = True
+            #If the job fails twice and it doesn't have a obj_choice key delete it
+            if "obj_choice" not in job.sp.keys():
+                job.remove()
+                raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
             raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
         else:#Otherwise, try with critical conditions
             job.doc.use_crit = True
