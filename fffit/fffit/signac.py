@@ -46,6 +46,10 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
                 # Assumes temperature increments >= 1 K
                 temperature = round(job.sp.T)
                 new_row["temperature"] = temperature
+                if hasattr(job.sp, "restart"):
+                    new_row["restart"] = job.sp.restart
+                else:
+                    new_row["restart"] = None
 
                 job_fail_stat = False
                 # Extract property values. Insert N/A if not found
@@ -65,7 +69,7 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
     df = pd.DataFrame(data)
 
     #sort by molecule and temperature -- added by Ning Wang
-    df.sort_values(by=["molecule", "temperature"], ignore_index=True, inplace=True)
+    df.sort_values(by=["molecule", "temperature", "restart"], ignore_index=True, inplace=True)
     
     if csv_name != None:
         df.to_csv(csv_name)
