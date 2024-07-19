@@ -52,12 +52,14 @@ molec_dict = {"R14": R14,
                 "R116": R116}
 
 at_number = 11
+obj_choice = "ExpValPrior"
+param_set = 1
 ff_list = []
 MSE_path_dict = {}
 for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     project = signac.get_project(project_path)
     if project_path == "opt_ff_ms":
-        project = project.find_jobs({"atom_type": at_number, "restart": {"$exists": False}})
+        project = project.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
         at_num_str = "at_" + str(at_number)
     else:
         at_num_str = ""
