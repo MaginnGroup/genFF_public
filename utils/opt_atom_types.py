@@ -866,10 +866,13 @@ class Problem_Setup:
         if save_data:
             #Write ranked indices and n_data to a csv on separate lines
             save_label = "_" + save_label if save_label is not None else ""
-            dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            save_csv_path1 = os.path.join(dir_name, "ranked_indices" + save_label + ".csv")
-            save_csv_path2 = os.path.join(dir_name, "n_data" + save_label + ".csv")
-            save_csv_path3 = os.path.join(dir_name, "Z_matrix" + save_label + ".csv")
+            dir_name = self.make_results_dir(list(self.molec_data_dict.keys())) 
+            os.makedirs(dir_name / "ranked_indices", exist_ok=True)
+            os.makedirs(dir_name / "n_data", exist_ok=True)
+            os.makedirs(dir_name / "Z_matrix", exist_ok=True)
+            save_csv_path1 = os.path.join(dir_name, "ranked_indices" , save_label + ".csv")
+            save_csv_path2 = os.path.join(dir_name, "n_data" , save_label + ".csv")
+            save_csv_path3 = os.path.join(dir_name, "Z_matrix" , save_label + ".csv")
             #Transform to Pandas df and save to csv
             df_ranked_indices = pd.DataFrame({'Indices': ranked_indices, 'AT Names': at_names_ranked})
             # df_ranked_indices = pd.DataFrame(ranked_indices)
@@ -1077,8 +1080,8 @@ class Analyze_opt_res(Problem_Setup):
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            os.makedirs(dir_name, exist_ok=True) 
-            save_path = os.path.join(dir_name, x_label + "_jac_approx.npy")
+            os.makedirs(dir_name / "jac_approx", exist_ok=True) 
+            save_path = os.path.join(dir_name / "jac_approx", x_label + ".npy")
             np.save(save_path, jac)
             
         return jac
@@ -1117,15 +1120,17 @@ class Analyze_opt_res(Problem_Setup):
             #Scale x values between 0 and 1 to get Hessian scaled w.r.t parameter differences
             x = values_real_to_scaled(x.reshape(1,-1), self.at_class.at_bounds_nm_kjmol).flatten()
             H = nd.Hessian(self.__unscl_theta_calc_obj)(x)
+            scl_str = "_scl"
         #Otherwise use the unscaled x values
         else:
             H = nd.Hessian(self.one_output_calc_obj)(x)
+            scl_str = ""
 
         if save_data:
             x_label = x_label if x_label is not None else "param_guess"
             dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-            os.makedirs(dir_name, exist_ok=True) 
-            save_path = os.path.join(dir_name, x_label + "_hess_approx_scl.npy")
+            os.makedirs(dir_name / "hess_approx", exist_ok=True) 
+            save_path = os.path.join(dir_name / "hess_approx", x_label + scl_str + ".npy")
             np.save(save_path, H)
         
         return H
@@ -1245,13 +1250,14 @@ class Analyze_opt_res(Problem_Setup):
 
         combined_df = pd.concat(list(dfs.values()), ignore_index=True)
         if save_data == True:
+            os.makedirs(dir_name / 'MAPD', exist_ok=True)
             save_label = save_label if save_label is not None else "MAPD_set"
-            save_csv_path = os.path.join(dir_name, "MAPD_" + save_label + ".csv")
+            save_csv_path = os.path.join(dir_name / 'MAPD' , save_label + ".csv")
             combined_df.to_csv(save_csv_path, index = False, header = True)
 
         return dfs
     
-    def get_unique_sets(self, all_param_sets, save_data = False, save_label = None):
+    def get_unique_sets(self, all_param_sets, tolerance = 0.05, save_data = False, save_label = None):
         """
         Gets unique sets of parameters from an array of parameters
         
@@ -1268,14 +1274,30 @@ class Analyze_opt_res(Problem_Setup):
         dist = pdist(all_param_sets_scaled)/np.sqrt(all_param_sets.shape[1])
         #Convert the condensed distance matrix to square form
         dist_sq = squareform(dist)
-        #Fill diagonals w/ infinity
-        np.fill_diagonal(dist_sq, np.inf)
-        # Find the indices of points where all distances to other points (excluding diagonal) are greater than 0.01
-        valid_indices = np.where(np.all(dist_sq > 0.01, axis=1))[0]
-        if len(valid_indices) > 0:
-            unique_param_sets = all_param_sets[valid_indices]
-        else:
-            unique_param_sets = all_param_sets[0].reshape(1,-1)
+
+        #Initialize a boolean array to keep track of unique sets
+        unique_mask = np.ones(all_param_sets.shape[0], dtype=bool)
+
+        # Iterate over the upper triangle of the distance matrix
+        for i in range(all_param_sets.shape[0]):
+            # If the current set is already marked as non-unique, skip it
+            if not unique_mask[i]:
+                continue
+            # Mark sets within the threshold distance as non-unique
+            within_threshold = dist_sq[i] <= tolerance
+            unique_mask[within_threshold] = False
+            unique_mask[i] = True  # Keep the current set
+
+        unique_param_sets = all_param_sets[unique_mask]
+
+        # #Fill diagonals w/ infinity
+        # np.fill_diagonal(dist_sq, np.inf)
+        # # Find the indices of points where all distances to other points (excluding diagonal) are greater than 0.01
+        # valid_indices = np.where(np.all(dist_sq > 0.01, axis=1))[0]
+        # if len(valid_indices) > 0:
+        #     unique_param_sets = all_param_sets[valid_indices]
+        # else:
+        #     unique_param_sets = all_param_sets[0].reshape(1,-1)
 
         data_df = pd.DataFrame(unique_param_sets, columns=self.at_class.at_names)
 
@@ -1776,8 +1798,9 @@ class Vis_Results(Analyze_opt_res):
         assert isinstance(save_label, (str, type(None))), "save_label must be a string or None"
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        os.makedirs(dir_name / 'prop_pred', exist_ok=True)
         save_label = save_label if save_label is not None else "best_set"
-        pdf = PdfPages(dir_name / ('prop_pred_' + save_label + '.pdf'))
+        pdf = PdfPages(dir_name / 'prop_pred' / (save_label + '.pdf'))
         
         #Loop over molecules
         for molec in all_molec_list:
@@ -2057,8 +2080,9 @@ class Vis_Results(Analyze_opt_res):
         param_dict, obj_dict = self.make_sse_sens_data(theta_guess)
         #Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
+        os.makedirs(dir_name / "obj_cont", exist_ok=True)
         set_label = set_label if set_label is not None else "best"
-        pdf = PdfPages(dir_name / ('obj_cont_' + set_label + '.pdf'))
+        pdf = PdfPages(dir_name / 'obj_cont' / (set_label + '.pdf'))
         #Loop over keys
         for key in list(param_dict.keys()):
             #Get parameter and sse data

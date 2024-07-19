@@ -54,7 +54,7 @@ all_df = pd.read_csv(path_best_sets, header = 0)
 first_param_name = visual.at_class.at_names[0] + "_min"
 last_param_name = visual.at_class.at_names[-1] + "_min"
 all_sets = all_df.loc[:, first_param_name:last_param_name].values
-unique_best_sets = visual.get_unique_sets(all_sets, save_data, save_label=x_label)
+unique_best_sets = visual.get_unique_sets(all_sets, save_data = save_data, save_label=x_label)
 
 #Loop over unique parameter sets
 for i in range(unique_best_sets.shape[0]):
@@ -67,16 +67,20 @@ for i in range(unique_best_sets.shape[0]):
     visual.comp_paper_full_ind(molec_names_all, save_label=x_label_set)
 
     #Calculate MAPD for predictions and save results
-    df = visual.calc_MAPD_best(molec_names_all, save_data = save_data, save_label=x_label_set)
+    df = visual.calc_MAPD_best(molec_names_all, theta_guess = best_real, save_data = save_data, save_label=x_label_set)
 
+for i in range(unique_best_sets.shape[0]):
+    x_label_set = x_label + "_" + str(i+1)
+    best_set = unique_best_sets.iloc[i,:].values
+    best_real = visual.values_pref_to_real(copy.copy(best_set))
     #Gat Jac and Hess Approximations
     scale_theta = True
     jac = visual.approx_jac(best_real, scale_theta, save_data, x_label=x_label_set)
     hess = visual.approx_hess(best_real, scale_theta, save_data, x_label=x_label_set)
     eigval, eigvec = scipy.linalg.eig(hess)
     if save_data == True:
-        eig_val_path = os.path.join(all_molec_dir, "Hess_EigVals")
-        eig_vec_path = os.path.join(all_molec_dir, "Hess_EigVecs")
+        eig_val_path = os.path.join(all_molec_dir / "hess_approx", "EigVals_" + x_label_set)
+        eig_vec_path = os.path.join(all_molec_dir / "hess_approx", "EigVecs_" + x_label_set)
         eigval = [np.real(num) for num in eigval]
         np.savetxt(eig_val_path,eigval,delimiter=",")
         np.savetxt(eig_vec_path,eigvec,delimiter=",")
