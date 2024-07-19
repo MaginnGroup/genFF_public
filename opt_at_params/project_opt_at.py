@@ -84,6 +84,9 @@ def run_obj_alg(job):
     if job.sp.obj_choice == "ExpValPrior":
         #Save weight scaler to job document
         job.doc["weight_sclr"] = driver.weight_sclr
+        #Add weights to job document
+        job.doc.weights = driver.at_class.at_weights
+        job.doc.wt_params = driver.at_class.weighted_params
 
     #Create param sets for the AT optimization based on seed. 
     # Save these to the Results folder in the directory above for reuse

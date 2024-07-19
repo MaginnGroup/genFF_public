@@ -437,13 +437,15 @@ class AT_Scheme_11(Atom_Types):
         # Get weight information
         at_weights = np.zeros(len(at_keys))
         gaff_params = np.array(at_param_bounds_l) #set initial gaff parameters as lower bounds
-        mask = np.isin(at_keys, list(["sigma_C2_2", "sigma_F_1", "epsilon_C1", "epsilon_C2_1", "epsilon_F_1"]))
+        mask_names = list(["sigma_C2_2", "sigma_F_1", "epsilon_C1", "epsilon_C2_1", "epsilon_F_1"])
+        mask = np.isin(at_keys, mask_names)
         GAFF_params = np.array([3.400, 3.118, 55.052, 55.052, 30.696])
         #For all of these, a value of 0.15 difference from GAFF is weighted as 5% of the average best objective for ExpVal
         # g_weights = np.array([0.05/0.15**2, 0.05/0.15**2, 0.05/0.15**2, 0.05/0.15**2, 0.05/0.15**2])
         g_weights = np.array([0.05/0.15**2, 0.05/0.15**2, 0.2/0.15**2, 0.05/0.15**2, 0.05/0.15**2])
         at_weights[mask] = g_weights
         gaff_params[mask] = GAFF_params
+        self.weighted_params = mask_names
         self.at_weights = at_weights
         self.gaff_params = gaff_params
 
