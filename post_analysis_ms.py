@@ -106,7 +106,7 @@ for ff_name in ff_names:
     ff_list.append(df_ff_final)
     
 #Work on combining into 1 PDF
-full_at_dir = os.path.join("Results_MS", "at_" + str(at_number))
+full_at_dir = os.path.join("Results_MS", obj_choice, "at_" + str(at_number))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
 pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
@@ -132,7 +132,7 @@ pdf_vle.close()
 pdf_hpvap.close()
 
 #Make MAPD Plots
-full_at_dir = os.path.join("Results_MS", "at_" + str(at_number))
+full_at_dir = os.path.join("Results_MS", obj_choice, "at_" + str(at_number))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
 #For each molecule
