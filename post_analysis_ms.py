@@ -52,7 +52,7 @@ molec_dict = {"R14": R14,
                 "R116": R116}
 
 at_number = 11
-obj_choice = "ExpVal"
+obj_choice = "ExpValPrior"
 param_set = 1
 ff_list = []
 MSE_path_dict = {}
@@ -62,11 +62,13 @@ for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
         project = project.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
         at_num_str = "at_" + str(at_number)
         obj_choice_str = obj_choice
+        param_set_str = "param_set_" + str(param_set)
     else:
         at_num_str = ""
         obj_choice_str = ""
-    csv_root_unproc = os.path.join("Results_MS","unprocessed_csv", obj_choice_str, at_num_str)
-    csv_root_final = os.path.join("Results_MS", obj_choice_str, at_num_str)
+        param_set_str = ""
+    csv_root_unproc = os.path.join("Results_MS","unprocessed_csv", at_num_str, obj_choice_str, param_set_str)
+    csv_root_final = os.path.join("Results_MS", at_num_str, obj_choice_str, param_set_str)
     os.makedirs(csv_root_unproc, exist_ok=True)
     os.makedirs(csv_root_final, exist_ok=True)
 
@@ -106,7 +108,7 @@ for ff_name in ff_names:
     ff_list.append(df_ff_final)
     
 #Work on combining into 1 PDF
-full_at_dir = os.path.join("Results_MS", obj_choice, "at_" + str(at_number))
+full_at_dir = os.path.join("Results_MS", "at_" + str(at_number), obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
 pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
@@ -132,7 +134,7 @@ pdf_vle.close()
 pdf_hpvap.close()
 
 #Make MAPD Plots
-full_at_dir = os.path.join("Results_MS", obj_choice, "at_" + str(at_number))
+full_at_dir = os.path.join("Results_MS", "at_" + str(at_number), obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
 #For each molecule
