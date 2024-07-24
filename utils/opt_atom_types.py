@@ -688,6 +688,20 @@ class Problem_Setup:
 
         res, sse_pieces, sse_var_pieces, var_ratios = self.calc_wt_res(theta_guess)
         sse = float(sum(sse_pieces.values()))
+
+        # var_ratio_dict = {}
+        # dummy_molec = list(self.molec_data_dict.keys())[0]
+        # molec_object = self.molec_data_dict[dummy_molec]
+        # #Get number of data per molecule
+        # n_data = len(list(molec_object.expt_vap_density.keys()))
+        # var_ratios_per_m_and_p = var_ratios.reshape(-1, n_data).sum(axis=1)
+        # count = 0
+        # for molec in list(self.molec_data_dict.keys()):
+        #     molec_gps_dict = self.all_gp_dict[molec]
+        #     for key in list(molec_gps_dict.keys()):
+        #         var_ratio_dict[molec + "-" + key + "-var_ratio"] = var_ratios_per_m_and_p[count]
+        #         count += 1
+        # print("var_ratio_dict: ", var_ratio_dict)
         
         if self.obj_choice == "SSE":
             obj = sse
