@@ -28,8 +28,12 @@ obj_choice_p = "ExpValPrior"
 molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170"]
 setup = opt_atom_types.Problem_Setup(molec_names, at_class, obj_choice)
 property_names = ["sim_liq_density", "sim_vap_density", "sim_Pvap", "sim_Hvap"]
-kernels = ["RBF", "Matern32", "Matern52"]
+kernels = ["RBF", "Matern32", "Matern52"] #Options include RBF, Matern32, Matern52, and RQ
 # property_names = ["sim_Pvap", "sim_Hvap"]
+use_white_kern = True
+use_train_lik = False
+anisotropic = True
+typeMeanFunc = "Linear" #options: Linear, Zero
 
 def get_hyperparams(model):
     """
@@ -93,16 +97,16 @@ for molec in list(setup.molec_data_dict.keys()):
 
         # Fit models
         models = {}
+
         lenscls = np.ones(molec_object.n_params + 1)
         for kernel in kernels:
-            if kernel == "RBF":
-                kernel_obj = gpflow.kernels.RBF(lengthscales=lenscls)
-            elif kernel == "Matern32":
-                kernel_obj = gpflow.kernels.Matern32(lengthscales=lenscls)
-            elif kernel == "Matern52":
-                kernel_obj = gpflow.kernels.Matern52(lengthscales=lenscls)
+            gpConfig={'kernel': kernel,
+                    'useWhiteKernel':use_white_kern,
+                    'trainLikelihood':use_train_lik,
+                    'anisotropic':anisotropic,
+                    'mean_function':typeMeanFunc}
 
-            models[kernel] = run_gpflow_scipy(x_train, y_train, kernel_obj, seed = seed,restarts = repeats)
+            models[kernel] = run_gpflow_scipy(x_train, y_train, gpConfig, restarts = repeats)
     
         # Get MAPD for each model + sort by lowest MAPD
         mapd_dict = calc_model_mapd(models, x_anal, y_anal, bounds)
@@ -176,16 +180,20 @@ for molec in list(setup.molec_data_dict.keys()):
         #Save the model predictions to a pdf
         title = molec + " " + prop + " " + mode + " Model Performance"
         fig = plot_model_performance(models, x_anal, y_anal, bounds, title = title)
-        pdf.savefig(fig)
-        plt.close(fig)
+        if save_data:
+            pdf.savefig(fig)
+            plt.close(fig)
+        else:
+            plt.show()
 
     #Save models to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
     gp_mod_dir = "molec_gp_data/" + molec + "-vlegp"
     save_path_gp = gp_mod_dir + "/" + 'vle-gps.pkl'
-    if not os.path.exists(save_path_gp) and mode == "test":
-        os.makedirs(gp_mod_dir, exist_ok=True)
-        print("Saving model to: ", save_path_gp)
-        pickle.dump(vle_models, open(save_path_gp, 'wb'))
+    if save_data:
+        if not os.path.exists(save_path_gp) and mode == "test":
+            os.makedirs(gp_mod_dir, exist_ok=True)
+            print("Saving model to: ", save_path_gp)
+            pickle.dump(vle_models, open(save_path_gp, 'wb'))
 pdf.close()
 
 #Sort lists by molecule, property, and kernel
@@ -196,4 +204,5 @@ df_mapd = df_mapd.sort_values(by=['Molecule', 'Property', 'Model'])
 df_mapd.to_csv(dir_name + "/" + "gp_models_eval_" +  mode + ".csv", index=False, header=True)
 #Shorten df to only include the lowest MAPD for each molecule and property
 optimal_df = df_mapd[df_mapd['best_model'] == True]
-optimal_df.to_csv(dir_name + "/" + "gp_models_eval_min_" + mode + ".csv", index=False, header=True)
+if save_data:
+    optimal_df.to_csv(dir_name + "/" + "gp_models_eval_min_" + mode + ".csv", index=False, header=True)

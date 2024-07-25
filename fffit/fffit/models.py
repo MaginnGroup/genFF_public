@@ -1,220 +1,213 @@
 import gpflow
 import numpy as np
 import tensorflow as tf
+from tensorflow_probability import bijectors as tfb
 from gpflow.utilities import print_summary
 import warnings
+# tf.config.run_functions_eagerly(True)
 import copy
 
-def buildGP(x_train, y_train, kernel, mean_function="linear", fmt="notebook", seed = None, lenscls = None):
+def buildGP(x_train, y_train, gpConfig, retrain = 0):
 
     """Create and train a GPFlow model
 
     Parameters
     ----------
-    x_train : np.ndarray, shape=(n_samples, n_parameters)
-        The x training data
-    y_train : np.ndarray, shape=(n_samples, 1)
-        The y training data
-    kernel : string
-        Kernel to use for the GP model
-    mean_function: string or None, default = "linear"
-        Type of mean function for the GP model
-        Options are "linear", or None
-    fmt : string, optional, default="notebook"
-        The formatting type for the GPFlow print_summary
-    """
-    kernel_use = copy.deepcopy(kernel)
-    if lenscls is not None:
-        kernel_use.lengthscales.assign(lenscls)
-    # print_summary(kernel)
-    if seed != None:
-        np.random.seed(seed)
-        tf.compat.v1.get_default_graph()
-        tf.compat.v1.set_random_seed(seed)
-        tf.random.set_seed(seed)
-    if mean_function is not None:
-        if mean_function == "linear":
-            mean_function = gpflow.mean_functions.Linear(
-                A=np.zeros(x_train.shape[1]).reshape(-1, 1)
-            )
-        elif mean_function.lower() == "none":
-            mean_function = None
-        else:
-            raise ValueError(
-                "Only supported mean functions are 'linear' and 'none'"
-            )
+    x_Train : numpy array (N,K)
+        Training features, where N is the number of data points and K is the
+        number of independent features (e.g., sigma profile bins).
+    y_Train : numpy array (N,1)
+        Training labels (e.g., property of a given molecule).
+    gpConfig : dictionary, optional
+        Dictionary containing the configuration of the GP. If a key is not
+        present in the dictionary, its default value is used.
+        Keys:
+            . kernel : string
+                Kernel to be used. One of:
+                    . 'RBF' - gpflow.kernels.RBF()
+                    . 'RQ' - gpflow.kernels.RationalQuadratic()
+                    . 'Matern32' - gpflow.kernels.Matern32()
+                    . 'Matern52' - gpflow.kernels.Matern52()
+                The default is 'RBF'.
+            . useWhiteKernel : boolean
+                Whether to use a White kernel (gpflow.kernels.White).
+                The default is True.
+            . trainLikelihood : boolean
+                Whether to treat the variance of the likelihood of the modeal
+                as a trainable (or fitting) parameter. If False, this value is
+                fixed at 10^-5.
+                The default is True.
+        The default is {}.
 
-    # Create the model
-    model = gpflow.models.GPR(
-        data=(x_train, y_train.reshape(-1, 1)),
-        kernel=kernel_use,
-        mean_function=mean_function
-    )
-
-    # Optimize model with scipy
-    optimizer = gpflow.optimizers.Scipy()
-    aux = optimizer.minimize(model.training_loss, model.trainable_variables)
-
-    return model, aux
-
-def init_hyper_parameters(count_fix, args):
-    # kernel = args[2]
-    # if count_fix != 0:
-        # Randomize the lengthscales after 1st opt
-        # x_train = args[0]
-        # kernel.variance.assign((1.0))
-        # lenscls = np.random.uniform(low=1e-2, high=5.0, size=x_train.shape[1])
-        # kernel.lengthscales.assign(lenscls)
-    lenscls = np.random.uniform(low=1e-2, high=10.0, size=args[0].shape[1]) if count_fix != 0 else None
-    return lenscls
-
-def fit_GP(count_fix, retrain_GP, args):
-    """
-    Fit a GP and fix Cholesky decomposition failure and optimization failure by random initialization
-
-    Parameters
-    ----------
-    count_fix: int, the number of times the GP has been retrained
+    Raises
+    ------
+    UserWarning
+        Warning raised if the optimization (fitting) fails to converge.
 
     Returns
-    --------
-    fit_successed: bool, whether the GP was fit successfully
-    model: instance of gpflow.models.GPR, the trained GP model
-    count_fix: int, the number of times the GP has been retrained
+    -------
+    model : gpflow.models.gpr.GPR object
+        GP model.
+
     """
-    #Randomize Seed
-    np.random.seed(count_fix+1)
-    #Initialize fit_sucess as true
-    fit_successed = True   
-    #Get hyperparam guess list
-    lenscls = init_hyper_parameters(count_fix, args)
-    # print(args[2])
-    # print_summary(args[2])
-    # print("count_fix: ", count_fix)
-    try:
-        #Make model and optimizer and get results
-        model, res = buildGP(*args, lenscls)
-
-        #If result isn't successful, remake and retrain model w/ different hyperparameters
-        if not(res.success):
-            if count_fix < retrain_GP:
-                # print('model failed to optimize, fix it by random initialization.')
-                count_fix += 1 
-                fit_successed,model,count_fix = fit_GP(count_fix, retrain_GP, args)
-            else:
-                fit_successed = False
-    #If an error is thrown becauuse of bad hyperparameters, reoptimize them
-    except tf.errors.InvalidArgumentError as e:
-        if count_fix < retrain_GP:
-            # print('bad initial hyperparameters, fix it by random initialization.')
-            count_fix += 1
-            fit_successed,model,count_fix = fit_GP(count_fix, retrain_GP, args)
-        else:
-            fit_successed = False
-
-    if fit_successed:
-        kern_var = model.kernel.variance.numpy()
-        kern_lensc = model.kernel.lengthscales.numpy()
-        #Check that all params are withing 1e-3 and 1e3
-        all_params = [kern_var, kern_lensc]
-        good_params = np.all((kern_lensc >= 1e-2) & (kern_lensc <= 1e3) & (kern_var >= 1e-2) & (kern_var <= 1e3))
-        #If the kernel parameters are too large or too small, reoptimize them
-        if not good_params:
-            if count_fix < retrain_GP:
-                # print('bad final hyperparameters, fix it by random initialization.')
-                count_fix = count_fix + 1 
-                fit_successed, model, count_fix = fit_GP(count_fix, retrain_GP, args)
-            else:
-                fit_successed = False
-        # #Otherwise check fit. Not using check fit because using the mean isn't a good way to check fit in these cases
-        # else:    
-        #     X_Train = args[0]
-        #     Y_Train = args[1]
-        #     min_values = np.min(X_Train, axis=0)
-        #     max_values = np.max(X_Train, axis=0)
-        #     # Generate random data points within these ranges for each feature
-        #     num_samples = 100
-        #     random_values = np.random.uniform(0, 1, size=(num_samples, X_Train.shape[1]))
-        #     xtest = min_values + random_values * (max_values - min_values)
-        #     mean, var = model.predict_y(xtest)
-        #     mean = mean.numpy()
-        #     var = var.numpy()
-
-        #     y_mean = np.mean(Y_Train)
-        #     mean_mean = np.mean(mean)
-        #     y_max = np.max(Y_Train)
-        #     mean_max = np.max(mean)
-        #     y_min = np.abs(np.min(Y_Train))
-        #     mean_min = np.abs(np.min(mean))
+    # Unpack gpConfig
+    kernel=gpConfig.get('kernel','RBF')
+    useWhiteKernel=gpConfig.get('useWhiteKernel','True')
+    trainLikelihood=gpConfig.get('trainLikelihood','True')
+    typeMeanFunc=gpConfig.get('mean_function','Zero')
+    anisotropy=gpConfig.get('anisotropic','True')
+    
+    #Get hyperparameters
+    hypers = get_init_hypers(retrain, x_train, anisotropy= anisotropy)
+    lengthscale_, variance_, alpha_, white_var = hypers
+    # print("lengthscale_", lengthscale_)
+    # print("variance_", variance_)
+    # print("alpha_", alpha_)
+    # print("white_var", white_var)
+    # Select and initialize kernel
+    if kernel=='RBF':
+        gpKernel=gpflow.kernels.SquaredExponential(variance=variance_, lengthscales=lengthscale_)
+    elif kernel=='RQ':
+        gpKernel=gpflow.kernels.RationalQuadratic(variance=variance_, lengthscales=lengthscale_, alpha=alpha_)
+    elif kernel=='Matern32':
+        gpKernel=gpflow.kernels.Matern32(variance=variance_, lengthscales=lengthscale_)
+    elif kernel=='Matern52':
+        gpKernel=gpflow.kernels.Matern52(variance=variance_, lengthscales=lengthscale_)
+    else:
+        raise ValueError('Invalid kernel type')
+    
+    # Add White kernel
+    if useWhiteKernel: 
+        gpKernel=gpKernel+gpflow.kernels.White(variance = white_var)
             
-        #     #If fit is bad, reoptimize
-        #     if y_mean > 1e-7 and (mean_max > y_max or mean_min < y_min):
-        #         if abs(((mean_mean-y_mean)/y_mean)) > 0.5 or np.isclose(mean_mean, 0.0, 1e-7):
-        #             print(abs(((mean_mean-y_mean)/y_mean)))
-        #             if count_fix < retrain_GP:
-        #                 print('bad solution, fix it by random initialization.')
-        #                 count_fix = count_fix + 1 
-        #                 fit_successed, model, count_fix = fit_GP(count_fix, retrain_GP, args)
+    # Add Mean function
+    if typeMeanFunc == 'Zero':
+        mf = None
+    elif typeMeanFunc == 'Linear':
+        mf = gpflow.mean_functions.Linear(
+                A=np.zeros(x_train.shape[1]).reshape(-1, 1)
+            )
+    else:
+        raise ValueError('Invalid mean function type')
 
-    return fit_successed, model, count_fix
+    # Build GP model    
+    model=gpflow.models.GPR((x_train,y_train.reshape(-1,1)),gpKernel,mean_function=mf, noise_variance=10**-5)
+    # model_pretrain = copy.deepcopy(model)
+    # print(gpflow.utilities.print_summary(model_pretrain))
+    condition_number = np.linalg.cond(model.kernel(x_train))
+    # Select whether the likelihood variance is trained
+    gpflow.utilities.set_trainable(model.likelihood.variance,trainLikelihood)
+    # Build optimizer
+    optimizer=gpflow.optimizers.Scipy()
 
+    # Fit GP to training data
+    aux=optimizer.minimize(model.training_loss,
+                           model.trainable_variables,
+                           options={'maxiter':10**9},
+                           method="L-BFGS-B")
+    train_loss = model.training_loss().numpy()
+    # print(gpflow.utilities.print_summary(model))
+    return model, aux, condition_number
 
-def run_gpflow_scipy(x_train, y_train, kernel, mean_function="linear", fmt="notebook", seed = None, restarts = 1):
+def get_init_hypers(retrain, x_train, anisotropy):
+    lenscl_bnds = [0.00001, 1000.0]
+    var_bnds = [0.00001, 100.0]
+    alpha_bnds = [0.0001, 3000.0]
+    white_var_bnds = [0.00001, 10.0]
+
+    if retrain == 0:
+        lengthscale_1 = bounded_parameter(lenscl_bnds[0], lenscl_bnds[1], 1.0)
+        if anisotropy == True:
+            lengthscale_ = np.ones(x_train.shape[1])*lengthscale_1
+        else:
+            lengthscale_ = lengthscale_1
+        variance_ = bounded_parameter(var_bnds[0], var_bnds[1], 1.0)
+        alpha_ = bounded_parameter(alpha_bnds[0], alpha_bnds[1], 1.0)
+        white_var = 1.0
+    else:
+        seed_ = int(retrain)
+        np.random.seed(seed_)
+        tf.random.set_seed(seed_)
+
+        if anisotropy == True:
+            initial_values = np.array(np.random.uniform(0.1, 100.0, x_train.shape[1]), dtype='float64')
+            lengthscale_ = bounded_parameter(lenscl_bnds[0], lenscl_bnds[1], initial_values)
+        else:
+            lengthscale_ = bounded_parameter(lenscl_bnds[0], lenscl_bnds[1], 
+                                             np.array(np.random.uniform(0.1, 100.0), dtype='float64'))
+        variance_ = bounded_parameter(var_bnds[0], var_bnds[1], np.array(np.random.lognormal(0.0, 1.0), dtype='float64'))
+        alpha_ = bounded_parameter(alpha_bnds[0], alpha_bnds[1], np.array(np.random.uniform(0.01, 100), dtype='float64'))
+        white_var = bounded_parameter(white_var_bnds[0], white_var_bnds[1], np.array(np.random.uniform(0.05, 10), dtype='float64'))
+
+    return lengthscale_, variance_, alpha_, white_var
+
+def bounded_parameter(low, high, initial_value):
+    sigmoid = tfb.Sigmoid(low=tf.cast(low, dtype=tf.float64), high=tf.cast(high, dtype=tf.float64))
+    return gpflow.Parameter(initial_value, transform=sigmoid, dtype=tf.float64)
+
+def run_gpflow_scipy(x_train, y_train, gpConfig, restarts = 1):
     """Create and train a GPFlow model
 
-    Parameters
-    ----------
-    x_train : np.ndarray, shape=(n_samples, n_parameters)
-        The x training data
-    y_train : np.ndarray, shape=(n_samples, 1)
-        The y training data
-    kernel : string
-        Kernel to use for the GP model
-    mean_function: string or None, default = "linear"
-        Type of mean function for the GP model
-        Options are "linear", or None
-    fmt : string, optional, default="notebook"
-        The formatting type for the GPFlow print_summary
+    x_Train : numpy array (N,K)
+        Training features, where N is the number of data points and K is the
+        number of independent features (e.g., sigma profile bins).
+    y_Train : numpy array (N,1)
+        Training labels (e.g., property of a given molecule).
+    gpConfig : dictionary, optional
+        Dictionary containing the configuration of the GP. If a key is not
+        present in the dictionary, its default value is used.
+        Keys:
+            . kernel : string
+                Kernel to be used. One of:
+                    . 'RBF' - gpflow.kernels.RBF()
+                    . 'RQ' - gpflow.kernels.RationalQuadratic()
+                    . 'Matern32' - gpflow.kernels.Matern32()
+                    . 'Matern52' - gpflow.kernels.Matern52()
+                The default is 'RBF'.
+            . useWhiteKernel : boolean
+                Whether to use a White kernel (gpflow.kernels.White).
+                The default is True.
+            . trainLikelihood : boolean
+                Whether to treat the variance of the likelihood of the modeal
+                as a trainable (or fitting) parameter. If False, this value is
+                fixed at 10^-5.
+                The default is True.
+        The default is {}.
+    restarts : int, optional
+        Number of restarts for the optimization. 
+        The default is 1.
     """
     # Train the model multiple times and keep track of the model with the lowest minimum training loss
     best_minimum_loss = float('inf')
     best_model = None
     first_model = None
-    best_model_success = None
-    args = [x_train, y_train, kernel, mean_function, fmt, seed]
-    #Initialize number of counters
-    count_fix_tot = 0
-    
-    #Initialize everything with vanilla parameters
-    first_mod_succ, first_model, count_fix = fit_GP(0, 0, args)
-    best_minimum_loss = first_model.training_loss().numpy()
-    # print('First model training loss: ', best_minimum_loss)
-    best_model = first_model
+    best_model_success = False
 
     #While you still have retrains left
-    while count_fix_tot <= restarts:
-        #Create and fit the model
-        fit_successed, gp_model, count_fix = fit_GP(count_fix_tot, restarts, args)
-        #The new counter total is the number of counters used + 1
-        count_fix_tot += count_fix + 1
-        
-        if fit_successed:
-            # Compute the training loss of the model
-            training_loss = gp_model.training_loss().numpy()
-            # print("training loss", training_loss)
+    for i in range(restarts):
+        model_params = buildGP(x_train, y_train, gpConfig, retrain = i)
+        gp_model, aux, condition_number = model_params
+        # Compute the training loss of the model
+        training_loss = gp_model.training_loss().numpy()
+        #If we succeeded in training the model
+        if aux.success:
             # Check if this model has the best minimum training loss
             if training_loss < best_minimum_loss:
-                #If the 1st model succeeds it will be a backup plan
+                #If it does, set success to true and save the model
                 best_minimum_loss = training_loss
                 best_model = gp_model
                 best_model_success = True
-        #or we have no good models
-        elif count_fix_tot >= restarts:
-            #If we have no good models, use the first model
-            if best_model is None:
-                best_model_success = False
-                best_model = first_model
-                warnings.warn('GP optimizer failed to converge.')
+        #Otherwise if this is the 1st iteration and it failed, save the model
+        #This model will be used as a backup in the case that all models fail
+        elif aux.success == False and i == 0:
+            first_model = gp_model
+            first_minimum_loss = training_loss
+            
+    #If we have no good models, use the first model
+    if best_model is None:
+        best_model = first_model
+        best_minimum_loss = first_minimum_loss
+        warnings.warn('GP optimizer failed to converge after' + str(restarts) + ' attempts. Using the first model as a backup.')
 
     # gpflow.utilities.print_summary(best_model)
     return best_model
