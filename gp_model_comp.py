@@ -17,18 +17,17 @@ import matplotlib
 # mpl_is_inline = 'inline' in matplotlib.get_backend()
 
 
-repeats = 3
-seed = 2
-mode = "train"
+repeats = 5
+mode = "test"
 #Get obj from a set of parameters
 at_class = 11
-save_data = False
+save_data = True
 obj_choice = "ExpVal"
 obj_choice_p = "ExpValPrior"
 molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170"]
 setup = opt_atom_types.Problem_Setup(molec_names, at_class, obj_choice)
 property_names = ["sim_liq_density", "sim_vap_density", "sim_Pvap", "sim_Hvap"]
-kernels = ["RBF", "Matern32", "Matern52"] #Options include RBF, Matern32, Matern52, and RQ
+kernels = ["RBF", "Matern32", "Matern52", "RQ"] #Options include RBF, Matern32, Matern52, and RQ
 # property_names = ["sim_Pvap", "sim_Hvap"]
 use_white_kern = True
 use_train_lik = False
@@ -45,10 +44,15 @@ def get_hyperparams(model):
     hyperparameters = {
         'Mean Fxn A': model.mean_function.A.numpy(),
         'Mean Fxn B': model.mean_function.b.numpy(),
-        'kernel_variance': model.kernel.variance.numpy(),
-        'kernel_lengthscale': model.kernel.lengthscales.numpy(),
+        'kernel_variance': model.kernel.kernels[0].variance.numpy(),
+        'kernel_lengthscale': model.kernel.kernels[0].lengthscales.numpy(),
+        'white_kernel_variance': model.kernel.kernels[1].variance.numpy(),
         'likelihood_variance': model.likelihood.variance.numpy()
     }
+    try:
+        hyperparameters['alpha'] = model.kernel.kernels[0].alpha.numpy()
+    except:
+        hyperparameters['alpha'] = None
     return hyperparameters
 
 def check_conditions(hypers):
@@ -58,7 +62,7 @@ def check_conditions(hypers):
     cond1 = (hypers['kernel_lengthscale'] >= 1e-2)
     cond2 = (hypers['kernel_lengthscale'] <= 1e2)
     cond3 = (hypers['kernel_variance'] >= 1e-2)
-    cond4 = (hypers['kernel_variance'] <= 10)
+    cond4 = (hypers['kernel_variance'] <= 15)
 
     met_all = np.all(cond1 & cond2 & cond3 & cond4)
     met_two = np.all(cond1 & cond2) or np.all(cond3 & cond4)
@@ -70,7 +74,7 @@ os.makedirs(dir_name, exist_ok=True)
 pdf = PdfPages(dir_name + "/" + 'gp_models_eval_' + mode + '.pdf')
 df_mapd = None
 df_mapd_b = None
-best_models = []
+
 for molec in list(setup.molec_data_dict.keys()):
     print(molec)
     molec_object = setup.molec_data_dict[molec]
@@ -125,10 +129,10 @@ for molec in list(setup.molec_data_dict.keys()):
             #Get the hyperparameters for the model
             hypers = get_hyperparams(models[min_mapd_key])
             #Check conditions for the hyperparameters + save results
-            met_all, met_two, met_var = check_conditions(hypers)
-            cond_dict_all[min_mapd_key] = met_all
-            cond_dict_half[min_mapd_key] = met_two
-            cond_dict_var[min_mapd_key] = met_var
+            # met_all, met_two, met_var = check_conditions(hypers)
+            # cond_dict_all[min_mapd_key] = met_all
+            # cond_dict_half[min_mapd_key] = met_two
+            # cond_dict_var[min_mapd_key] = met_var
 
             #Save data to a dataframe
             new_row = pd.DataFrame({"Molecule": [molec], 
@@ -138,8 +142,10 @@ for molec in list(setup.molec_data_dict.keys()):
                                     "Mean Fxn A": [hypers["Mean Fxn A"].flatten()],
                                     "Mean Fxn B": [hypers["Mean Fxn B"]],
                                     "kernel_variance": [hypers["kernel_variance"]],
+                                    "white_kernel_variance": [hypers["white_kernel_variance"]],
                                     "kernel_lengthscale": [hypers["kernel_lengthscale"]],
                                     "likelihood_variance": [hypers["likelihood_variance"]],
+                                    "alpha": [hypers["alpha"]],
                                     "best_model": [False]})
             model_data[min_mapd_key] = new_row
             if df_mapd is None:
@@ -153,24 +159,23 @@ for molec in list(setup.molec_data_dict.keys()):
         else:
             default, backup = "RBF", "Matern52"
 
-        #If the default model does not meet the criteria, but the backup does save the backup model
-        if cond_dict_var[default] == False and cond_dict_all[backup] == True:
-            save_model=models[backup]
-        #Otherwise save the default model
-        else:
-            save_model=models[default]
+        # #If the default model does not meet the criteria, but the backup does save the backup model
+        # if cond_dict_var[default] == False and cond_dict_all[backup] == True:
+        #     save_model=models[backup]
+        # #Otherwise save the default model
+        # else:
+        save_model=models[default]
         vle_models[prop]=save_model
 
         #Get the best model that meets the criteria
-        if any(cond_dict_all.values()):
-            min_mapd_key = next(key for key, value in cond_dict_all.items() if value)
-        elif any(cond_dict_half.values()):
-            warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
-            min_mapd_key = next(key for key, value in cond_dict_half.items() if value) 
-        else:
-            warnings.warn("No hyperparameters meet any criteria " + molec + " " + prop, UserWarning)
-            min_mapd_key = min_mapd_keys[0]
-        best_models.append(models[min_mapd_key])
+        # if any(cond_dict_all.values()):
+        #     min_mapd_key = next(key for key, value in cond_dict_all.items() if value)
+        # elif any(cond_dict_half.values()):
+        #     warnings.warn("No hyperparameters meet both criteria " + molec + " " + prop, UserWarning)
+        #     min_mapd_key = next(key for key, value in cond_dict_half.items() if value) 
+        # else:
+        #     warnings.warn("No hyperparameters meet any criteria " + molec + " " + prop, UserWarning)
+        min_mapd_key = min_mapd_keys[0] #use the most accurate model if not considering criteria
 
         #Save which model was the best
         df_mapd.loc[(df_mapd['Molecule'] == molec) & 
@@ -184,7 +189,8 @@ for molec in list(setup.molec_data_dict.keys()):
             pdf.savefig(fig)
             plt.close(fig)
         else:
-            plt.show()
+            plt.show(fig)
+            plt.close(fig)
 
     #Save models to molec_gp_data/RXX-vlegp/gp-vle.py (ensure original files have moved to go-vle-org.py)
     gp_mod_dir = "molec_gp_data/" + molec + "-vlegp"
