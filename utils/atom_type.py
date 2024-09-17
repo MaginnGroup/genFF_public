@@ -199,24 +199,24 @@ class AT_Scheme_01(Atom_Types):
                     "epsilon_F2": "epsilon_F"
                     }
 
-        r134a_map_dict = {"sigma_C2": "sigma_C",
-                    "sigma_C1": "sigma_C",
+        r134a_map_dict = {"sigma_C1": "sigma_C",
+                    "sigma_C2": "sigma_C",
                     "sigma_H1": "sigma_H",
-                    "sigma_F2": "sigma_F",
                     "sigma_F1": "sigma_F",
-                    "epsilon_C2": "epsilon_C",
+                    "sigma_F2": "sigma_F",
                     "epsilon_C1": "epsilon_C",
+                    "epsilon_C2": "epsilon_C",
                     "epsilon_H1":"epsilon_H",
-                    "epsilon_F2": "epsilon_F",
-                    "epsilon_F1": "epsilon_F"
+                    "epsilon_F1": "epsilon_F",
+                    "epsilon_F2": "epsilon_F"
                     }
 
-        r143a_map_dict = {"sigma_C2": "sigma_C",
-                          "sigma_C1": "sigma_C",
+        r143a_map_dict = {"sigma_C1": "sigma_C",
+                          "sigma_C2": "sigma_C",
                         "sigma_H1": "sigma_H",
                         "sigma_F1": "sigma_F",
-                        "epsilon_C2": "epsilon_C",
                         "epsilon_C1": "epsilon_C",
+                        "epsilon_C2": "epsilon_C",
                         "epsilon_H1": "epsilon_H",
                         "epsilon_F1": "epsilon_F",
                         }
@@ -275,18 +275,18 @@ class AT_Scheme_01(Atom_Types):
                         "epsilon_F1": "epsilon_F",
                         }
 
-        r143_map_dict = {"sigma_C2": "sigma_C",
-                         "sigma_C1": "sigma_C",
+        r143_map_dict = {"sigma_C1": "sigma_C",
+                         "sigma_C2": "sigma_C",
                         "sigma_H1": "sigma_H",
                         "sigma_H2": "sigma_H",
-                        "sigma_F2": "sigma_F",
                         "sigma_F1": "sigma_F",
-                        "epsilon_C2": "epsilon_C",
+                        "sigma_F2": "sigma_F",
                         "epsilon_C1": "epsilon_C",
+                        "epsilon_C2": "epsilon_C",
                         "epsilon_H1": "epsilon_H",
                         "epsilon_H2": "epsilon_H",
-                        "epsilon_F2": "epsilon_F",
                         "epsilon_F1": "epsilon_F",
+                        "epsilon_F2": "epsilon_F",
                         }
         
         r134_map_dict = {"sigma_C": "sigma_C",
@@ -445,13 +445,13 @@ class AT_Scheme_02(Atom_Types):
         
         r152a_map_dict = {"sigma_C1": "sigma_C",
                          "sigma_C2": "sigma_C",
-                        "sigma_H1": "sigma_Hc",
-                        "sigma_H2": "sigma_H2",
+                         "sigma_H2": "sigma_Hc",
+                        "sigma_H1": "sigma_H2",
                         "sigma_F1": "sigma_F",
                         "epsilon_C1": "epsilon_C",
                         "epsilon_C2": "epsilon_C",
-                        "epsilon_H1": "epsilon_Hc",
-                        "epsilon_H2": "epsilon_H2",
+                        "epsilon_H2": "epsilon_Hc",
+                        "epsilon_H1": "epsilon_H2",
                         "epsilon_F1": "epsilon_F",
                         }
         
