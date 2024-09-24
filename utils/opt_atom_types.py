@@ -43,7 +43,7 @@ def get_gp_data_from_pkl(key_list):
     --------
     all_gp_dict: dict, dictionary of dictionary of training molecule gps for each property
     """
-    valid_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
+    valid_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170", "R41"]
     assert isinstance(key_list, list), "at_names must be a list"
     assert all(isinstance(name, str) for name in key_list) == True, "all key in key_list must be string"
     assert all(key in valid_keys for key in key_list) == True, "all key in key_list must be valid keys"
@@ -106,8 +106,8 @@ class Problem_Setup:
         r134a_class = r134a.R134aConstants()
         r143a_class = r143a.R143aConstants()
         r170_class = r170.R170Constants()
-
         r41_class = r41.R41Constants()
+
         r23_class = r23.R23Constants()
         r161_class = r161.R161Constants()
         r152a_class = r152a.R152aConstants()
@@ -122,9 +122,10 @@ class Problem_Setup:
                    "R170":r170_class, 
                    "R125":r125_class, 
                    "R134a":r134a_class, 
-                   "R143a":r143a_class}
+                   "R143a":r143a_class,
+                   "R41": r41_class}
 
-        self.all_test_molec_data = {"R41":r41_class, 
+        self.all_test_molec_data = {
                    "R23":r23_class, 
                    "R161":r161_class, 
                    "R152a":r152a_class, 
@@ -138,7 +139,7 @@ class Problem_Setup:
         except:
             warnings.warn("No gp data found. Many functions will not work without GP Data")
         self.valid_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170", "R23", "R41", "R161", "R152a", "R152", "R134", "R143", "R116"]
-        self.valid_train_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170"]
+        self.valid_train_mol_keys = ["R14", "R32", "R50", "R125", "R143a", "R134a", "R170", "R41"]
         self.valid_prop_keys = ["sim_vap_density", "sim_liq_density", "sim_Pvap", "sim_Hvap"]
         assert isinstance(obj_choice, str), "obj_choice must be string"
         assert obj_choice in ["ExpVal", "SSE", "ExpValPrior"], "obj_choice must be SSE, ExpVal, or ExpValPrior"

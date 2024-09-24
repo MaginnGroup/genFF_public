@@ -1,8 +1,10 @@
 import numpy as np
 import unyt as u
 
+
 class R41Constants:
     """Experimental data and other constants for R41"""
+
     def __init__(self):
         assert (
             self.expt_liq_density.keys()
@@ -55,7 +57,22 @@ class R41Constants:
         )
 
         return param_names
-    
+
+    @property
+    def lit_param_set(self):
+        """Adjustable parameter names"""
+
+        lit_param_set = {
+            "sigma_C1": 3.261855496961485,
+            "sigma_F1": 3.225184763020838,
+            "sigma_H1": 2.24519813299968,
+            "epsilon_C1": 66.83814527840707,
+            "epsilon_F1": 48.89729172233189,
+            "epsilon_H1": 9.080944720877245,
+        }
+
+        return lit_param_set
+
     @property
     def param_bounds(self):
         """Bounds on sigma and epsilon in units of nm and kJ/mol"""
@@ -64,7 +81,7 @@ class R41Constants:
             (
                 np.asarray(
                     [
-                        [2.0, 4.0], #[3.0, 4.0],  # C
+                        [2.0, 4.0],  # [3.0, 4.0],  # C
                         [2.0, 4.0],  # F
                         [1.5, 3.0],  # H
                     ]
@@ -79,7 +96,7 @@ class R41Constants:
             (
                 np.asarray(
                     [
-                        [10.0,75.0], #[20.0, 75.0],  # C
+                        [10.0, 75.0],  # [20.0, 75.0],  # C
                         [15.0, 50.0],  # F
                         [2.0, 10.0],  # H
                     ]
@@ -112,7 +129,7 @@ class R41Constants:
         }
 
         return expt_liq_density
-    
+
     @property
     def expt_vap_density(self):
         """Dictionary with experimental vapor density
@@ -178,10 +195,10 @@ class R41Constants:
             "expt_liq_density": 0.002,
             "expt_vap_density": 0.002,
             "expt_Pvap": 0.002,
-            "expt_Hvap": 0.02
+            "expt_Hvap": 0.02,
         }
         return uncertainty
-    
+
     @property
     def temperature_bounds(self):
         """Bounds on temperature in units of K"""
