@@ -84,7 +84,9 @@ def gen_pareto_sets(job):
     pareto_info = driver.gen_pareto_sets(
         job.sp.lhs_pts, driver.at_class.at_bounds_nm_kjmol, save_data=True
     )
-    job.doc["pareto_info"] = pareto_info
+
+    # Save pareto_info to job document
+    job.doc["pareto_info"] = True
 
     #Find all jobs with the same atom type, obj_choice, and training molecules
     # and set their pareto_info to True

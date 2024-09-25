@@ -8,7 +8,7 @@ from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41
 from utils import atom_type, opt_atom_types
 
 at_number = 11 
-num_restarts = 1 #Number of restarts for replications
+num_restarts = 3 #Number of restarts for replications
 n_vap = 160 # number of molecules in vapor phase
 n_liq = 640
 obj_choice = "ExpValPrior" #Objective to consider
@@ -119,14 +119,14 @@ for molec_name, molec_data in molec_dict.items():
                         "param_set": i+1
                     }
                     state_point = unpack_molec_values(molec_name, setup.at_class, sample, state_point)    
-                    if molec_name in ["R41", "R23"]:
-                        state_point["nsteps_nvt"] = 2500000
-                        state_point["nsteps_liqeq"]= 10000
-                    elif molec_name in "R161" and temp == 240.0:
-                        state_point["nsteps_nvt"] = 2500000
-                        state_point["nsteps_liqeq"]= 5000
-                    else:
-                        state_point["nsteps_liqeq"]= 5000
+                    # if molec_name in ["R41", "R23"]:
+                    #     state_point["nsteps_nvt"] = 2500000
+                    #     state_point["nsteps_liqeq"]= 10000
+                    # elif molec_name in "R161" and temp == 240.0:
+                    #     state_point["nsteps_nvt"] = 2500000
+                    #     state_point["nsteps_liqeq"]= 5000
+                    # else:
+                    state_point["nsteps_liqeq"]= 5000
 
                     # print(state_point)
                     job = project.open_job(state_point)
