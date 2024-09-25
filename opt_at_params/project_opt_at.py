@@ -1,5 +1,6 @@
 # Import dependencies
 from flow import FlowProject, directives
+import signac
 import templates.ndcrc
 import warnings
 from pathlib import Path
@@ -85,12 +86,13 @@ def gen_pareto_sets(job):
         job.sp.lhs_pts, driver.at_class.at_bounds_nm_kjmol, save_data=True
     )
 
-    # Save pareto_info to job document
-    job.doc["pareto_info"] = True
+    #Load signac project that the job belongs to
+    project = signac.get_project()
 
     #Find all jobs with the same atom type, obj_choice, and training molecules
-    # and set their pareto_info to True
-    for other_job in ProjectOPT.find_jobs(dict(atom_type=job.sp.atom_type, obj_choice=job.sp.obj_choice, training_molecules=job.sp.training_molecules)):
+    #dict(atom_type= job.sp.atom_type, obj_choice= job.sp.obj_choice, training_molecules=job.sp.training_molecules)
+    for other_job in project.find_jobs({"atom_type" : job.sp.atom_type, "obj_choice" : job.sp.obj_choice, "training_molecules":job.sp.training_molecules}):
+        # and set their pareto_info to True
         other_job.doc["pareto_info"] = True
 
 @ProjectOPT.label
