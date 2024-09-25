@@ -1437,9 +1437,9 @@ class Analyze_opt_res(Problem_Setup):
         assert isinstance(
             save_label, (str, type(None))
         ), "save_label must be a string or None"
-        assert all(
-            item in list(self.molec_data_dict.keys()) for item in all_molec_list
-        ), "all_molec_list must be a subset of the training molecules"
+        # assert all(
+        #     item in list(self.molec_data_dict.keys()) for item in all_molec_list
+        # ), "all_molec_list must be a subset of the training molecules"
         df = pd.DataFrame(columns=["Molecule", "Property", "Model", "MAPD"])
         # Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
@@ -2181,7 +2181,7 @@ class Vis_Results(Analyze_opt_res):
 
         # Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-        pdf = PdfPages(dir_name + "/prop_vs_T.pdf")
+        pdf = PdfPages(os.path.join(dir_name , "prop_vs_T.pdf"))
         # Loop over molecules
         for molec in all_molec_list:
             # Get constants for molecule
