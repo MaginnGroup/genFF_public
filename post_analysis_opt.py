@@ -14,7 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 # Set params for what you want to analyze
 save_data = True  # Data to save
 obj_choice = "ExpVal"  # Objective to consider
-at_number = 11  # atom type to consider
+at_number = 2  # atom type to consider
 seed = 1  # Seed to use
 molec_names = [
     "R14",
@@ -32,13 +32,16 @@ project = signac.get_project("opt_at_params")
 filtered_jobs = project.find_jobs({"obj_choice": obj_choice, "atom_type": at_number})
 grouped_jobs = filtered_jobs.groupby("training_molecules")
 for statepoint_value, group in grouped_jobs:
+    print(statepoint_value, group)
     unsorted_df = None
+    save_path = None
     for i, job in enumerate(group):
-        # For each group of training molecules, get the first job to get the path to the directory
-        if i == 0:
-            save_path = job.document.dir_name
         # If the best run file exists
         if os.path.exists(job.fn("best_run.csv")):
+            # For each group of training molecules, get the first job to get the path to the directory
+            if save_path is None:
+                save_path = job.document.dir_name
+
             # Read the file and concatenate the data
             df_best_run = pd.read_csv(job.fn("best_run.csv"), header=0, index_col=False)
             # On the 1st iteration where we have data, create the df
@@ -47,13 +50,18 @@ for statepoint_value, group in grouped_jobs:
             # Otherwise append to it
             else:
                 unsorted_df = pd.concat([unsorted_df, df_best_run], ignore_index=True)
-    # Sort the data by the minimum objective value
-    all_df = unsorted_df.sort_values(by="Min Obj", ascending=True).reset_index(
-        drop=True
-    )
-    # Save all the best sets in appropriate folder for each set of training molecules
-    all_df.to_csv(os.path.join(save_path, "best_per_run.csv"), index=False, header=True)
 
+    if unsorted_df is not None:
+        # Sort the data by the minimum objective value
+        all_df = unsorted_df.sort_values(by="Min Obj", ascending=True).reset_index(
+            drop=True
+        )
+        # Save all the best sets in appropriate folder for each set of training molecules
+        all_df.to_csv(
+            os.path.join(save_path, "best_per_run.csv"), index=False, header=True
+        )
+
+"""
 # Create visualization object
 visual = opt_atom_types.Vis_Results(molec_names, at_number, seed, obj_choice)
 # Set parameter set of interest (in this case get the best parameter set)
@@ -87,6 +95,7 @@ for i in range(unique_best_sets.shape[0]):
         save_label=x_label_set,
     )
 
+
 for i in range(unique_best_sets.shape[0]):
     x_label_set = x_label + "_" + str(i + 1)
     best_set = unique_best_sets.iloc[i, :].values
@@ -109,7 +118,7 @@ for i in range(unique_best_sets.shape[0]):
 
     # Plot optimization result heat maps
     visual.plot_obj_hms(best_set, x_label_set)
-
+"""
 # Plot atom_type scheme results
 # at_schemes = [11,12,13,14]
 # if len(at_schemes) > 1 and isinstance(at_schemes, (list,np.ndarray)):
