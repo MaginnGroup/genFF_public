@@ -6,12 +6,10 @@ from .utils import values_scaled_to_real
 from .utils import values_real_to_scaled
 from .utils import variances_scaled_to_real
 
-mpl_is_inline = 'inline' in matplotlib.get_backend()
+mpl_is_inline = "inline" in matplotlib.get_backend()
 
 
-def calc_model_mapd(
-    models, x_data, y_data, property_bounds, xylim=None
-):
+def calc_model_mapd(models, x_data, y_data, property_bounds, xylim=None):
     """Plot the predictions vs. result for one or more GP models
 
     Parameters
@@ -39,27 +37,39 @@ def calc_model_mapd(
 
     fig, ax = plt.subplots()
     mapd_dict = {}
-    for (label, model) in models.items():
+    for label, model in models.items():
         gp_mu, gp_var = model.predict_f(x_data)
         gp_mu_physical = values_scaled_to_real(gp_mu, property_bounds)
         gp_var_physical = variances_scaled_to_real(gp_var, property_bounds)
         gp_std_physical = np.sqrt(abs(gp_var_physical))
-        ax.scatter(y_data_physical, gp_mu_physical, label=label, zorder=2.5, alpha=0.4)
-        ax.errorbar(y_data_physical.flatten(), gp_mu_physical.flatten(), yerr = 1.96*gp_std_physical.flatten(), fmt = 'o', alpha=0.4)
+        ax.scatter(
+            y_data_physical, gp_mu_physical, label=label, zorder=2.5, alpha=0.4
+        )
+        ax.errorbar(
+            y_data_physical.flatten(),
+            gp_mu_physical.flatten(),
+            yerr=1.96 * gp_std_physical.flatten(),
+            fmt="o",
+            alpha=0.4,
+        )
         meansqerr = np.mean(
             (gp_mu_physical - y_data_physical.reshape(-1, 1)) ** 2
         )
         # print("Model: {}. Mean squared err: {:.2e}".format(label, meansqerr))
         mape = np.mean(
-            np.abs((gp_mu_physical - y_data_physical.reshape(-1, 1))/y_data_physical.reshape(-1, 1) )
+            np.abs(
+                (gp_mu_physical - y_data_physical.reshape(-1, 1))
+                / y_data_physical.reshape(-1, 1)
+            )
         )
-        mapd_dict[label] = mape*100 
+        mapd_dict[label] = mape * 100
         # print("Model: {}. MAPE: {:.6e}".format(label, mape))
-    
+
     return mapd_dict
-    
+
+
 def plot_model_performance(
-    models, x_data, y_data, property_bounds, xylim=None, title = None
+    models, x_data, y_data, property_bounds, xylim=None, title=None
 ):
     """Plot the predictions vs. result for one or more GP models
 
@@ -91,29 +101,44 @@ def plot_model_performance(
 
     fig, ax = plt.subplots()
 
-    count=0
-    cycle_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    for (label, model) in models.items():
-        count+= 1
+    count = 0
+    cycle_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    for label, model in models.items():
+        count += 1
         gp_mu, gp_var = model.predict_f(x_data)
         gp_mu_physical = values_scaled_to_real(gp_mu, property_bounds)
         gp_var_physical = variances_scaled_to_real(gp_var, property_bounds)
         gp_std_physical = np.sqrt(abs(gp_var_physical))
-        ax.scatter(y_data_physical, gp_mu_physical, label=label, zorder=2.5, alpha=0.4)
-        ax.errorbar(y_data_physical.flatten(), gp_mu_physical.flatten(), yerr = 1.96*gp_std_physical.flatten(), fmt = 'o', alpha=0.4)
+        ax.scatter(
+            y_data_physical, gp_mu_physical, label=label, zorder=2.5, alpha=0.4
+        )
+        ax.errorbar(
+            y_data_physical.flatten(),
+            gp_mu_physical.flatten(),
+            yerr=1.96 * gp_std_physical.flatten(),
+            fmt="o",
+            alpha=0.4,
+        )
         meansqerr = np.mean(
             (gp_mu_physical - y_data_physical.reshape(-1, 1)) ** 2
         )
         # print("Model: {}. Mean squared err: {:.2e}".format(label, meansqerr))
         mape = np.mean(
-            np.abs((gp_mu_physical - y_data_physical.reshape(-1, 1))/y_data_physical.reshape(-1, 1) )
+            np.abs(
+                (gp_mu_physical - y_data_physical.reshape(-1, 1))
+                / y_data_physical.reshape(-1, 1)
+            )
         )
 
-        ax.text(0.97,0.06*count,
-            label + ' MAPD = '+'{:.2f} '.format(mape*100)+"%",
-            horizontalalignment='right',
-            transform=plt.gca().transAxes, c = cycle_colors[count-1])
-        
+        ax.text(
+            0.97,
+            0.06 * count,
+            label + " MAPD = " + "{:.2f} ".format(mape * 100) + "%",
+            horizontalalignment="right",
+            transform=plt.gca().transAxes,
+            c=cycle_colors[count - 1],
+        )
+
         # print("Model: {}. MAPE: {:.6e}".format(label, mape))
         if np.min(gp_mu_physical) < min_xylim:
             min_xylim = np.min(gp_mu_physical)
@@ -148,8 +173,8 @@ def plot_slices_temperature(
     n_params,
     temperature_bounds,
     property_bounds,
-    plot_bounds,#=[220.0, 340.0],
-    property_name="property"
+    plot_bounds,  # =[220.0, 340.0],
+    property_name="property",
 ):
     """Plot the model predictions as a function of temperature
     Slices are plotted where the values of the other parameters
@@ -189,7 +214,7 @@ def plot_slices_temperature(
         xx = np.hstack((other, vals_scaled))
 
         fig, ax = plt.subplots()
-        for (label, model) in models.items():
+        for label, model in models.items():
             mean_scaled, var_scaled = model.predict_f(xx)
             mean = values_scaled_to_real(mean_scaled, property_bounds)
             var = variances_scaled_to_real(var_scaled, property_bounds)
@@ -269,7 +294,7 @@ def plot_slices_params(
         xx = np.hstack((other1, vals_scaled, other2, temp_vals_scaled))
 
         fig, ax = plt.subplots()
-        for (label, model) in models.items():
+        for label, model in models.items():
             mean_scaled, var_scaled = model.predict_f(xx)
             mean = values_scaled_to_real(mean_scaled, property_bounds)
             var = variances_scaled_to_real(var_scaled, property_bounds)
@@ -304,9 +329,9 @@ def plot_model_vs_test(
     property_bounds,
     plot_bounds=[220.0, 340.0],
     property_name="property",
-    exp_x_data = None,
-    exp_y_data = None,
-    title = None
+    exp_x_data=None,
+    exp_y_data=None,
+    title=None,
 ):
     """Plots the GP model(s) as a function of temperature with all other parameters
     taken as param_values. Overlays training and testing points with the same
@@ -338,7 +363,7 @@ def plot_model_vs_test(
     matplotlib.figure.Figure
     """
     linestyles = ["solid", "dashed", "dotted"]
-    cycle_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    cycle_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
     n_samples = 100
     vals = np.linspace(plot_bounds[0], plot_bounds[1], n_samples).reshape(
@@ -348,23 +373,29 @@ def plot_model_vs_test(
 
     fig, ax = plt.subplots()
     if exp_x_data is not None and exp_y_data is not None:
-        ax.scatter(exp_x_data, exp_y_data, label="Exp Data", zorder = 4, color = "purple")
+        ax.scatter(
+            exp_x_data, exp_y_data, label="Exp Data", zorder=4, color="purple"
+        )
     for i, key in enumerate(list(param_values.keys())):
         if param_values[key] is not None:
             if not np.all(np.isnan(param_values[key])):
                 other = np.tile(param_values[key], (n_samples, 1))
                 xx = np.hstack((other, vals_scaled))
                 if exp_x_data is not None and exp_y_data is not None:
-                    exp_other = np.tile(param_values[key], (len(exp_x_data), 1))
-                    scld_exp_x_data = values_real_to_scaled(exp_x_data, temperature_bounds)
+                    exp_other = np.tile(
+                        param_values[key], (len(exp_x_data), 1)
+                    )
+                    scld_exp_x_data = values_real_to_scaled(
+                        exp_x_data, temperature_bounds
+                    )
                     exp_xx = np.hstack((exp_other, scld_exp_x_data))
-            
-            for (label, model) in models.items():
+
+            for label, model in models.items():
                 mean_scaled, var_scaled = model.predict_f(xx)
                 mean = values_scaled_to_real(mean_scaled, property_bounds)
                 var = variances_scaled_to_real(var_scaled, property_bounds)
-                
-                ax.plot(vals, mean, lw=2, linestyle = linestyles[i], label=key)
+
+                ax.plot(vals, mean, lw=2, linestyle=linestyles[i], label=key)
                 ax.fill_between(
                     vals[:, 0],
                     mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
@@ -374,17 +405,34 @@ def plot_model_vs_test(
 
                 if exp_x_data is not None and exp_y_data is not None:
                     exp_mean_scaled, exp_var_scaled = model.predict_f(exp_xx)
-                    exp_mean = values_scaled_to_real(exp_mean_scaled, property_bounds)
-                    mapd = np.mean(np.abs((exp_mean - exp_y_data.reshape(-1, 1))/exp_y_data.reshape(-1, 1) ))*100
+                    exp_mean = values_scaled_to_real(
+                        exp_mean_scaled, property_bounds
+                    )
+                    mapd = (
+                        np.mean(
+                            np.abs(
+                                (exp_mean - exp_y_data.reshape(-1, 1))
+                                / exp_y_data.reshape(-1, 1)
+                            )
+                        )
+                        * 100
+                    )
                     # meansqerr = np.mean((exp_mean - exp_y_data.reshape(-1, 1)) ** 2)
-                    if "Vapor Density" in property_name or "Pressure" in property_name:
-                        y_lab = 0.06 + 0.06*i
+                    if (
+                        "Vapor Density" in property_name
+                        or "Pressure" in property_name
+                    ):
+                        y_lab = 0.06 + 0.06 * i
                     else:
-                        y_lab = 0.94-0.06*i
-                    ax.text(0.97,y_lab,
-                        ' MAPD = '+'{:.2f} '.format(mapd)+'%',
-                        horizontalalignment='right',
-                        transform=plt.gca().transAxes, c = cycle_colors[i])
+                        y_lab = 0.94 - 0.06 * i
+                    ax.text(
+                        0.97,
+                        y_lab,
+                        " MAPD = " + "{:.2f} ".format(mapd) + "%",
+                        horizontalalignment="right",
+                        transform=plt.gca().transAxes,
+                        c=cycle_colors[i],
+                    )
 
     if train_points.shape[0] > 0:
         md_train_temp = values_scaled_to_real(
@@ -408,15 +456,16 @@ def plot_model_vs_test(
     ax.set_xlabel("Temperature")
     ax.set_ylabel(property_name)
     if "Vapor Density" in property_name or "Pressure" in property_name:
-        plt.legend(loc = "upper left")
+        plt.legend(loc="upper left")
     else:
-        plt.legend(loc = "lower left")
+        plt.legend(loc="lower left")
     if title is not None:
         plt.title(title, fontsize=16)
 
     if not mpl_is_inline:
         return fig
-    
+
+
 def plot_model_vs_exp(
     models,
     param_values,
@@ -460,35 +509,43 @@ def plot_model_vs_exp(
     )
     vals_scaled = values_real_to_scaled(vals, temperature_bounds)
 
-    other = np.tile(param_values, (n_samples, 1))
-    xx = np.hstack((other, vals_scaled))
-
     fig, ax = plt.subplots()
-    for (label, model) in models.items():
-        mean_scaled, var_scaled = model.predict_f(xx)
 
-        mean = values_scaled_to_real(mean_scaled, property_bounds)
-        var = variances_scaled_to_real(var_scaled, property_bounds)
-        ax.plot(vals, mean, lw=2, label="GP " + label)
-        ax.fill_between(
-            vals[:, 0],
-            mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
-            mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
-            alpha=0.25,
-        )
+    for key, param_value in param_values.items():
+        if param_value is not None:
+            other = np.tile(param_value, (n_samples, 1))
+            xx = np.hstack((other, vals_scaled))
 
+            for label, model in models.items():
+                mean_scaled, var_scaled = model.predict_f(xx)
+
+                mean = values_scaled_to_real(mean_scaled, property_bounds)
+                var = variances_scaled_to_real(var_scaled, property_bounds)
+                ax.plot(vals, mean, lw=2, label=key + " " + label)
+                ax.fill_between(
+                    vals[:, 0],
+                    mean[:, 0] - 1.96 * np.sqrt(var[:, 0]),
+                    mean[:, 0] + 1.96 * np.sqrt(var[:, 0]),
+                    alpha=0.25,
+                )
+
+    ax.set_title("GP Model vs. Exp Data for " + label)
     exp_temp = np.array(list(exp_data.keys()))
     exp_property = np.array(list(exp_data.values()))
-    ax.plot(
-        exp_temp, exp_property, "s", color="black", label="Exp"
-    )
+    ax.plot(exp_temp, exp_property, "s", color="black", label="Exp")
 
     ax.set_xlabel("Temperature")
     ax.set_ylabel(property_name)
-    fig.legend()
+    # print(property_name)
+    if "Liquid Density" in property_name or "Enthalpy" in property_name:
+        plt.legend(loc="lower left")
+    else:
+        plt.legend(loc="upper left")
+    # fig.legend()
 
     if not mpl_is_inline:
         return fig
+
 
 def plot_obj_contour(
     param_mesh,
@@ -497,7 +554,7 @@ def plot_obj_contour(
     param_names,
 ):
     """Plots the objective as a function of 2 parameter values with all other parameters
-    taken as param_values.values. 
+    taken as param_values.values.
 
     Parameters
     ----------
@@ -514,18 +571,18 @@ def plot_obj_contour(
     """
     # Create the heatmap using contourf
     fig, ax = plt.subplots()
-    
+
     x, y = param_mesh
-    cmap = ax.contourf(x, y, obj_vals, 50, cmap='viridis')
+    cmap = ax.contourf(x, y, obj_vals, 50, cmap="viridis")
 
     ax.scatter(
         true_vals[0], true_vals[1], marker="*", color="red", label="Best Set"
     )
 
     # Add colorbar
-    cbar = fig.colorbar(cmap, ax = ax)
-    cbar.set_label('Objective Value')
-    
+    cbar = fig.colorbar(cmap, ax=ax)
+    cbar.set_label("Objective Value")
+
     # Add title and labels
     ax.set_xlabel(param_names[0])
     ax.set_ylabel(param_names[1])

@@ -1476,6 +1476,8 @@ class Analyze_opt_res(Problem_Setup):
                         mean = values_scaled_to_real(mean_scaled, y_bounds)
                         mapd = mean_absolute_percentage_error(y_data, mean) * 100
                         mapd_vals[param_set_key].append(mapd)
+                    else:
+                        mapd_vals[param_set_key].append(None)
 
             for param_set_key in list(test_params.keys()):
                 all_data_lists[param_set_key].append([molec] + mapd_vals[param_set_key])
@@ -2174,14 +2176,14 @@ class Vis_Results(Analyze_opt_res):
         ----------
         theta_guess: np.ndarray, the atom type scheme parameter set of interest (sigma in nm, epsilon in kJ/mol)
         """
-        assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
+        # assert isinstance(theta_guess, np.ndarray), "theta_guess must be an np.ndarray"
         assert all(
             item in list(self.molec_data_dict.keys()) for item in all_molec_list
         ), "all_molec_list must be a subset of the training molecules"
 
         # Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-        pdf = PdfPages(os.path.join(dir_name , "prop_vs_T.pdf"))
+        pdf = PdfPages(os.path.join(dir_name, "prop_vs_T.pdf"))
         # Loop over molecules
         for molec in all_molec_list:
             # Get constants for molecule
@@ -2190,15 +2192,20 @@ class Vis_Results(Analyze_opt_res):
             param_matrix = self.at_class.get_transformation_matrix(
                 {molec: molec_object}
             )
-            # Transform the guess, and scale to bounds
-            gp_theta = theta_guess.reshape(1, -1) @ param_matrix
-            gp_theta_guess = values_real_to_scaled(gp_theta, molec_object.param_bounds)
+            t_guesses = {}
+            for t_key, t_guess in theta_guess.items():
+                # Transform the guess, and scale to bounds
+                gp_theta = t_guess.reshape(1, -1) @ param_matrix
+                gp_theta_guess = values_real_to_scaled(
+                    gp_theta, molec_object.param_bounds
+                )
+                t_guesses[t_key] = gp_theta_guess
             # Get GPs associated with each molecule
             molec_gps_dict = self.all_train_gp_dict[molec]
             # Loop over gps (1 per property)
             for key in list(molec_gps_dict.keys()):
                 # Set label
-                label = molec + "_" + key
+                label = molec
                 # Get GP associated with property
                 gp_model = molec_gps_dict[key]
                 # Get X and Y data and bounds associated with the GP
@@ -2207,7 +2214,7 @@ class Vis_Results(Analyze_opt_res):
                 pdf.savefig(
                     plot_model_vs_exp(
                         {label: gp_model},
-                        gp_theta_guess,
+                        t_guesses,
                         exp_data,
                         molec_object.temperature_bounds,
                         y_bounds,
@@ -2429,6 +2436,7 @@ class Vis_Results(Analyze_opt_res):
                     color=df_colors[i],
                 )
 
+            # ax.set_ylim(0, np.maximum(max_val_f * 1.05, 5))
             ax.set_ylim(0, max_val_f * 1.05)
             ax.tick_params(axis="y", which="major", labelsize=16)
             ax.set_title(name, fontsize=18)

@@ -32,7 +32,7 @@ project = signac.get_project("opt_at_params")
 filtered_jobs = project.find_jobs({"obj_choice": obj_choice, "atom_type": at_number})
 grouped_jobs = filtered_jobs.groupby("training_molecules")
 for statepoint_value, group in grouped_jobs:
-    print(statepoint_value, group)
+    # print(statepoint_value, group)
     unsorted_df = None
     save_path = None
     for i, job in enumerate(group):
