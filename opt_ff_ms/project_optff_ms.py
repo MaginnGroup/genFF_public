@@ -9,47 +9,69 @@ import copy
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 sys.path.append("..")
-from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+from utils.molec_class_files import (
+    r14,
+    r32,
+    r50,
+    r125,
+    r134a,
+    r143a,
+    r170,
+    r41,
+    r23,
+    r161,
+    r152a,
+    r152,
+    r134,
+    r143,
+    r116,
+)
+
 sys.path.remove("..")
+
 
 class Project(FlowProject):
     def __init__(self):
-        #Set Project Path to be that of the current working directory
+        # Set Project Path to be that of the current working directory
         current_path = Path(os.getcwd()).absolute()
-        super().__init__(path = current_path)
-        
+        super().__init__(path=current_path)
+
 
 @Project.post.isfile("ff.xml")
 @Project.operation
 def create_forcefield(job):
     """Create the forcefield .xml file for the job"""
 
-    #Generate content based on job sp molecule name
-    molec_xml_function = _get_xml_from_molecule(job.sp.mol_name)       
+    # Generate content based on job sp molecule name
+    molec_xml_function = _get_xml_from_molecule(job.sp.mol_name)
     content = molec_xml_function(job)
 
     with open(job.fn("ff.xml"), "w") as ff:
         ff.write(content)
 
+
 def calc_box_helper(job):
     "Calculate the initial box length of the boxes"
 
     import unyt as u
-    #Get reference data from constants file
-    #Load class properies for each training and testing molecule
+
+    # Get reference data from constants file
+    # Load class properies for each training and testing molecule
     class_dict = _get_class_from_molecule(job.sp.mol_name)
     class_data = class_dict[job.sp.mol_name]
     # Reference data to compare to (i.e. experiments or other simulation studies) (load from constants file in ProjectGAFF_gaff.py as needed)
     ref = {}
-    
-    #If the gemc simulation failed previously, use the critical values
+
+    # If the gemc simulation failed previously, use the critical values
     if "use_crit" in job.doc and job.doc.use_crit == True:
-        rho_liq = class_data.expt_rhoc * u.kilogram/(u.meter)**3
-        rho_vap = class_data.expt_rhoc * u.kilogram/(u.meter)**3
+        rho_liq = class_data.expt_rhoc * u.kilogram / (u.meter) ** 3
+        rho_vap = class_data.expt_rhoc * u.kilogram / (u.meter) ** 3
     else:
-        #Initialize rho_liq and rho_vap as the experimental values
-        rho_liq = job.sp.expt_liq_density * u.kilogram/(u.meter)**3
-        rho_vap = class_data.expt_vap_density[int(job.sp.T)] * u.kilogram/(u.meter)**3
+        # Initialize rho_liq and rho_vap as the experimental values
+        rho_liq = job.sp.expt_liq_density * u.kilogram / (u.meter) ** 3
+        rho_vap = (
+            class_data.expt_vap_density[int(job.sp.T)] * u.kilogram / (u.meter) ** 3
+        )
 
     # Create a tuple containing the values from each dictionary
     ref[int(job.sp.T)] = (rho_liq, rho_vap, job.sp.P)
@@ -62,9 +84,9 @@ def calc_box_helper(job):
     # Strip unyts and round to 0.1 angstrom
     vapboxl = round(float(vapboxl.in_units(u.nm).to_value()), 2)
 
-    #If molecule is R41, reduce the vapor box length by 20% to keep it inside the phase envelope
+    # If molecule is R41, reduce the vapor box length by 20% to keep it inside the phase envelope
     if job.sp.mol_name == "R41":
-        vapboxl = vapboxl*0.80
+        vapboxl = vapboxl * 0.80
 
     # Save to job document file
     job.doc.vapboxl = vapboxl  # nm, compatible with mbuild
@@ -82,12 +104,14 @@ def calc_box_helper(job):
 
     return job.doc.liqboxl, job.doc.vapboxl
 
+
 @Project.post(lambda job: "vapboxl" in job.doc)
 @Project.post(lambda job: "liqboxl" in job.doc)
 @Project.operation
 def calc_boxes(job):
     "Calculate the initial box length of the boxes"
     liqbox, vapbox = calc_box_helper(job)
+
 
 # @Project.post(lambda job: "vapboxl" in job.doc)
 # @Project.operation
@@ -125,26 +149,29 @@ def calc_boxes(job):
 #     # Save to job document file
 #     job.doc.liqboxl = boxl  # nm, compatible with mbuild
 
+
 @Project.label
 def nvt_finished(job):
     "Confirm a given nvt simulation is completed or not necessary"
     import numpy as np
-    import os 
-    #If nsteps not in init, then GEMC ran without it earlier
+    import os
+
+    # If nsteps not in init, then GEMC ran without it earlier
     if "nsteps_nvt" not in job.sp:
         completed = True
     else:
         with job:
             try:
-                thermo_data = np.genfromtxt(
-                    "nvt.eq.out.prp", skip_header=3
-                )
-                completed = int(thermo_data[-1][0]) == job.sp.nsteps_nvt #job.sp.nsteps_liqeq
+                thermo_data = np.genfromtxt("nvt.eq.out.prp", skip_header=3)
+                completed = (
+                    int(thermo_data[-1][0]) == job.sp.nsteps_nvt
+                )  # job.sp.nsteps_liqeq
             except:
                 completed = False
                 pass
 
     return completed
+
 
 @Project.pre(lambda job: "nsteps_nvt" in job.sp)
 @Project.pre.after(create_forcefield, calc_boxes)
@@ -171,18 +198,15 @@ def NVT_liqbox(job):
     moves = mc.MoveSet("nvt", species_list)
 
     # Property outputs relevant for NPT simulations
-    thermo_props = [
-            "energy_total", 
-            "pressure"
-            ]
+    thermo_props = ["energy_total", "pressure"]
 
     custom_args = {
         "vdw_style": "lj",
         "cutoff_style": "cut_tail",
         "vdw_cutoff": 12.0 * u.angstrom,
         "charge_style": "ewald",
-        "charge_cutoff": 12.0 * u.angstrom, 
-        "ewald_accuracy": 1.0e-5, 
+        "charge_cutoff": 12.0 * u.angstrom,
+        "ewald_accuracy": 1.0e-5,
         "mixing_rule": "lb",
         "units": "steps",
         "coord_freq": 1000,
@@ -192,7 +216,7 @@ def NVT_liqbox(job):
     custom_args["properties"] = thermo_props
     mols_to_add = [[job.sp.N_liq]]
 
-    # Create box list 
+    # Create box list
     boxl = job.doc.liqboxl
     box = mbuild.Box(lengths=[boxl, boxl, boxl])
     box_list = [box]
@@ -213,16 +237,16 @@ def NVT_liqbox(job):
 
             if "use_crit" not in job.doc:
                 job.doc.use_crit = False
-            
+
     except:
-        #Note this overwrites liquid and vapor box lengths in job.doc
+        # Note this overwrites liquid and vapor box lengths in job.doc
         liqbox, vapbox = calc_box_helper(job)
         # Create system with box lengths based on critical points
         boxl = job.doc.liqboxl
         box = mbuild.Box(lengths=[boxl, boxl, boxl])
         box_list = [box]
         system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
-        
+
         try:
             with job:
                 # Run equilibration
@@ -237,7 +261,13 @@ def NVT_liqbox(job):
                 job.doc.use_crit = True
         except:
             job.doc.nvt_failed == True
-            raise Exception("NVT failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
+            raise Exception(
+                "NVT failed with critical and experimental starting conditions and the molecule is "
+                + job.sp.mol_name
+                + " at temperature "
+                + str(job.sp.T)
+            )
+
 
 @Project.pre(lambda job: "nsteps_nvt" in job.sp)
 @Project.pre.after(NVT_liqbox)
@@ -269,6 +299,7 @@ def extract_final_NVT_config(job):
             box_data.append(line.strip().split())
     job.doc.nvt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
+
 def npt_finished(job):
     "Confirm a given simulation is completed"
     import numpy as np
@@ -277,18 +308,18 @@ def npt_finished(job):
     with job:
         try:
             if job.isfile("liqbox-equil/equil.out.prp") and "nsteps_nvt" not in job.sp:
-                thermo_data = np.genfromtxt("liqbox-equil/equil.out.prp", skip_header=3
-                )
+                thermo_data = np.genfromtxt("liqbox-equil/equil.out.prp", skip_header=3)
             else:
-                thermo_data = np.genfromtxt(
-                    "npt.eq.out.prp", skip_header=3
-                )
-            completed = int(thermo_data[-1][0]) == job.sp.nsteps_liqeq #job.sp.nsteps_liqeq
+                thermo_data = np.genfromtxt("npt.eq.out.prp", skip_header=3)
+            completed = (
+                int(thermo_data[-1][0]) == job.sp.nsteps_liqeq
+            ) 
         except:
             completed = False
             pass
 
     return completed
+
 
 # @Project.pre.after(extract_final_NVT_config)
 @Project.pre.after(create_forcefield, calc_boxes)
@@ -312,16 +343,16 @@ def NPT_liqbox(job):
     compound_ff = ff.apply(compound)
 
     # Create box list and species list
-    #Use nvt initial box length if available, otherwise use original calculated liqboxl
+    # Use nvt initial box length if available, otherwise use original calculated liqboxl
     if "nvt_liqbox_final_dim" in job.doc:
         with job:
             liq_box = mbuild.formats.xyz.read_xyz(job.fn("nvt.final.xyz"))
         boxl = job.doc.nvt_liqbox_final_dim
-        liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90., 90., 90.])
+        liq_box.box = mbuild.Box(lengths=[boxl, boxl, boxl], angles=[90.0, 90.0, 90.0])
         liq_box.periodicity = [True, True, True]
     else:
         boxl = job.doc.liqboxl
-        liq_box = mbuild.Box(lengths=[boxl, boxl, boxl])    
+        liq_box = mbuild.Box(lengths=[boxl, boxl, boxl])
 
     box_list = [liq_box]
     species_list = [compound_ff]
@@ -340,9 +371,7 @@ def NPT_liqbox(job):
     new_prob_volume = 1.0 / job.sp.N_liq
     moves.prob_volume = new_prob_volume
 
-    moves.prob_translate = (
-        moves.prob_translate + orig_prob_volume - new_prob_volume
-    )
+    moves.prob_translate = moves.prob_translate + orig_prob_volume - new_prob_volume
 
     # Define thermo output props
     thermo_props = [
@@ -384,29 +413,39 @@ def NPT_liqbox(job):
             )
 
     except:
-        #if GEMC failed with critical conditions as intial conditions, terminate with error
+        # if GEMC failed with critical conditions as intial conditions, terminate with error
         if "use_crit" in job.doc and job.doc.use_crit == True:
-            #If so, terminate with error and log failure in job document
+            # If so, terminate with error and log failure in job document
             job.doc.gemc_failed = True
-            #If the job fails twice and it doesn't have a obj_choice key delete it
+            # If the job fails twice and it doesn't have a obj_choice key delete it
             if "obj_choice" not in job.sp.keys():
                 job.remove()
-                raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
-            raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
-        else:#Otherwise, try with critical conditions
+                raise Exception(
+                    "NPT failed with critical and experimental starting conditions and the molecule is "
+                    + job.sp.mol_name
+                    + " at temperature "
+                    + str(job.sp.T)
+                )
+            raise Exception(
+                "NPT failed with critical and experimental starting conditions and the molecule is "
+                + job.sp.mol_name
+                + " at temperature "
+                + str(job.sp.T)
+            )
+        else:  # Otherwise, try with critical conditions
             job.doc.use_crit = True
-            #Ensure that you will do an nvt simulation before the next gemc simulation
+            # Ensure that you will do an nvt simulation before the next gemc simulation
             job.sp.nsteps_nvt = 2500000
-            #If GEMC fails, remove files in post conditions of previous operations
-            del job.doc["vapboxl"] #calc_boxes
-            del job.doc["liqboxl"] #calc_boxes
+            # If GEMC fails, remove files in post conditions of previous operations
+            del job.doc["vapboxl"]  # calc_boxes
+            del job.doc["liqboxl"]  # calc_boxes
             with job:
-                if job.isfile("nvt.eq.out.prp"): 
-                    os.remove("nvt.eq.out.prp") #NVT_liqbox
-                    os.remove("nvt.final.xyz") #extract_final_NVT_config
+                if job.isfile("nvt.eq.out.prp"):
+                    os.remove("nvt.eq.out.prp")  # NVT_liqbox
+                    os.remove("nvt.final.xyz")  # extract_final_NVT_config
                 if "liqbox_final_dim" in job.doc:
-                    del job.doc["liqbox_final_dim"] #extract_final_NPT_config
-                    os.remove("liqbox.xyz") #extract_final_NPT_config
+                    del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
+                    os.remove("liqbox.xyz")  # extract_final_NPT_config
 
 
 # @Project.label
@@ -539,8 +578,12 @@ def NPT_liqbox(job):
 #             box_data.append(line.strip().split())
 #     job.doc.liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
+
 @Project.pre.after(NPT_liqbox)
-@Project.post(lambda job: job.isfile("npt.final.xyz") or (job.isfile("liqbox.xyz") and "nsteps_nvt" not in job.sp))
+@Project.post(
+    lambda job: job.isfile("npt.final.xyz")
+    or (job.isfile("liqbox.xyz") and "nsteps_nvt" not in job.sp)
+)
 @Project.post(lambda job: "npt_liqbox_final_dim" or "liqbox_final_dim" in job.doc)
 @Project.operation
 def extract_final_NPT_config(job):
@@ -568,15 +611,14 @@ def extract_final_NPT_config(job):
             box_data.append(line.strip().split())
     job.doc.npt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
+
 @Project.label
 def gemc_equil_complete(job):
     "Confirm gemc equilibration has completed"
     import numpy as np
 
     try:
-        thermo_data = np.genfromtxt(
-            job.fn("equil.out.box1.prp"), skip_header=2
-        )
+        thermo_data = np.genfromtxt(job.fn("equil.out.box1.prp"), skip_header=2)
         completed = int(thermo_data[-1][0]) == job.sp.nsteps_eq
     except:
         completed = False
@@ -610,6 +652,7 @@ def run_gemc(job):
     import foyer
     import mosdef_cassandra as mc
     import unyt as u
+
     ff = foyer.Forcefield(job.fn("ff.xml"))
 
     # Load the compound and apply the ff
@@ -625,7 +668,9 @@ def run_gemc(job):
     with job:
         liq_box = mbuild.formats.xyz.read_xyz(job.fn("npt.final.xyz"))
 
-    liq_box.box = mbuild.Box(lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90., 90., 90.])
+    liq_box.box = mbuild.Box(
+        lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90.0, 90.0, 90.0]
+    )
     liq_box.periodicity = [True, True, True]
 
     boxl_vap = job.doc.vapboxl  # nm
@@ -655,12 +700,8 @@ def run_gemc(job):
     moves.prob_volume = new_prob_volume
     moves.prob_swap = new_prob_swap
 
-    moves.prob_translate = (
-        moves.prob_translate + orig_prob_volume - new_prob_volume
-    )
-    moves.prob_translate = (
-        moves.prob_translate + orig_prob_swap - new_prob_swap
-    )
+    moves.prob_translate = moves.prob_translate + orig_prob_volume - new_prob_volume
+    moves.prob_translate = moves.prob_translate + orig_prob_swap - new_prob_swap
 
     # Define thermo output props
     thermo_props = [
@@ -677,9 +718,11 @@ def run_gemc(job):
         "run_name": "gemc.eq",
         "charge_style": "ewald",
         "rcut_min": 1.0 * u.angstrom,
-        "charge_cutoff_box2": 0.4 * (boxl_vap * u.nanometer).to("angstrom"), #25.0 * u.angstrom,
+        "charge_cutoff_box2": 0.4
+        * (boxl_vap * u.nanometer).to("angstrom"),  # 25.0 * u.angstrom,
         "vdw_cutoff_box1": 12.0 * u.angstrom,
-        "vdw_cutoff_box2": 0.4 * (boxl_vap * u.nanometer).to("angstrom"), #25.0 * u.angstrom,
+        "vdw_cutoff_box2": 0.4
+        * (boxl_vap * u.nanometer).to("angstrom"),  # 25.0 * u.angstrom,
         "units": "sweeps",
         "steps_per_sweep": job.sp.N_liq + job.sp.N_vap,
         "coord_freq": 500,
@@ -701,8 +744,8 @@ def run_gemc(job):
             )
 
             # Adjust custom args for production
-            #custom_args["run_name"] = "prod"
-            #custom_args["restart_name"] = "equil"
+            # custom_args["run_name"] = "prod"
+            # custom_args["restart_name"] = "equil"
 
             # Run production
             mc.restart(
@@ -712,30 +755,34 @@ def run_gemc(job):
                 run_name="prod",
             )
     except:
-        #if GEMC failed with critical conditions as intial conditions, terminate with error
+        # if GEMC failed with critical conditions as intial conditions, terminate with error
         if "use_crit" in job.doc and job.doc.use_crit == True:
-            #If so, terminate with error and log failure in job document
+            # If so, terminate with error and log failure in job document
             job.doc.gemc_failed = True
-            raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
+            raise Exception(
+                "GEMC failed with critical and experimental starting conditions and the molecule is "
+                + job.sp.mol_name
+                + " at temperature "
+                + str(job.sp.T)
+            )
         else:
-            #Otherwise, try with critical conditions
+            # Otherwise, try with critical conditions
             job.doc.use_crit = True
-            #Ensure that you will do an nvt simulation before the next gemc simulation
+            # Ensure that you will do an nvt simulation before the next gemc simulation
             job.sp.nsteps_nvt = 2500000
-            #If GEMC fails, remove files in post conditions of previous operations
-            del job.doc["vapboxl"] #calc_boxes
-            del job.doc["liqboxl"] #calc_boxes
+            # If GEMC fails, remove files in post conditions of previous operations
+            del job.doc["vapboxl"]  # calc_boxes
+            del job.doc["liqboxl"]  # calc_boxes
             with job:
-                if job.isfile("nvt.eq.out.prp"): 
-                    os.remove("nvt.eq.out.prp") #NVT_liqbox
-                    os.remove("nvt.final.xyz") #extract_final_NVT_config
+                if job.isfile("nvt.eq.out.prp"):
+                    os.remove("nvt.eq.out.prp")  # NVT_liqbox
+                    os.remove("nvt.final.xyz")  # extract_final_NVT_config
                 if job.isfile("npt.eq.out.prp"):
-                    os.remove("npt.eq.out.prp") #NPT_liqbox
-                    os.remove("npt.final.xyz") #extract_final_NPT_config
+                    os.remove("npt.eq.out.prp")  # NPT_liqbox
+                    os.remove("npt.final.xyz")  # extract_final_NPT_config
                 if "liqbox_final_dim" in job.doc:
-                    del job.doc["liqbox_final_dim"] #extract_final_NPT_config
-                    os.remove("liqbox.xyz") #extract_final_NPT_config
-
+                    del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
+                    os.remove("liqbox.xyz")  # extract_final_NPT_config
 
 
 @Project.pre.after(run_gemc)
@@ -758,8 +805,10 @@ def calculate_props(job):
     """Calculate the density"""
 
     import numpy as np
+
     sys.path.append("..")
     from utils.analyze_ms import block_average
+
     sys.path.remove("..")
 
     # Load the thermo data
@@ -793,7 +842,7 @@ def calculate_props(job):
     nmols_vap_ave = np.mean(nmols_vap)
 
     # calculate enthalpy of vaporization
-    Hvap = (vap_enthalpy/nmols_vap) - (liq_enthalpy/nmols_liq)
+    Hvap = (vap_enthalpy / nmols_vap) - (liq_enthalpy / nmols_liq)
     Hvap_ave = np.mean(Hvap)
 
     # save average density
@@ -810,7 +859,7 @@ def calculate_props(job):
         "liq_density": liq_density,
         "vap_density": vap_density,
         "Pvap": Pvap,
-        "Hvap" : Hvap,
+        "Hvap": Hvap,
         "liq_enthalpy": liq_enthalpy,
         "vap_enthalpy": vap_enthalpy,
         "nmols_liq": nmols_liq,
@@ -826,9 +875,7 @@ def calculate_props(job):
                 zip(means_est, vars_est, vars_err)
             ):
                 ferr.write(
-                    "{}\t{}\t{}\t{}\n".format(
-                        nblk_ops, mean_est, var_est, var_err
-                    )
+                    "{}\t{}\t{}\t{}\n".format(nblk_ops, mean_est, var_est, var_err)
                 )
 
         job.doc[name + "_unc"] = np.max(np.sqrt(vars_est))
@@ -838,7 +885,7 @@ def calculate_props(job):
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
 #####################################################################
 def _get_molec_dicts():
-    #Load class properies for each training and testing molecule
+    # Load class properies for each training and testing molecule
     R14 = r14.R14Constants()
     R32 = r32.R32Constants()
     R50 = r50.R50Constants()
@@ -855,26 +902,30 @@ def _get_molec_dicts():
     R134 = r134.R134Constants()
     R116 = r116.R116Constants()
 
-    molec_dict = {"R14": R14,
-                    "R32": R32,
-                    "R50": R50,
-                    "R125": R125,
-                    "R134a": R134a,
-                    "R143a": R143a,
-                    "R170": R170,
-                    "R41": R41,
-                    "R23": R23,
-                    "R161":R161,
-                    "R152a":R152a,
-                    "R152": R152,
-                    "R143": R143,
-                    "R134": R134,
-                    "R116": R116}
+    molec_dict = {
+        "R14": R14,
+        "R32": R32,
+        "R50": R50,
+        "R125": R125,
+        "R134a": R134a,
+        "R143a": R143a,
+        "R170": R170,
+        "R41": R41,
+        "R23": R23,
+        "R161": R161,
+        "R152a": R152a,
+        "R152": R152,
+        "R143": R143,
+        "R134": R134,
+        "R116": R116,
+    }
     return molec_dict
+
 
 def _get_class_from_molecule(molecule_name):
     molec_dict = _get_molec_dicts()
     return {molecule_name: molec_dict[molecule_name]}
+
 
 def _get_xml_from_molecule(molecule_name):
     if molecule_name == "R41":
@@ -911,7 +962,8 @@ def _get_xml_from_molecule(molecule_name):
         raise ValueError("Molecule name not recognized")
     return molec_xml_function
 
-def _generate_r14_xml(job): 
+
+def _generate_r14_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
@@ -938,7 +990,8 @@ def _generate_r14_xml(job):
 
     return content
 
-def _generate_r50_xml(job): 
+
+def _generate_r50_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
@@ -965,7 +1018,8 @@ def _generate_r50_xml(job):
 
     return content
 
-def _generate_r170_xml(job): 
+
+def _generate_r170_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
@@ -997,7 +1051,8 @@ def _generate_r170_xml(job):
 
     return content
 
-def _generate_r134a_xml(job): 
+
+def _generate_r134a_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
@@ -1046,6 +1101,7 @@ def _generate_r134a_xml(job):
 
     return content
 
+
 def _generate_r143a_xml(job):
 
     content = """<ForceField>
@@ -1087,8 +1143,8 @@ def _generate_r143a_xml(job):
         epsilon_H1=job.sp.epsilon_H1,
     )
 
-
     return content
+
 
 def _generate_r32_xml(job):
 
@@ -1123,6 +1179,7 @@ def _generate_r32_xml(job):
     )
 
     return content
+
 
 def _generate_r125_xml(job):
 
@@ -1172,6 +1229,7 @@ def _generate_r125_xml(job):
 
     return content
 
+
 def _generate_r41_xml(job):
 
     content = """<ForceField>
@@ -1201,13 +1259,12 @@ def _generate_r41_xml(job):
         epsilon_C1=job.sp.epsilon_C1,
         epsilon_F1=job.sp.epsilon_F1,
         epsilon_H1=job.sp.epsilon_H1,
-        
     )
-
 
     return content
 
-def _generate_r116_xml(job): 
+
+def _generate_r116_xml(job):
 
     content = """<ForceField>
  <AtomTypes>
@@ -1239,6 +1296,7 @@ def _generate_r116_xml(job):
 
     return content
 
+
 def _generate_r23_xml(job):
 
     content = """<ForceField>
@@ -1268,11 +1326,10 @@ def _generate_r23_xml(job):
         epsilon_C1=job.sp.epsilon_C1,
         epsilon_F1=job.sp.epsilon_F1,
         epsilon_H1=job.sp.epsilon_H1,
-        
     )
 
-
     return content
+
 
 def _generate_r152a_xml(job):
 
@@ -1321,11 +1378,10 @@ def _generate_r152a_xml(job):
         epsilon_F1=job.sp.epsilon_F1,
         epsilon_H1=job.sp.epsilon_H1,
         epsilon_H2=job.sp.epsilon_H2,
-        
     )
 
-
     return content
+
 
 def _generate_r161_xml(job):
 
@@ -1374,13 +1430,12 @@ def _generate_r161_xml(job):
         epsilon_F1=job.sp.epsilon_F1,
         epsilon_H1=job.sp.epsilon_H1,
         epsilon_H2=job.sp.epsilon_H2,
-        
     )
-
 
     return content
 
-def _generate_r152_xml(job): 
+
+def _generate_r152_xml(job):
 
     content = """<ForceField name="R152 GAFF" version="1.0">
 <AtomTypes>
@@ -1417,12 +1472,12 @@ def _generate_r152_xml(job):
         epsilon_C1=job.sp.epsilon_C1,
         epsilon_F1=job.sp.epsilon_F1,
         epsilon_H1=job.sp.epsilon_H1,
-        
     )
 
     return content
 
-def _generate_r134_xml(job): 
+
+def _generate_r134_xml(job):
 
     content = """<ForceField name="R134 GAFF" version="1.0">
 <AtomTypes>
@@ -1459,12 +1514,12 @@ def _generate_r134_xml(job):
         epsilon_C1=job.sp.epsilon_C,
         epsilon_F1=job.sp.epsilon_F,
         epsilon_H1=job.sp.epsilon_H,
-        
     )
 
     return content
 
-def _generate_r143_xml(job): 
+
+def _generate_r143_xml(job):
 
     content = """<ForceField name="R134 GAFF" version="1.0">
 <AtomTypes>
@@ -1521,6 +1576,7 @@ def _generate_r143_xml(job):
     )
 
     return content
+
 
 if __name__ == "__main__":
     Project().main()
