@@ -14,7 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 # Set params for what you want to analyze
 save_data = True  # Data to save
 obj_choice = "ExpVal"  # Objective to consider
-at_number = 11  # atom type to consider
+at_number = 1  # atom type to consider
 seed = 1  # Seed to use
 molec_names = [
     "R14",
@@ -61,7 +61,7 @@ for statepoint_value, group in grouped_jobs:
             os.path.join(save_path, "best_per_run.csv"), index=False, header=True
         )
 
-"""
+
 # Create visualization object
 visual = opt_atom_types.Vis_Results(molec_names, at_number, seed, obj_choice)
 # Set parameter set of interest (in this case get the best parameter set)
@@ -76,7 +76,7 @@ all_sets = all_df.loc[:, first_param_name:last_param_name].values
 unique_best_sets = visual.get_unique_sets(
     all_sets, save_data=save_data, save_label=x_label
 )
-
+"""
 # Loop over unique parameter sets
 for i in range(unique_best_sets.shape[0]):
     x_label_set = x_label + "_" + str(i + 1)
