@@ -14,7 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 # Set params for what you want to analyze
 save_data = True  # Data to save
 obj_choice = "ExpVal"  # Objective to consider
-at_number = 11  # atom type to consider
+at_number = 2  # atom type to consider
 seed = 1  # Seed to use
 molec_names = [
     "R14",
@@ -115,10 +115,10 @@ for i in range(unique_best_sets.shape[0]):
         eigval = [np.real(num) for num in eigval]
         np.savetxt(eig_val_path, eigval, delimiter=",")
         np.savetxt(eig_vec_path, eigvec, delimiter=",")
-
+"""
     # Plot optimization result heat maps
     visual.plot_obj_hms(best_set, x_label_set)
-"""
+
 # Plot atom_type scheme results
 # at_schemes = [11,12,13,14]
 # if len(at_schemes) > 1 and isinstance(at_schemes, (list,np.ndarray)):
