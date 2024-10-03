@@ -174,6 +174,7 @@ def nvt_finished(job):
 
 
 @Project.pre(lambda job: "nsteps_nvt" in job.sp)
+@Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.pre.after(create_forcefield, calc_boxes)
 @Project.post(nvt_finished)
 @Project.operation(directives={"omp_num_threads": 12})
