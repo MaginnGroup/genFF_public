@@ -104,7 +104,7 @@ def calc_box_helper(job):
 
     return job.doc.liqboxl, job.doc.vapboxl
 
-
+@Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.post(lambda job: "vapboxl" in job.doc)
 @Project.post(lambda job: "liqboxl" in job.doc)
 @Project.operation
@@ -323,6 +323,7 @@ def npt_finished(job):
 
 # @Project.pre.after(extract_final_NVT_config)
 @Project.pre.after(create_forcefield, calc_boxes)
+@Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.pre(nvt_finished)
 @Project.post(npt_finished)
 @Project.operation(directives={"omp_num_threads": 12})
@@ -783,7 +784,6 @@ def run_gemc(job):
                 if "liqbox_final_dim" in job.doc:
                     del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
                     os.remove("liqbox.xyz")  # extract_final_NPT_config
-
 
 @Project.pre.after(run_gemc)
 @Project.post(lambda job: "liq_density" in job.doc)
