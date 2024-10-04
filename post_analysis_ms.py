@@ -51,8 +51,8 @@ molec_dict = {"R14": R14,
                 "R134": R134,
                 "R116": R116}
 
-at_number = 11
-obj_choice = "ExpValPrior"
+at_number = 8
+obj_choice = "ExpVal"
 param_set = 1
 ff_list = []
 MSE_path_dict = {}

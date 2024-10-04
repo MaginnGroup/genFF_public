@@ -23,7 +23,7 @@ from utils.molec_class_files import (
 )
 from utils import atom_type, opt_atom_types
 
-at_number = 8
+at_number = 1
 num_restarts = 1  # Number of restarts for replications
 n_vap = 160  # number of molecules in vapor phase
 n_liq = 640
@@ -154,7 +154,11 @@ for molec_name, molec_data in molec_dict.items():
                     state_point = unpack_molec_values(
                         molec_name, setup.at_class, sample, state_point
                     )
-                    # if molec_name in ["R41", "R23"]:
+
+                    state_point["nsteps_liqeq"] = 10000
+                    state_point["nsteps_nvt"] = 2500000
+
+                    # if molec_name in ["R23","R152a","R134", "R152"]:
                     #     state_point["nsteps_nvt"] = 2500000
                     #     state_point["nsteps_liqeq"]= 10000
                     # elif molec_name in "R161" and temp == 240.0:
@@ -162,7 +166,7 @@ for molec_name, molec_data in molec_dict.items():
                     #     state_point["nsteps_liqeq"]= 5000
                     # else:
                     # state_point["nsteps_nvt"] = 2500000
-                    state_point["nsteps_liqeq"] = 5000
+                    
 
                     # print(state_point)
                     job = project.open_job(state_point)
