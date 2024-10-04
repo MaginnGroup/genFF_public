@@ -643,7 +643,7 @@ def gemc_prod_complete(job):
 
     return completed
 
-
+@Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.pre.after(extract_final_NPT_config)
 @Project.post(gemc_prod_complete)
 @Project.operation(directives={"omp_num_threads": 2})
@@ -785,6 +785,18 @@ def run_gemc(job):
                 if "liqbox_final_dim" in job.doc:
                     del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
                     os.remove("liqbox.xyz")  # extract_final_NPT_config
+
+#Create operation to delete failed jobs
+@Project.label
+def gemc_failed(job):
+    "Confirm gemc failed"
+    return "gemc_failed" in job.doc
+
+@Project.pre(gemc_failed)
+@Project.operation
+def del_job(job):
+    "Delete job if gemc failed"
+    job.remove()
 
 @Project.pre.after(run_gemc)
 @Project.post(lambda job: "liq_density" in job.doc)
