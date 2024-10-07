@@ -18,6 +18,8 @@ def make_atom_type_class(at_number):
         return AT_Scheme_01()
     elif at_number == 2:
         return AT_Scheme_02()
+    elif at_number == 3:
+        return AT_Scheme_03()
     elif at_number == 8:
         return AT_Scheme_08()
     elif at_number == 7:
