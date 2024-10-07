@@ -1,7 +1,7 @@
 # generalizedFF
 Generalized force field for one- and two-carbon single-bonded refrigerants with elements of C, F, and H
 
-### LJ Parameter Optimization (OptFF)
+### LJ Parameter Optimization (OptAT)
 To run LJ parameter optimization, follow the following steps:
 1. Make weight dictionary in Results/at_zz/Rxx/weight_sclrs.json. Use form {"Rxx": wt1, "Ryy": wt2}
 2. Use init_optff_ms.py to initialize files for simulation use. Change init_opt_at.py as necessary
@@ -10,20 +10,16 @@ To run LJ parameter optimization, follow the following steps:
      python init_opt_at.py
    ```  
 3. Do the following in opt_at_params directory:
-4. Use init_optff_ms.py to initialize files for simulation use. Change init_opt_at.py as necessary
-   ```
-     cd generalizedFF
-     python init_opt_at.py
    ```  
-5. Generate pareto sets for 1st repeats
+4. Generate pareto sets for 1st repeats
    ```
      python project_opt_at.py submit -o gen_pareto_sets -f obj_choice [val] atom_type [val]
    ```   
-6. Run the optimization algorithm with repeats
+5. Run the optimization algorithm with repeats
    ```
      python project_opt_at.py submit -o run_obj_alg -f obj_choice [val] atom_type [val]
    ```
-7. Run the post analysis algorithm
+6. Run the post analysis algorithm
    ```
      cd generalizedFF
      python post_analysis_opt.py
