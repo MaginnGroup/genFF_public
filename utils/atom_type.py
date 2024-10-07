@@ -401,16 +401,8 @@ class AT_Scheme_03(Atom_Types):
 
     def __init__(self):
         # Get Bounds
-        at_param_bounds_l = [
-            2,
-            2,
-            1.5,
-            2,
-            10,
-            10,
-            2,
-            15,
-        ]  # Units of Angstroms and Kelvin for Sigmas and Epsilons
+        # Units of Angstroms and Kelvin for Sigmas and Epsilons
+        at_param_bounds_l = [2, 2, 2, 1.5, 2, 10, 10, 10, 2, 15]  
         at_param_bounds_u = [4, 4, 4, 3, 4, 75, 75, 75, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_03"
