@@ -210,8 +210,8 @@ def NVT_liqbox(job):
         "ewald_accuracy": 1.0e-5,
         "mixing_rule": "lb",
         "units": "steps",
-        "coord_freq": 1000,
-        "prop_freq": 1000,
+        "coord_freq": 500,
+        "prop_freq": 10,
     }
     custom_args["run_name"] = "nvt.eq"
     custom_args["properties"] = thermo_props
