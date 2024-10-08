@@ -68,7 +68,7 @@ def pareto_set_exists(job):
 
 # Only run this operation for the first repeat job
 @ProjectOPT.pre(
-    lambda job: job.sp.repeat_number == 1 and job.sp.atom_type in [1, 2, 3, 8, 11]
+    lambda job: job.sp.repeat_number == 1 and job.sp.atom_type in [1, 2, 3, 4, 8, 11]
 )
 @ProjectOPT.post(pareto_set_exists)
 @ProjectOPT.operation()

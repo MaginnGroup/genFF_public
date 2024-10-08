@@ -51,7 +51,7 @@ molec_dict = {"R14": R14,
                 "R134": R134,
                 "R116": R116}
 
-at_number = 1
+at_number = 3
 obj_choice = "ExpVal"
 param_set = 1
 ff_list = []
