@@ -20,6 +20,8 @@ def make_atom_type_class(at_number):
         return AT_Scheme_02()
     elif at_number == 3:
         return AT_Scheme_03()
+    elif at_number == 4:
+        return AT_Scheme_04()
     elif at_number == 8:
         return AT_Scheme_08()
     elif at_number == 7:
@@ -600,6 +602,215 @@ class AT_Scheme_03(Atom_Types):
         # Get scaled bounds
         self.scale_bounds()
 
+class AT_Scheme_04(Atom_Types):
+    """
+    Class for Atom Type Scheme 4 (C1, C2, F, H1, H2)
+
+    Methods
+    -------
+    __init__(self)
+    """
+
+    def __init__(self):
+        # Get Bounds
+        # Units of Angstroms and Kelvin for Sigmas and Epsilons
+        at_param_bounds_l = [2, 2, 1.5, 1.5, 2, 10, 10, 2, 2, 15]  
+        at_param_bounds_u = [4, 4, 3, 3, 4, 75, 75, 15, 15, 50]
+        at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
+        self.scheme_name = "at_04"
+        # Get Names
+        at_keys = [
+            "sigma_C1",
+            "sigma_C2",
+            "sigma_H1",
+            "sigma_H2",
+            "sigma_F",
+            "epsilon_C1",
+            "epsilon_C2",
+            "epsilon_H1",
+            "epsilon_H2",
+            "epsilon_F",
+        ]
+        assert (
+            len(at_keys) == len(at_param_bounds_l) == len(at_param_bounds_u)
+        ), "Length of at_keys, at_param_bounds_l, and at_param_bounds_u must be the same"
+
+        # Create a file that maps param names (keys) to at_param names for atom type 4 (values) for each molecule
+        r14_map_dict = {
+            "sigma_C1": "sigma_C1",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C1",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r32_map_dict = {
+            "sigma_C": "sigma_C1",
+            "sigma_H": "sigma_H1",
+            "sigma_F": "sigma_F",
+            "epsilon_C": "epsilon_C1",
+            "epsilon_H": "epsilon_H1",
+            "epsilon_F": "epsilon_F",
+        }
+
+        r50_map_dict = {
+            "sigma_C1": "sigma_C1",
+            "sigma_H1": "sigma_H1",
+            "epsilon_C1": "epsilon_C1",
+            "epsilon_H1": "epsilon_H1",
+        }
+
+        r125_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_C2": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "sigma_F2": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_C2": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+            "epsilon_F2": "epsilon_F",
+        }
+
+        r134a_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_C2": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "sigma_F2": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_C2": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+            "epsilon_F2": "epsilon_F",
+        }
+
+        r143a_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_C2": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_C2": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r170_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+        }
+
+        # Test molecules
+        r41_map_dict = {
+            "sigma_C1": "sigma_C1",
+            "sigma_H1": "sigma_H1",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C1",
+            "epsilon_H1": "epsilon_H1",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r23_map_dict = {
+            "sigma_C1": "sigma_C1",
+            "sigma_H1": "sigma_H1",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C1",
+            "epsilon_H1": "epsilon_H1",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r161_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_C2": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_H2": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_C2": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_H2": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r152a_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_C2": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_H2": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_C2": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_H2": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r152_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        r143_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_C2": "sigma_C2",
+            "sigma_H1": "sigma_H2",
+            "sigma_H2": "sigma_H2",
+            "sigma_F1": "sigma_F",
+            "sigma_F2": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_C2": "epsilon_C2",
+            "epsilon_H1": "epsilon_H2",
+            "epsilon_H2": "epsilon_H2",
+            "epsilon_F1": "epsilon_F",
+            "epsilon_F2": "epsilon_F",
+        }
+
+        r134_map_dict = {
+            "sigma_C": "sigma_C2",
+            "sigma_H": "sigma_H2",
+            "sigma_F": "sigma_F",
+            "epsilon_C": "epsilon_C2",
+            "epsilon_H": "epsilon_H2",
+            "epsilon_F": "epsilon_F",
+        }
+
+        r116_map_dict = {
+            "sigma_C1": "sigma_C2",
+            "sigma_F1": "sigma_F",
+            "epsilon_C1": "epsilon_C2",
+            "epsilon_F1": "epsilon_F",
+        }
+
+        at_names = at_keys.copy()
+
+        molec_map_dicts = {
+            "R14": r14_map_dict,
+            "R32": r32_map_dict,
+            "R50": r50_map_dict,
+            "R125": r125_map_dict,
+            "R134a": r134a_map_dict,
+            "R143a": r143a_map_dict,
+            "R170": r170_map_dict,
+            "R41": r41_map_dict,
+            "R23": r23_map_dict,
+            "R161": r161_map_dict,
+            "R152a": r152a_map_dict,
+            "R152": r152_map_dict,
+            "R143": r143_map_dict,
+            "R134": r134_map_dict,
+            "R116": r116_map_dict,
+        }
+
+        super().__init__(at_bounds, at_names, molec_map_dicts)
+        # Get scaled bounds
+        self.scale_bounds()
 class AT_Scheme_02(Atom_Types):
     """
     Class for Atom Type Scheme 2 (GAFF)
