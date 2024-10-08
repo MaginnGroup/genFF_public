@@ -23,7 +23,7 @@ from utils.molec_class_files import (
 )
 from utils import atom_type, opt_atom_types
 
-at_number = 3
+at_number = 2
 num_restarts = 1  # Number of restarts for replications
 n_vap = 160  # number of molecules in vapor phase
 n_liq = 640
@@ -81,6 +81,10 @@ def unpack_molec_values(molec_name, at_class, sample, state_point):
     for param in param_names:
         state_point[param] = sample[index_mapping[param]].item()
 
+    #For R23 AT Scheme 2, use the GAFF parameters for H since these parameters aren't identifiable
+    if molec_name == "R23" and at_class.scheme_name == "at_02":
+        state_point["epsilon_H1"] = float(7.901 * (u.K * u.kb).in_units("kJ/mol"))
+        state_point["sigma_H1"] = float((2.115 * u.Angstrom).in_units(u.nm).value)
     # For R41 and R23 add the GAFF Parameter for epsilon C1 instead of the OptFF one
     # if molec_name in ["R41", "R23"]:
     #     state_point["epsilon_C1"] = float(55.052 * (u.K * u.kb).in_units("kJ/mol"))
@@ -116,7 +120,7 @@ for molec_name, molec_data in molec_dict.items():
     all_df = pd.read_csv(all_molec_dir / "unique_best_set.csv", header=0)
 
     # Loop over best molecules
-    for i in range(len(all_df)):
+    for i in range(1):
         full_opt_best = all_df.iloc[i].values
         # Convert to units of nm and kJ/mol
         param_matrix = setup.at_class.get_transformation_matrix(
