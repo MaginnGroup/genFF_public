@@ -14,7 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 # Set params for what you want to analyze
 save_data = True  # Data to save
 obj_choice = "ExpVal"  # Objective to consider
-at_number = 4  # atom type to consider
+at_number = 5  # atom type to consider
 seed = 1  # Seed to use
 molec_names = [
     "R14",

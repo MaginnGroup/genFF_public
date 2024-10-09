@@ -2352,7 +2352,7 @@ class Vis_Results(Analyze_opt_res):
     def plot_avg_MAPD(self, mapd_dfs, df_labels, df_colors, title=None):
         fig, ax = plt.subplots()
         cols = ["mapd_liq_density", "mapd_vap_density", "mapd_Pvap", "mapd_Hvap"]
-        bar_width = 0.2
+        bar_width = 0.1
         molec_names = list(mapd_dfs[0]["molecule"])
         indices = np.arange(len(mapd_dfs[0]))
         max_val_f = 0
@@ -2420,7 +2420,7 @@ class Vis_Results(Analyze_opt_res):
         fig, axs = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
         # Plot each column in a subplot
         for ax, column, name in zip(axs.flatten(), cols, names):
-            bar_width = 0.2
+            bar_width = 0.1
             indices = np.arange(len(molec_names))
             max_val_f = 0
             for i in range(len(df_mse_list)):
