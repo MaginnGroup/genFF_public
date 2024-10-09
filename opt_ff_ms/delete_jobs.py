@@ -4,7 +4,7 @@ import signac
 project = signac.get_project()
 
 # Iterate through all jobs in the project
-for job in project.find_jobs({'atom_type': 2}):
+for job in project.find_jobs({'atom_type': 11}):
     job.remove()
     # if "restart" in job.sp.keys():
     #     if job.sp.restart > 1:
