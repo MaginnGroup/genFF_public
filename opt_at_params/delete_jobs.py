@@ -40,6 +40,6 @@ project = signac.get_project()
 #     if pareto_save.exists():
 #         job.doc["pareto_info"] = True
 for job in project:
-    if job.sp.obj_choice == "ExpVal" and job.sp.atom_type == 11:
+    if job.sp.atom_type == 6 and job.sp.num_train_molec < 2:
         # print(job.id)
         job.remove()
