@@ -330,16 +330,22 @@ def get_min_max(curr_min, curr_max, new_vals, std_dev = None):
         curr_max = max_new_val
     return curr_min, curr_max
 
-def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
+def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
     molec = list(molec_dict.keys())[0]
     mol_data = molec_dict[molec]
     # Plot VLE envelopes
     fig, ax2 = plt.subplots(1, 1, figsize=(6,6))    
     
-    df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
-    df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
-    df_markers = ['o', 's', '^', '*', 'p', 'd']
-    df_z_order = [6,3,2,1,5,4]
+    df_keys, df_ffs =  zip(*df_ff_dict.items())
+    df_labels = list(df_keys)
+    df_ff_list = list(df_ffs)
+
+    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'deeppink', 'olive', 'olive']
+    # df_labels, df_ffs = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
+    # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
+    # df_markers = ['o', 's', '^', '*', 'p', 'd']
+    # df_z_order = [6,3,2,1,5,4]
 
     #Initialize min and max values
     if molec not in ["R152", "R134"]:
@@ -357,7 +363,25 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
                 break
 
     for i in range(len(df_ff_list)):
+        df_label = df_labels[i]
         df_ff = df_ff_list[i]
+
+        if "AT-" in df_label:
+            df_z_order = len(df_ff_list)
+            df_marker = "o"
+        elif "GAFF" in df_label:
+            df_z_order = 3
+            df_marker = "s"
+        elif "Potoff" in df_label:
+            df_z_order = 2
+            df_marker = "^"
+        elif "TraPPE" in df_label:
+            df_z_order = 1
+            df_marker = "*"
+        else:
+            df_z_order = 4
+            df_marker = "p"
+        
         if df_ff is not None:
             all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
             grouped = df_ff.groupby(["temperature", "atom_type"])[all_props]
@@ -373,23 +397,23 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
                 
                 # #Plot opt_scheme_ms vle curve
                 ax2.errorbar(means[x_prop], means["temperature"], xerr=1.96*stds[x_prop],
-                            c=df_colors[i],markersize=10, ls='none', marker = df_markers[i], alpha=0.7, 
-                            zorder = df_z_order[i],)
+                            c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.7, 
+                            zorder = df_z_order,)
 
             #Plot critical points
             min_temp, max_temp = get_min_max(min_temp, max_temp, means["sim_Tc"].values, stds["sim_Tc"].values)
             ax2.errorbar(means["sim_rhoc"],means["sim_Tc"], xerr=1.96*stds["sim_rhoc"],
-                        c=df_colors[i],markersize=10, ls='none', marker = df_markers[i], alpha=0.7, 
-                        zorder = df_z_order[i], label = df_labels[i] )
+                        c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.7, 
+                        zorder = df_z_order, label = df_labels[i] )
 
     #Plot experimental data
     if molec not in ["R152", "R134"]:
         ax2.scatter(mol_data.expt_liq_density.values(),mol_data.expt_liq_density.keys(),
-            color="black",marker="x",linewidths=2,s=80,label="Experiment", zorder = 7)
+            color="black",marker="x",linewidths=2,s=100,label="Experiment", zorder = 7)
         ax2.scatter(mol_data.expt_vap_density.values(),mol_data.expt_vap_density.keys(),
-            color="black",marker="x",linewidths=2,s=80, zorder = 7)
+            color="black",marker="x",linewidths=2,s=100, zorder = 7)
         ax2.scatter(mol_data.expt_rhoc, mol_data.expt_Tc, color="black", marker="x", linewidths=2, 
-                    s=200, zorder = 7)
+                    s=100, zorder = 7)
 
     #Set Axes
     ax2.set_xlim(min_rho*0.95,max_rho*1.05)
@@ -413,6 +437,8 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
     if molec not in ["R14", "R50", "R170", "R116"]:
         #Substitute mole string R w/ HFC
         molec = molec.replace("R","HFC")
+    # handles, labels = ax2.get_legend_handles_labels()
+    # for h in handles: h.set_linestyle("")
     ax2.legend(loc="lower left", bbox_to_anchor=(-0.16, 1.03), ncol=2, fontsize=22, handletextpad=0.1, markerscale=0.9, edgecolor="dimgrey")
     ax2.text(0.60,  0.82, molec, fontsize=30, transform=ax2.transAxes)
     fig.subplots_adjust(bottom=0.2, top=0.75, left=0.15, right=0.95, wspace=0.55)
@@ -423,15 +449,22 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
     #     path = os.path.join(save_name, "vle_plt.png")
     #     fig.savefig(path,dpi=300)
 
-def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
+def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
     molec = list(molec_dict.keys())[0]
     mol_data = molec_dict[molec]
     # Plot Pvap and Hvap
     
-    df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
-    df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
-    df_markers = ['o', 's', '^', '*', 'p', 'd']
-    df_z_order = [6,3,2,1,5,4]
+    df_keys, df_ffs =  zip(*df_ff_dict.items())
+    df_labels = list(df_keys)
+    df_ff_list = list(df_ffs)
+
+    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'deeppink', 'olive', 'olive']
+
+    # df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
+    # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
+    # df_markers = ['o', 's', '^', '*', 'p', 'd']
+    # df_z_order = [6,3,2,1,5,4]
 
     #Initialize min and max values
     if molec not in ["R152", "R134"]:
@@ -464,7 +497,24 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
 
     #Loop over dfs of given ff results
     for i in range(len(df_ff_list)):
+        df_label = df_labels[i]
         df_ff = df_ff_list[i]
+
+        if "AT-" in df_label:
+            df_z_order = len(df_ff_list)
+            df_marker = "o"
+        elif "GAFF" in df_label:
+            df_z_order = 3
+            df_marker = "s"
+        elif "Potoff" in df_label:
+            df_z_order = 2
+            df_marker = "^"
+        elif "TraPPE" in df_label:
+            df_z_order = 1
+            df_marker = "*"
+        else:
+            df_z_order = 4
+            df_marker = "p"
         if df_ff is not None:
             x_props = ["sim_Pvap", "sim_Hvap"]
             grouped = df_ff.groupby(["temperature", "atom_type"])[x_props]
@@ -477,23 +527,23 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
             min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, np.log(means["sim_Pvap"]).values)
             min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, means["sim_Hvap"].values)
             #Plot 1/T vs log(Pvap) 
-            axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), c=df_colors[i], 
-                        s=70,alpha=0.7, label = df_labels[i], marker = df_markers[i],
-                        zorder = df_z_order[i])
+            axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), color=df_colors[i], 
+                        s=70,alpha=0.7, label = df_label, marker = df_marker,
+                        zorder = df_z_order)
             #Plot T vs Hvap
-            axs[1].scatter(means["temperature"],means["sim_Hvap"], c=df_colors[i], 
-                        s=70,alpha=0.7, marker = df_markers[i],
-                        zorder = df_z_order[i])
+            axs[1].scatter(means["temperature"],means["sim_Hvap"], color=df_colors[i], 
+                        s=70,alpha=0.7, marker = df_marker,
+                        zorder = df_z_order)
         
     #Plot experimental pvap
     if molec not in ["R152", "R134"]:
         axs[0].scatter(1/np.array(list(mol_data.expt_Pvap.keys())),
                        np.log(np.array(list(mol_data.expt_Pvap.values()))),
-            color="black",marker="x",label="Experiment",s=80,zorder = 7)
+            color="black",marker="x",label="Experiment",s=100,zorder = 7)
     #Plot experimental Hvap
     if molec not in ["R152", "R134", "R143"]:
         axs[1].scatter(mol_data.expt_Hvap.keys(),mol_data.expt_Hvap.values(),
-            color="black",marker="x",label="Experiment",s=80, zorder = 7)
+            color="black",marker="x",label="Experiment",s=100, zorder = 7)
 
     #Set axes details
     axs[0].set_xlim((1/max_temp)*0.95,(1/min_temp)*1.05)
@@ -541,73 +591,105 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
     #     path = os.path.join(save_name, "h_p_vap_plt.png")
     #     fig.savefig(path,dpi=300)
 
-def plot_MAPD_each_prop(molec_names, MSE_path_dict, obj = 'mapd', save_name = None):
-    cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap", "mapd_Tc", "mapd_rhoc"]
-    # cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap"]
-    names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization", "Critical Temperature", "Critical Density"]
-    # names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
-    df_labels = ["This Work", "GAFF", "Wang et al.", "Befort et al." ]
-    df_colors = ['blue', 'gray', 'green','purple']
-    # color_lab_dict = {"This Work": list(plt.rcParams['axes.prop_cycle'].by_key()['color']), "GAFF": "gray", "Prior Work": "green"}
-    df_labels = ["This Work", "GAFF", "Prior Work", "Prior Work" ]
-    df_colors = ['blue', 'gray', 'green','green']
-    df_mse_list = []
-    for key in list(MSE_path_dict.keys()):
-        df_mse = pd.read_csv(MSE_path_dict[key], header = 0, index_col = "molecule")
-        df_mse_list.append(df_mse.reindex(molec_names))
+def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = None):
+    props = ["liq_density", "vap_density", "Pvap", "Hvap"]
+    cols = [obj + "_" + prop for prop in props]
+    names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
+    cols = [item for item in cols for _ in range(2)]
+    names = [item for item in names for _ in range(2)]
+    
+    df_keys, df_ffs =  zip(*err_path_dict.items())
+    df_labels = list(df_keys)
+    df_mse_list = list(df_ffs)
 
-    fig, axs = plt.subplots(3, 2, figsize=(24, 16), sharex = True)
+    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-3)] + ['gray', 'olive', 'olive']
+
+    train_molecs = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"]
+    #Get indeces where train molecules are in all molecules
+    len_train = len(set(molec_names).intersection(train_molecs))
+    left_indices = np.arange(len_train)
+    right_indices =  np.arange(len_train, len(molec_names))
+
+    fig, axs = plt.subplots(4, 2, figsize=(24, 16), sharex = False)
     # Plot each column in a subplot
-    for ax, column, name in zip(axs.flatten(), cols, names):
-        bar_width = 0.2
-        indices = np.arange(len(molec_names))
+    for i, (ax, column, name) in enumerate(zip(axs.flatten(), cols, names)):
+        bar_width = 0.1
         max_val_f = 0
-        for i in range(len(df_mse_list)):
-            df = df_mse_list[i]
-            if i < len(df_mse_list):
+
+        if i % 2 ==0:
+            indices = left_indices
+            mol_names = molec_names[:len_train]
+        else:
+            indices = right_indices
+            mol_names = molec_names[len_train:]
+
+        for j, df in enumerate(df_mse_list):
+            if j < len(df_mse_list):
                 max_val = np.nanmax(df[column].values)
                 max_val_f = max(max_val, max_val_f)
-            ax.bar(indices + i*bar_width, df[column], bar_width, label=df_labels[i], color = df_colors[i])
+            ax.bar(indices + j*bar_width, df[column].iloc[indices], bar_width, label=df_labels[j], color = df_colors[j])
         
         ax.set_ylim(0, max_val_f*1.05)
-        ax.set_title(name, fontsize = 14) 
+        ax.set_title(name, fontsize = 20) 
         ax.set_xticks(indices + bar_width)
+        ax.tick_params(axis='y', labelsize=20)
 
         molec_names_use = []
-        for molec in molec_names:
+        for molec in mol_names:
             if molec not in ["R14", "R50", "R170", "R116"]:
                 #Substitute mole string R w/ HFC
                 molec_names_use.append(molec.replace("R","HFC"))
             else:
                 molec_names_use.append(molec)
 
-        ax.set_xticklabels(molec_names, fontsize=14)
+        ax.set_xticklabels(molec_names_use, fontsize=20)
         if name == "Liquid Density":
-            ax.legend(loc = 'upper right', fontsize = 14)
+            ax.legend(loc = 'upper right', fontsize = 20)
 
     # Adjust layout
     fig.supxlabel('Molecule', fontsize = 20)
-    fig.supylabel("MAPD", fontsize = 20)
+    fig.supylabel(obj.upper(), fontsize = 20)
 
     plt.tight_layout(rect=[0.01, 0.0, 1, 1])
     # Show the plot
     return fig
 
-def plot_MAPD_avg_props(molec_names, MSE_path_dict, save_name = None):
+def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = None):
     #Load our results, Gaff results, and old result MAPD values
-    df_labels = ["This Work", "GAFF", "Wang et al.", "Befort et al." ]
-    df_colors = ['blue', 'gray', 'green','purple']
-    cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap", "mapd_Tc", "mapd_rhoc"]
-    df_mse_list = []
-    for key in list(MSE_path_dict.keys()):
-        df_mse = pd.read_csv(MSE_path_dict[key], header = 0, index_col = "molecule")
-        df_mse_list.append(df_mse.reindex(molec_names))
+    # df_labels = ["This Work", "GAFF", "Wang et al.", "Befort et al." ]
+    # df_colors = ['blue', 'gray', 'green','purple']
+    # props = ["liq_density", "vap_density", "Pvap", "Hvap", "Tc", "rhoc"]
+    # cols = [obj + "_" + prop for prop in props]
+    # df_mse_list = []
+    # for key in list(MSE_path_dict.keys()):
+    #     df_mse = pd.read_csv(MSE_path_dict[key], header = 0, index_col = "molecule")
+    #     df_mse_list.append(df_mse.reindex(molec_names))
+
+    props = ["liq_density", "vap_density", "Pvap", "Hvap"]
+    cols = [obj + "_" + prop for prop in props]
+    names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
+    cols = [item for item in cols for _ in range(2)]
+    names = [item for item in names for _ in range(2)]
+    
+    df_keys, df_ffs =  zip(*err_path_dict.items())
+    df_labels = list(df_keys)
+    df_mse_list = list(df_ffs)
+
+    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-3)] + ['gray', 'olive', 'olive']
+
+    train_molecs = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"]
+    #Get indeces where train molecules are in all molecules
+    len_train = len(set(molec_names).intersection(train_molecs))
+    left_labels = molec_names[:len_train]
+    right_labels = molec_names[len_train:]
 
     # #Get Avg MAPD values for each molecule and each property + get min and max values
     df_avg_list = []
     for df in df_mse_list:
         df_avg = df[cols].agg(['mean', 'min', 'max'], axis=1)
-        df_avg.columns = ['MAPD', 'Min', 'Max']
+        df_avg.columns = [obj, 'Min', 'Max']
         df_avg_list.append(df_avg.reindex(molec_names))
 
     #Merge the dataframes
@@ -615,20 +697,41 @@ def plot_MAPD_avg_props(molec_names, MSE_path_dict, save_name = None):
     # merged_df.drop(["R41", "R23", "R152", "R134"], inplace = True)
 
     # Plot the merged DataFrame
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(24, 8), sharex=False)
 
-    yerr_list = []
     for i in range(len(df_labels)):
         label = df_labels[i]
         color = df_colors[i]
-        y_err = [merged_df[label]['MAPD'] - merged_df[label]['Min'], merged_df[label]['Max'] - merged_df[label]['MAPD']]
-        merged_df[label]['MAPD'].plot(kind='bar', color=color, ax=ax, yerr =y_err, position=i, width=0.2, label=label, rot = 0)
+        # y_err = [merged_df[label][obj] - merged_df[label]['Min'], merged_df[label]['Max'] - merged_df[label][obj]]
+        y_err = [merged_df[label][obj] - merged_df[label]['Min'], merged_df[label]['Max'] - merged_df[label][obj]]
+        y_err = np.array(y_err)  # Convert to numpy array for easier slicing
+        # Plot for training data on the left subplot
+        merged_df[label][obj].iloc[:len_train].plot(
+            kind='bar', color=color, ax=ax_left, 
+            yerr=y_err[:, :len_train],  # Slicing y_err for left subplot
+            position=i, width=0.1, label=label, rot=0
+        )
+        
+        # Plot for test data on the right subplot
+        merged_df[label][obj].iloc[len_train:].plot(
+            kind='bar', color=color, ax=ax_right, 
+            yerr=y_err[:, len_train:],  # Slicing y_err for right subplot
+            position=i, width=0.1, label=label, rot=0
+        )
+        # merged_df[label][obj].plot(kind='bar', color=color, ax=ax, yerr =y_err, position=i, width=0.1, label=label, rot = 0)
 
-    ax.set_title('MAPD Comparison for Different Refrigerants')
-    ax.set_xlabel('Molecule')
-    ax.set_xlim(-0.4, len(merged_df.index) - 0.2)
-    ax.set_ylabel('Average MAPD')
-    ax.legend(loc='upper left')
+    ax_left.set_xlim(-0.4, len_train - 0.6)  # Adjust the xlim based on train set size
+    ax_right.set_xlim(-0.4, len(merged_df.index) - len_train - 0.6)  # Adjust for test set size
+    
+    # ax.set_ylabel('Average ' + obj.upper())
+    ax_right.legend(loc = 'upper right', fontsize = 20)
+    ax_right.tick_params(axis='both', labelsize=20)
+    ax_left.tick_params(axis='both', labelsize=20)
+
+    fig.suptitle(obj.upper() + ' Comparison for Different Refrigerants', fontsize = 20)
+    fig.supxlabel('Molecule', fontsize = 20)
+    fig.supylabel('Average ' + obj.upper(), fontsize = 20)
+    plt.tight_layout(rect=[0.01, 0.0, 1, 1])
 
     # Show the plot
     return fig

@@ -190,6 +190,7 @@ class AT_Scheme_00(Atom_Types):
         at_param_bounds_u = [4, 3, 4, 75, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_00"
+        self.scheme_plot_name = "AT-3"
         # Get Names
         at_keys = [
             "sigma_C",
@@ -403,6 +404,7 @@ class AT_Scheme_01(Atom_Types):
         at_param_bounds_u = [4, 4, 3, 4, 75, 75, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_01"
+        self.scheme_plot_name = "AT-4"
         # Get Names
         at_keys = [
             "sigma_C1",
@@ -624,6 +626,7 @@ class AT_Scheme_03(Atom_Types):
         at_param_bounds_u = [4, 4, 4, 3, 4, 75, 75, 75, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_03"
+        self.scheme_plot_name = "AT-5a"
         # Get Names
         at_keys = [
             "sigma_Cm",
@@ -834,6 +837,7 @@ class AT_Scheme_05(Atom_Types):
         at_param_bounds_u = [4, 4, 3, 3, 4, 75, 75, 15, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_05"
+        self.scheme_plot_name = "AT-5c"
         # Get Names
         at_keys = [
             "sigma_C1",
@@ -1044,6 +1048,7 @@ class AT_Scheme_06(Atom_Types):
         at_param_bounds_u = [4, 4, 4, 3, 3, 4, 75, 75, 75, 15, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_06"
+        self.scheme_plot_name = "AT-6b"
         # Get Names
         at_keys = [
             "sigma_Cm",
@@ -1256,6 +1261,7 @@ class AT_Scheme_06(Atom_Types):
 #         at_param_bounds_u = [4, 4, 4, 3, 4, 75, 75, 75, 15, 50]
 #         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
 #         self.scheme_name = "at_06"
+#         self.scheme_plot_name = "AT-5d"
 #         # Get Names
 #         at_keys = [
 #             "sigma_Cc",
@@ -1465,6 +1471,7 @@ class AT_Scheme_04(Atom_Types):
         at_param_bounds_u = [4, 4, 3, 3, 4, 75, 75, 15, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_04"
+        self.scheme_plot_name = "AT-5b"
         # Get Names
         at_keys = [
             "sigma_C1",
@@ -1686,6 +1693,7 @@ class AT_Scheme_02(Atom_Types):
         at_param_bounds_u = [4, 3, 3, 3, 3, 4, 75, 15, 15, 15, 15, 50]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_02"
+        self.scheme_plot_name = "AT-6a"
         # Get Names
         at_keys = [
             "sigma_C",

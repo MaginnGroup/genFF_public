@@ -9,7 +9,7 @@ import copy
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import scipy 
-from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes, plot_pvap_hvap, plot_MAPD_each_prop, plot_MAPD_avg_props
+from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes,plot_pvap_hvap, plot_err_each_prop, plot_err_avg_props
 
 #After jobs are finished
 #save signac results for each atom for a given atom typing scheme and number of training parameters
@@ -37,8 +37,9 @@ R116 = r116.R116Constants()
 
 obj_choice = "ExpVal"
 param_set = 1
-ff_list = []
-MSE_path_dict = {}
+ff_dict = {}
+err_path_dict = {}
+err_labels = []
 #Dictionary of all molecules
 molec_dict = {"R14": R14,
                 "R32": R32,
@@ -97,8 +98,9 @@ for at_number in [1]:
     df_all, csv_name, df_paramsets = get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path)
     #Add column to df_all for atom type
     df_all['atom_type'] = at_number
-    ff_list.append(df_all)
-    MSE_path_dict[project_path]= csv_name
+    ff_dict[at_class.scheme_plot_name] = df_all
+    err_path_dict[project_path]= csv_name
+    err_labels.append(at_class.scheme_plot_name)
 
 #Load csvs for GAFF, NW, Trappe, and Potoff, and BBFF
 project_path = "gaff_ff_ms"
@@ -108,12 +110,14 @@ obj_choice_str = ""
 param_set_str = ""
 df_all, csv_name, df_paramsets = get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path)
 df_all['atom_type'] = "GAFF"
-ff_list.append(df_all)
-MSE_path_dict[project_path]= csv_name
+ff_dict["GAFF"] = df_all
+err_labels.append("GAFF")
+err_path_dict[project_path]= csv_name
 
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff, and BBFF
 ff_names = ["Potoff", "TraPPE", "Wang_FFO", "BBFF"]
-for ff_name in ff_names:
+ff_labels = ["Potoff et al.", "TraPPE", "Wang et al.", "Befort et al."]
+for ff_name, ff_label in zip(ff_names, ff_labels):
     #Check that files all exist and load them if they do
     read_path = os.path.join("Results_MS/unprocessed_csv", ff_name + ".csv")
     df_simple = pd.read_csv(read_path) if os.path.exists(read_path) else None
@@ -122,11 +126,12 @@ for ff_name in ff_names:
     df_ff_final = prepare_df_vle(df_simple, molec_dict, csv_name=csv_path_final + ".csv")
     if ff_name in  ["Wang_FFO", "BBFF"]:
         df_paramsets_w = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_path_final + "_err.csv")
-        MSE_path_dict[ff_name]= csv_path_final + "_err.csv"
-    df_ff_final['atom_type'] = ff_name
-    ff_list.append(df_ff_final)
-
-# print(MSE_path_dict)   
+        err_path_dict[ff_name]= csv_path_final + "_err.csv"
+        err_labels.append(ff_label)
+    if df_ff_final is not None:
+        df_ff_final['atom_type'] = ff_name
+    ff_dict[ff_label] = df_ff_final
+      
 #Work on combining into 1 PDF
 full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
@@ -137,32 +142,37 @@ molecules = df_paramsets['molecule'].unique().tolist()
 for molec in molecules:
     #Get the data for the molecule from each FF if it exists
     one_molec_dict = {molec: molec_dict[molec]}
-    ff_molec_list = []
-    for df_ff in ff_list:
+    ff_molec_dict = {}
+    for df_label, df_ff in ff_dict.items():
         df_molec = copy.copy(df_ff[df_ff['molecule'] == molec])
         if df_molec.empty:
             df_molec = None
-        ff_molec_list.append(df_molec)
+        ff_molec_dict[df_label] = df_molec
     #Get the data for the molecule from each FF
-    # print(ff_molec_list)
+    # print(ff_molec_dict)
     #Plot Vle, Hvap, and Pvap and save to different pdfs
-    pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_list), bbox_inches='tight')
+    pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
     plt.close()
-    pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_list), bbox_inches='tight')
+    pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
     plt.close()
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
+
+df_err_dict = {}
+molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170", "R41", "R23", "R161", "R152a",  "R143",  "R116"]
+for label, key in zip(err_labels, list(err_path_dict.keys())):
+    df_err = pd.read_csv(err_path_dict[key], header = 0, index_col = "molecule")
+    df_err_dict[label] = df_err.reindex(molec_names)
 
 #Make MAPD Plots
 full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
 #For each molecule
-molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170", "R41", "R23", "R161", "R152a",  "R143",  "R116"]
-pdf_MAPD.savefig(plot_MAPD_each_prop(molec_names, MSE_path_dict), bbox_inches='tight')
+pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict), bbox_inches='tight')
 plt.close()
-pdf_MAPD.savefig(plot_MAPD_avg_props(molec_names, MSE_path_dict), bbox_inches='tight')
+pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict), bbox_inches='tight')
 plt.close()
-#Close figures 
+# #Close figures 
 pdf_MAPD.close()   
