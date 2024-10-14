@@ -7,7 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import seaborn
 from scipy.stats import linregress
-from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error, mean_absolute_error
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
 from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params, plot_model_vs_exp, plot_obj_contour
@@ -258,7 +258,7 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
     df=df.sort_values(by=["molecule", "temperature"])
     molecules = df['molecule'].unique().tolist()
     for group, values in df.groupby(['molecule']):
-
+        new_quantities = {}
         #The molecule is listed as the first value in the group
         molecule = molec_dict[values["molecule"].values[0]]
         if group[0] not in ["R134", "R152"] and len(values) > 0:
@@ -274,86 +274,38 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
                 lambda temp: molecule.expt_Pvap[int(temp)])
             values["expt_Hvap"] = values["temperature"].apply(
                 lambda temp: molecule.expt_Hvap[int(temp)])
-            values["expt_Tc"] = molecule.expt_Tc
+            # Critical Point (Law of rectilinear diameters)
+            values["expt_Tc"] =  molecule.expt_Tc
             values["expt_rhoc"] = molecule.expt_rhoc
         
-            # Liquid density
-            sim_liq_density = values["sim_liq_density"]
-            mse_liq_density = mean_squared_error(values["expt_liq_density"], sim_liq_density)
-            mapd_liq_density = mean_absolute_percentage_error(
-                values["expt_liq_density"], sim_liq_density) * 100.0
+            def calculate_objs(expt_values, sim_values, property_name, molecule_name):
+                try:
+                    mse = mean_squared_error(expt_values, sim_values)
+                    mapd = mean_absolute_percentage_error(expt_values, sim_values) * 100.0
+                    mae = mean_absolute_error(expt_values, sim_values)
+                except ValueError as e:
+                    print("Exp", expt_values, "Sim", sim_values)
+                    print(f"Error in calculating {property_name} for {molecule_name}: {e}. Setting MSE, MAE, and MAPD to NaN")
+                    mse, mapd, mae = np.nan, np.nan, np.nan
+                return mse, mapd, mae
 
-            # Vapor density
-            sim_vap_density = values["sim_vap_density"]
-            mse_vap_density = mean_squared_error(values["expt_vap_density"],sim_vap_density)
-            mapd_vap_density = mean_absolute_percentage_error(
-                values["expt_vap_density"], sim_vap_density) * 100.0
-            
-            # Vapor pressure
-            sim_pvap = values["sim_Pvap"]
-            mse_Pvap = mean_squared_error(values["expt_Pvap"], sim_pvap)
-            mapd_Pvap = mean_absolute_percentage_error(
-                values["expt_Pvap"], sim_pvap) * 100.0
-        
-            if group[0] not in ["R143"]:
-                # Enthalpy of vaporization
-                sim_hvap = values["sim_Hvap"]
-                mse_Hvap = mean_squared_error(values["expt_Hvap"], sim_hvap)
-                mapd_Hvap = mean_absolute_percentage_error(values["expt_Hvap"], sim_hvap) * 100.0
+            for prop in ["liq_density", "vap_density", "Pvap", "Hvap"]:
+                mse, mapd, mae = calculate_objs(values["expt_" + prop], values["sim_" + prop], prop, group[0])
+                new_quantities["mse_" + prop] = mse
+                new_quantities["mapd_" + prop] = mapd
+                new_quantities["mae_" + prop] = mae
 
-            else:
-                mse_Hvap = np.nan
-                mapd_Hvap = np.nan
-        
-            # Critical Point (Law of rectilinear diameters)
-            expt_Tc_arr = np.array([molecule.expt_Tc])
-            sim_Tc_arr = np.array([values["sim_Tc"].values[0]])
-            expt_rhoc_arr = np.array([molecule.expt_rhoc])
-            sim_rhoc_arr = np.array([values["sim_rhoc"].values[0]])
-            try:
-                mse_Tc = mean_squared_error(expt_Tc_arr, sim_Tc_arr)
-                mapd_Tc = mean_absolute_percentage_error(expt_Tc_arr, sim_Tc_arr) * 100.0
-            except ValueError as e:
-                print(f"Error in calculating Tc for {group[0]}: {e}. Setting MSE and MAPD to NaN")
-                mse_Tc = np.nan
-                mapd_Tc = np.nan
-            try:
-                mse_rhoc = mean_squared_error(expt_rhoc_arr, sim_rhoc_arr)
-                mapd_rhoc = mean_absolute_percentage_error(expt_rhoc_arr, sim_rhoc_arr) * 100.0
-            except ValueError as e:
-                print(f"Error in calculating rhoc for {group[0]}: {e}. Setting MSE and MAPD to NaN")
-                mse_rhoc = np.nan
-                mapd_rhoc = np.nan
-            
+            for prop in ["Tc", "rhoc"]:
+                mse, mapd, mae = calculate_objs(np.array([values["expt_" + prop].values[0]]), np.array([values["sim_" + prop].values[0]]), prop, group[0])
+                new_quantities["mse_" + prop] = mse
+                new_quantities["mapd_" + prop] = mapd
+                new_quantities["mae_" + prop] = mae
         else:
-            mse_liq_density = np.nan
-            mapd_liq_density = np.nan
-            mse_vap_density = np.nan
-            mapd_vap_density = np.nan
-            mse_Pvap = np.nan
-            mapd_Pvap = np.nan
-            mse_Hvap = np.nan
-            mapd_Hvap = np.nan
-            mse_Tc = np.nan
-            mapd_Tc = np.nan
-            mse_rhoc = np.nan
-            mapd_rhoc = np.nan
+            for prop in ["liq_density", "vap_density", "Pvap", "Hvap", "Tc", "rhoc"]:
+                new_quantities["mse_" + prop] = np.nan
+                new_quantities["mapd_" + prop] = np.nan
+                new_quantities["mae_" + prop] = np.nan
         
-        new_quantities = {
-                "mse_liq_density": mse_liq_density,
-                "mse_vap_density": mse_vap_density,
-                "mse_Pvap": mse_Pvap,
-                "mse_Hvap": mse_Hvap,
-                "mse_Tc": mse_Tc,
-                "mse_rhoc": mse_rhoc,
-                "mapd_liq_density": mapd_liq_density,
-                "mapd_vap_density": mapd_vap_density,
-                "mapd_Pvap": mapd_Pvap,
-                "mapd_Hvap": mapd_Hvap,
-                "mapd_Tc": mapd_Tc,
-                "mapd_rhoc": mapd_rhoc,
-            }
-
         data_to_append = list(group) + list(new_quantities.values())
         # print(data_to_append)
         new_data.append(data_to_append)
@@ -408,7 +360,7 @@ def plot_vle_envelopes(molec_dict, df_ff_list, save_name = None):
         df_ff = df_ff_list[i]
         if df_ff is not None:
             all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
-            grouped = df_ff.groupby("temperature")[all_props]
+            grouped = df_ff.groupby(["temperature", "atom_type"])[all_props]
             
             x_props = ["sim_liq_density", "sim_vap_density"]
             # Calculate mean and standard deviation for each group
@@ -515,7 +467,7 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
         df_ff = df_ff_list[i]
         if df_ff is not None:
             x_props = ["sim_Pvap", "sim_Hvap"]
-            grouped = df_ff.groupby("temperature")[x_props]
+            grouped = df_ff.groupby(["temperature", "atom_type"])[x_props]
             
             # Calculate mean and standard deviation for each group
             means = grouped.mean().reset_index()
@@ -589,11 +541,16 @@ def plot_pvap_hvap(molec_dict, df_ff_list, save_name = None):
     #     path = os.path.join(save_name, "h_p_vap_plt.png")
     #     fig.savefig(path,dpi=300)
 
-def plot_MAPD_each_prop(molec_names, MSE_path_dict, save_name = None):
+def plot_MAPD_each_prop(molec_names, MSE_path_dict, obj = 'mapd', save_name = None):
     cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap", "mapd_Tc", "mapd_rhoc"]
+    # cols = ["mapd_liq_density",	"mapd_vap_density",	"mapd_Pvap", "mapd_Hvap"]
     names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization", "Critical Temperature", "Critical Density"]
+    # names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
     df_labels = ["This Work", "GAFF", "Wang et al.", "Befort et al." ]
     df_colors = ['blue', 'gray', 'green','purple']
+    # color_lab_dict = {"This Work": list(plt.rcParams['axes.prop_cycle'].by_key()['color']), "GAFF": "gray", "Prior Work": "green"}
+    df_labels = ["This Work", "GAFF", "Prior Work", "Prior Work" ]
+    df_colors = ['blue', 'gray', 'green','green']
     df_mse_list = []
     for key in list(MSE_path_dict.keys()):
         df_mse = pd.read_csv(MSE_path_dict[key], header = 0, index_col = "molecule")

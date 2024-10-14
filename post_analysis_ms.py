@@ -95,6 +95,8 @@ for at_number in [1]:
     obj_choice_str = obj_choice
     param_set_str = "param_set_" + str(param_set)
     df_all, csv_name, df_paramsets = get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path)
+    #Add column to df_all for atom type
+    df_all['atom_type'] = at_number
     ff_list.append(df_all)
     MSE_path_dict[project_path]= csv_name
 
@@ -105,6 +107,7 @@ at_num_str = ""
 obj_choice_str = ""
 param_set_str = ""
 df_all, csv_name, df_paramsets = get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path)
+df_all['atom_type'] = "GAFF"
 ff_list.append(df_all)
 MSE_path_dict[project_path]= csv_name
 
@@ -120,9 +123,10 @@ for ff_name in ff_names:
     if ff_name in  ["Wang_FFO", "BBFF"]:
         df_paramsets_w = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_path_final + "_err.csv")
         MSE_path_dict[ff_name]= csv_path_final + "_err.csv"
+    df_ff_final['atom_type'] = ff_name
     ff_list.append(df_ff_final)
 
-print(MSE_path_dict)   
+# print(MSE_path_dict)   
 #Work on combining into 1 PDF
 full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
@@ -140,7 +144,7 @@ for molec in molecules:
             df_molec = None
         ff_molec_list.append(df_molec)
     #Get the data for the molecule from each FF
-    print(ff_molec_list)
+    # print(ff_molec_list)
     #Plot Vle, Hvap, and Pvap and save to different pdfs
     pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_list), bbox_inches='tight')
     plt.close()
