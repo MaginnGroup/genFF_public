@@ -35,6 +35,11 @@ R143 = r143.R143Constants()
 R134 = r134.R134Constants()
 R116 = r116.R116Constants()
 
+obj_choice = "ExpVal"
+param_set = 1
+ff_list = []
+MSE_path_dict = {}
+#Dictionary of all molecules
 molec_dict = {"R14": R14,
                 "R32": R32,
                 "R50": R50,
@@ -51,22 +56,7 @@ molec_dict = {"R14": R14,
                 "R134": R134,
                 "R116": R116}
 
-at_number = 2
-obj_choice = "ExpVal"
-param_set = 1
-ff_list = []
-MSE_path_dict = {}
-for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
-    project = signac.get_project(project_path)
-    if project_path == "opt_ff_ms":
-        project = project.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
-        at_num_str = "at_" + str(at_number)
-        obj_choice_str = obj_choice
-        param_set_str = "param_set_" + str(param_set)
-    else:
-        at_num_str = ""
-        obj_choice_str = ""
-        param_set_str = ""
+def get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path):
     csv_root_unproc = os.path.join("Results_MS","unprocessed_csv", at_num_str, obj_choice_str, param_set_str)
     csv_root_final = os.path.join("Results_MS", at_num_str, obj_choice_str, param_set_str)
     os.makedirs(csv_root_unproc, exist_ok=True)
@@ -88,11 +78,36 @@ for project_path in ["opt_ff_ms", "gaff_ff_ms"]:
     #process data and save
     csv_name_final = os.path.join(csv_root_final, project_path)
     df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_name_final + ".csv")
-    ff_list.append(df_all)
+    
     #Calculate MAPD and MSE for each T point
     df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_name_final + "_err.csv")
-    MSE_path_dict[project_path]= csv_name_final + "_err.csv"
-    
+    csv_name_final_err = csv_name_final + "_err.csv"
+
+    return df_all, csv_name_final_err, df_paramsets
+
+#Load csvs for Opt_FF
+project_path = "opt_ff_ms"
+project = signac.get_project(project_path)
+for at_number in [1]:
+    project = project.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
+    at_class = atom_type.make_atom_type_class(at_number)
+    at_num_str = at_class.scheme_name
+    obj_choice_str = obj_choice
+    param_set_str = "param_set_" + str(param_set)
+    df_all, csv_name, df_paramsets = get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path)
+    ff_list.append(df_all)
+    MSE_path_dict[project_path]= csv_name
+
+#Load csvs for GAFF, NW, Trappe, and Potoff, and BBFF
+project_path = "gaff_ff_ms"
+project = signac.get_project(project_path)
+at_num_str = ""
+obj_choice_str = ""
+param_set_str = ""
+df_all, csv_name, df_paramsets = get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_path)
+ff_list.append(df_all)
+MSE_path_dict[project_path]= csv_name
+
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff, and BBFF
 ff_names = ["Potoff", "TraPPE", "Wang_FFO", "BBFF"]
 for ff_name in ff_names:
@@ -106,9 +121,10 @@ for ff_name in ff_names:
         df_paramsets_w = prepare_df_vle_errors(df_ff_final, molec_dict, csv_name = csv_path_final + "_err.csv")
         MSE_path_dict[ff_name]= csv_path_final + "_err.csv"
     ff_list.append(df_ff_final)
-    
+
+print(MSE_path_dict)   
 #Work on combining into 1 PDF
-full_at_dir = os.path.join("Results_MS", "at_" + str(at_number), obj_choice, "param_set_" + str(param_set))
+full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
 pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
@@ -124,6 +140,7 @@ for molec in molecules:
             df_molec = None
         ff_molec_list.append(df_molec)
     #Get the data for the molecule from each FF
+    print(ff_molec_list)
     #Plot Vle, Hvap, and Pvap and save to different pdfs
     pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_list), bbox_inches='tight')
     plt.close()
@@ -134,7 +151,7 @@ pdf_vle.close()
 pdf_hpvap.close()
 
 #Make MAPD Plots
-full_at_dir = os.path.join("Results_MS", "at_" + str(at_number), obj_choice, "param_set_" + str(param_set))
+full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
 #For each molecule
