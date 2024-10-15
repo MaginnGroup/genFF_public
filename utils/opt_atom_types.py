@@ -737,13 +737,13 @@ class Problem_Setup:
                 # y_var_2pct = (y_exp*0.02)**2
                 # y_var = np.maximum(y_var_unc, y_var_2pct)
                 # y_std =np.sqrt(y_var)
-                # gp_mean_y_scl = gp_mean.flatten()/y_std.flatten()
+                # gp_mean_y_scl = gp_mean_scl.flatten()/gp_var_scl.flatten()
                 # Scale gp_variances to real values
                 # y_bounds_2D = np.asarray(y_bounds).reshape(-1,2)
                 # gp_covar = gp_covar_scl * (y_bounds_2D[:, 1] - y_bounds_2D[:, 0]) ** 2
                 # gp_var = variances_scaled_to_real(gp_var_scl, y_bounds)
                 # mean_array += list(gp_mean_y_scl)
-                # Return objective value standardized to 0 mean and unit variance since each property has different units
+                # No scaling necessary since we are using the scaled values (between 0 and 1) for the objectives and parameters
                 mean_array += list(gp_mean_scl)
                 # var_array += list(gp_var.flatten())
 
