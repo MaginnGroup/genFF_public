@@ -1026,6 +1026,7 @@ class Problem_Setup:
 
         # Initialize variables
         ranked_indices = []  # To keep track of ranked parameter indices
+        ranked_norm_vals = [] # To keep track of ranked parameter magnitudes
         k = 1
         n_data, m = Z.shape
 
@@ -1034,16 +1035,18 @@ class Problem_Setup:
                 # Step 2: Identify the most estimable parameter
                 max_index = np.argmax(column_magnitudes)
                 ranked_indices.append(max_index)
+                ranked_norm_vals.append(column_magnitudes[max_index])
             else:
                 # Step 3: Build X_k with the k most estimable columns
                 X_k = Z[:, ranked_indices]
 
                 # Predict Z using ordinary least-squares
-                # Note that this value is reporting Z_hat, without scaling by Xk
-                Z_hat, _, _, _ = scipy.linalg.lstsq(X_k, Z)
+                # Note that this value is reporting Z_hat(Xk)^-1
+                ols_est, _, _, _ = scipy.linalg.lstsq(X_k, Z)
+                Z_hat = X_k @ ols_est
 
-                # Calculate the residual matrix R_k, scaling Z_hat by Xk
-                R_k = Z - X_k @ Z_hat
+                # Calculate the residual matrix R_k, using Z_hat
+                R_k = Z - Z_hat
 
                 # Step 4: Calculate the magnitude of each column in R_k
                 residual_magnitudes = np.linalg.norm(R_k, axis=0)
@@ -1053,6 +1056,7 @@ class Problem_Setup:
                 for idx in np.argsort(-residual_magnitudes):
                     if idx not in ranked_indices:
                         ranked_indices.append(idx)
+                        ranked_norm_vals.append(residual_magnitudes[idx])
                         break
 
             k += 1  # Step 6: Increase k and repeat
@@ -1072,7 +1076,7 @@ class Problem_Setup:
             save_csv_path3 = os.path.join(dir_name, "Z_matrix", save_label + ".csv")
             # Transform to Pandas df and save to csv
             df_ranked_indices = pd.DataFrame(
-                {"Indices": ranked_indices, "AT Names": at_names_ranked}
+                {"Indices": ranked_indices, "Norm Values":ranked_norm_vals, "AT Names": at_names_ranked}
             )
             # df_ranked_indices = pd.DataFrame(ranked_indices)
             df_ndata = pd.DataFrame([n_data])
