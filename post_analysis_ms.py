@@ -36,6 +36,7 @@ R134 = r134.R134Constants()
 R116 = r116.R116Constants()
 
 obj_choice = "ExpVal"
+at_numbers = [6]
 param_set = 1
 ff_dict = {}
 err_path_dict = {}
@@ -89,7 +90,7 @@ def get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_
 #Load csvs for Opt_FF
 project_path = "opt_ff_ms"
 project = signac.get_project(project_path)
-for at_number in [1]:
+for at_number in at_numbers:
     project = project.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
     at_class = atom_type.make_atom_type_class(at_number)
     at_num_str = at_class.scheme_name
