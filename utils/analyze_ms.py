@@ -644,7 +644,7 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
                 molec_names_use.append(molec)
 
         ax.set_xticklabels(molec_names_use, fontsize=20)
-        if name == "Liquid Density":
+        if i == 0:
             ax.legend(loc = 'upper right', fontsize = 20)
 
     # Adjust layout
