@@ -36,7 +36,7 @@ R134 = r134.R134Constants()
 R116 = r116.R116Constants()
 
 obj_choice = "ExpVal"
-at_numbers = [6]
+at_numbers = [8]
 param_set = 1
 ff_dict = {}
 err_path_dict = {}
@@ -153,9 +153,10 @@ for molec in molecules:
     # print(ff_molec_dict)
     #Plot Vle, Hvap, and Pvap and save to different pdfs
     pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-    plt.close()
+    # plt.show()
+    # plt.close()
     pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-    plt.close()
+    # plt.close()
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
