@@ -402,7 +402,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
 
             #Plot critical points
             min_temp, max_temp = get_min_max(min_temp, max_temp, means["sim_Tc"].values, stds["sim_Tc"].values)
-            ax2.errorbar(means["sim_rhoc"],means["sim_Tc"], xerr=1.96*stds["sim_rhoc"],
+            ax2.errorbar(means["sim_rhoc"].values[0],means["sim_Tc"].values[0], xerr=1.96*stds["sim_rhoc"].values[0],
                         c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
                         zorder = df_z_order, label = df_labels[i] )
 
@@ -417,7 +417,11 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
 
     #Set Axes
     ax2.set_xlim(min_rho*0.95,max_rho*1.05)
-    ax2.xaxis.set_major_locator(MultipleLocator(500))
+    number_of_ticks = int(np.ceil((ax2.get_xlim()[1] - ax2.get_xlim()[0]) / 500))
+    if number_of_ticks > 2:
+        ax2.xaxis.set_major_locator(MultipleLocator(500))
+    else:
+        ax2.xaxis.set_major_locator(MultipleLocator(200))
     ax2.xaxis.set_minor_locator(AutoMinorLocator(4))
     
     ax2.set_ylim(min_temp*0.95, max_temp*1.05)
