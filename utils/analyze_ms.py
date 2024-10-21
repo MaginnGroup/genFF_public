@@ -397,13 +397,13 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
                 
                 # #Plot opt_scheme_ms vle curve
                 ax2.errorbar(means[x_prop], means["temperature"], xerr=1.96*stds[x_prop],
-                            c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.7, 
+                            c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
                             zorder = df_z_order,)
 
             #Plot critical points
             min_temp, max_temp = get_min_max(min_temp, max_temp, means["sim_Tc"].values, stds["sim_Tc"].values)
             ax2.errorbar(means["sim_rhoc"],means["sim_Tc"], xerr=1.96*stds["sim_rhoc"],
-                        c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.7, 
+                        c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
                         zorder = df_z_order, label = df_labels[i] )
 
     #Plot experimental data
@@ -528,11 +528,11 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
             min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, means["sim_Hvap"].values)
             #Plot 1/T vs log(Pvap) 
             axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), color=df_colors[i], 
-                        s=70,alpha=0.7, label = df_label, marker = df_marker,
+                        s=70,alpha=0.5, label = df_label, marker = df_marker,
                         zorder = df_z_order)
             #Plot T vs Hvap
             axs[1].scatter(means["temperature"],means["sim_Hvap"], color=df_colors[i], 
-                        s=70,alpha=0.7, marker = df_marker,
+                        s=70,alpha=0.5, marker = df_marker,
                         zorder = df_z_order)
         
     #Plot experimental pvap
