@@ -36,7 +36,7 @@ R134 = r134.R134Constants()
 R116 = r116.R116Constants()
 
 obj_choice = "ExpVal"
-at_numbers = [8]
+at_numbers = [1,2,6,8]
 param_set = 1
 ff_dict = {}
 err_path_dict = {}
@@ -89,9 +89,9 @@ def get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_
 
 #Load csvs for Opt_FF
 project_path = "opt_ff_ms"
-project = signac.get_project(project_path)
+project_all = signac.get_project(project_path)
 for at_number in at_numbers:
-    project = project.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
+    project = project_all.find_jobs({"atom_type": at_number, "obj_choice": obj_choice, "param_set": param_set})
     at_class = atom_type.make_atom_type_class(at_number)
     at_num_str = at_class.scheme_name
     obj_choice_str = obj_choice
@@ -100,7 +100,7 @@ for at_number in at_numbers:
     #Add column to df_all for atom type
     df_all['atom_type'] = at_number
     ff_dict[at_class.scheme_plot_name] = df_all
-    err_path_dict[project_path]= csv_name
+    err_path_dict[project_path + str(at_number)]= csv_name
     err_labels.append(at_class.scheme_plot_name)
 
 #Load csvs for GAFF, NW, Trappe, and Potoff, and BBFF
@@ -133,8 +133,11 @@ for ff_name, ff_label in zip(ff_names, ff_labels):
         df_ff_final['atom_type'] = ff_name
     ff_dict[ff_label] = df_ff_final
       
-#Work on combining into 1 PDF
-full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+#If one atom type
+if len(at_numbers) == 1:
+    full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+else:
+    full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
 pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
@@ -154,9 +157,9 @@ for molec in molecules:
     #Plot Vle, Hvap, and Pvap and save to different pdfs
     pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
     # plt.show()
-    # plt.close()
+    plt.close()
     pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-    # plt.close()
+    plt.close()
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
@@ -168,7 +171,10 @@ for label, key in zip(err_labels, list(err_path_dict.keys())):
     df_err_dict[label] = df_err.reindex(molec_names)
 
 #Make MAPD Plots
-full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+if len(at_numbers) == 1:
+    full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+else:
+    full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
 #For each molecule

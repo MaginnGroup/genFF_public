@@ -644,8 +644,9 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
                 molec_names_use.append(molec)
 
         ax.set_xticklabels(molec_names_use, fontsize=20)
-        if i == 0:
-            ax.legend(loc = 'upper right', fontsize = 20)
+    
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=4, fontsize = 20)
 
     # Adjust layout
     fig.supxlabel('Molecule', fontsize = 20)
@@ -694,7 +695,27 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
 
     #Merge the dataframes
     merged_df = pd.concat(df_avg_list, axis=1, keys=df_labels)
-    # merged_df.drop(["R41", "R23", "R152", "R134"], inplace = True)
+    #Group by molecule and take average and print
+    #Split into  dfs baed on train_molecs
+    merged_df_train = merged_df.loc[merged_df.index.isin(train_molecs)]
+    merged_df_test = merged_df.loc[~merged_df.index.isin(train_molecs)]
+
+    def compute_average_mapd(df, mapd_columns, obj):
+        # Select the columns that contain 'mapd' for each scheme
+        mapd_columns = [col for col in df.columns if obj in col]
+        # # Calculate the average MAPD for each scheme
+        average_mapd = df[mapd_columns].mean().sort_values().reset_index().iloc[:, [0, -1]]
+        #Ignore objective column
+        average_mapd.columns = ['Molecule', 'Average ' + obj.upper()]
+        return average_mapd
+
+    average_mapd = compute_average_mapd(merged_df, cols, obj)
+    average_train_mapd = compute_average_mapd(merged_df_train, cols, obj)
+    average_test_mapd = compute_average_mapd(merged_df_test, cols, obj)
+    #Sort by average MAPD
+    print("Overall Average:\n", average_mapd)
+    print("Train Average:\n", average_train_mapd)
+    print("Test Average:\n", average_test_mapd)
 
     # Plot the merged DataFrame
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(24, 8), sharex=False)
@@ -727,6 +748,11 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
     ax_right.legend(loc = 'upper right', fontsize = 20)
     ax_right.tick_params(axis='both', labelsize=20)
     ax_left.tick_params(axis='both', labelsize=20)
+
+    # ax_left.set_xticklabels([])  # Removes x-axis labels on the left subplot
+    # ax_right.set_xticklabels([])  # Removes x-axis labels on the right subplot
+    ax_left.set_xlabel('')  # Ensure no x-axis label for the left subplot
+    ax_right.set_xlabel('')  # Ensure no x-axis label for the right subplot
 
     fig.suptitle(obj.upper() + ' Comparison for Different Refrigerants', fontsize = 20)
     fig.supxlabel('Molecule', fontsize = 20)
