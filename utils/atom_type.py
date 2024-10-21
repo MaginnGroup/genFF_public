@@ -1953,6 +1953,7 @@ class AT_Scheme_08(Atom_Types):
         ]
         at_bounds = np.array([at_param_bounds_l, at_param_bounds_u]).T
         self.scheme_name = "at_08"
+        self.scheme_plot_name = "AT-8"
         # Get Names
         at_keys = [
             "sigma_Cm",
