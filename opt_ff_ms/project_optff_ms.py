@@ -852,6 +852,16 @@ def calculate_props(job):
     nmols_liq = df_box1[:, n_mols_col - 1]
     nmols_liq_ave = np.mean(nmols_liq)
     nmols_vap = df_box2[:, n_mols_col - 1]
+    # # Find indices where nmols_vap or nmols_liq contain zeros or NaN values
+    # problematic_vap = np.where((nmols_vap == 0) | np.isnan(nmols_vap))[0]
+    # problematic_liq = np.where((nmols_liq == 0) | np.isnan(nmols_liq))[0]
+
+    # print(f"Indices with problematic values in nmols_vap: {problematic_vap}")
+    # print(f"Indices with problematic values in nmols_liq: {problematic_liq}")
+
+    # # Optionally print the actual values as well
+    # print(f"Problematic values in nmols_vap: {nmols_vap[problematic_vap]}")
+    # print(f"Problematic values in nmols_liq: {nmols_liq[problematic_liq]}")
     nmols_vap_ave = np.mean(nmols_vap)
 
     # calculate enthalpy of vaporization

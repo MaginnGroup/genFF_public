@@ -5,23 +5,27 @@ import signac
 
 def main():
     # Ensure the correct number of arguments
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         print("Usage: python script.py mol_name")
         sys.exit(1)
 
     # Extract the statepoint value from the command line argument
     mol_name = sys.argv[1]
 
+
     # Locate the signac project
     project = signac.get_project()
 
     # Find all jobs with the specified statepoint value
-    jobs = project.find_jobs({"mol_name": mol_name})
+    if sys.argv[2] != None and sys.argv[3] !=None:
+        jobs = project.find_jobs({"mol_name": mol_name, "T": float(sys.argv[3]), "atom_type": int(sys.argv[2])})
+    else:
+        jobs = project.find_jobs({"mol_name": mol_name})
 
     # Iterate over the matching jobs
     for job in jobs:
         # Construct the command using the job ID and statepoint value
-        print(job.id, job.sp.T)
+        print("ID", job.id, "AT", job.sp.atom_type, "T", job.sp.T)
         if os.path.exists(f"workspace/{job.id}/gemc.eq.rst.001.out.box1.prp") and os.path.exists(f"workspace/{job.id}/gemc.eq.rst.001.out.box2.prp"):
             command = (
                 f"xmgrace -block workspace/{job.id}/gemc.eq.rst.001.out.box1.prp -bxy 1:6 "

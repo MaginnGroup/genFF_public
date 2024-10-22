@@ -284,8 +284,8 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
                     mapd = mean_absolute_percentage_error(expt_values, sim_values) * 100.0
                     mae = mean_absolute_error(expt_values, sim_values)
                 except ValueError as e:
-                    print("Exp", expt_values, "Sim", sim_values)
                     print(f"Error in calculating {property_name} for {molecule_name}: {e}. Setting MSE, MAE, and MAPD to NaN")
+                    print("Exp", expt_values, "\n Sim", sim_values)
                     mse, mapd, mae = np.nan, np.nan, np.nan
                 return mse, mapd, mae
 
@@ -397,13 +397,13 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
                 
                 # #Plot opt_scheme_ms vle curve
                 ax2.errorbar(means[x_prop], means["temperature"], xerr=1.96*stds[x_prop],
-                            c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
+                            color=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
                             zorder = df_z_order,)
 
             #Plot critical points
             min_temp, max_temp = get_min_max(min_temp, max_temp, means["sim_Tc"].values, stds["sim_Tc"].values)
             ax2.errorbar(means["sim_rhoc"].values[0],means["sim_Tc"].values[0], xerr=1.96*stds["sim_rhoc"].values[0],
-                        c=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
+                        color=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
                         zorder = df_z_order, label = df_labels[i] )
 
     #Plot experimental data
