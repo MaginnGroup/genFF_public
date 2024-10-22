@@ -502,6 +502,17 @@ def GEMC(job):
 #@Project.post(lambda job: "Hvap_unc" in job.doc)
 #@Project.post(lambda job: "liq_enthalpy_unc" in job.doc)
 #@Project.post(lambda job: "vap_enthalpy_unc" in job.doc)
+#Create operation to delete failed jobs
+@ProjectGAFF.label
+def gemc_failed(job):
+    "Confirm gemc failed"
+    return "gemc_failed" in job.doc
+
+@ProjectGAFF.pre(gemc_failed)
+@ProjectGAFF.operation
+def del_job(job):
+    "Delete job if gemc failed"
+    job.remove()
 
 @vle
 @ProjectGAFF.pre.after(GEMC)

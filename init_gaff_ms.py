@@ -7,7 +7,6 @@ import pandas as pd
 from utils.molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
 from utils import atom_type, opt_atom_types
 
-at_number = 11
 num_restarts = 3
 n_vap = 160
 n_liq = 640
