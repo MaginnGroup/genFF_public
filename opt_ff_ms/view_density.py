@@ -33,8 +33,8 @@ def main():
             )
         else:
             command = (
-                f"xmgrace -block workspace/{job.id}/prod.out.box1.prp -bxy 1:6 "
-                f"-block workspace/{job.id}/prod.out.box2.prp -bxy 1:6"
+                f"xmgrace -block workspace/{job.id}/prod.out.box2.prp -bxy 1:5 "
+                # f"-block workspace/{job.id}/prod.out.box2.prp -bxy 1:6"
             )
 
         # Execute the command
