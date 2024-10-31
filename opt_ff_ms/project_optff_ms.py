@@ -6,6 +6,9 @@ import os
 import sys
 import unyt as u
 import copy
+from pymser import pymser
+import numpy as np
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 sys.path.append("..")
@@ -621,7 +624,8 @@ def gemc_equil_complete(job):
 
     try:
         thermo_data = np.genfromtxt(job.fn("equil.out.box1.prp"), skip_header=2)
-        completed = int(thermo_data[-1][0]) == job.sp.nsteps_eq
+        #This line will fail until job.doc.nsteps_eq is defined
+        completed = int(thermo_data[-1][0]) == job.doc.nsteps_eq
     except:
         completed = False
         pass
@@ -642,6 +646,146 @@ def gemc_prod_complete(job):
         pass
 
     return completed
+
+def plot_res_pymser(job, eq_col, results, name):
+    fig, [ax1, ax2] = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, sharey=True)
+
+    ax1.set_ylabel(name, color="black", fontsize=14, fontweight='bold')
+    ax1.set_xlabel("GEMC step", fontsize=14, fontweight='bold')
+
+    ax1.plot(range(len(eq_col)), 
+            eq_col, 
+            label = 'Raw data', 
+            color='blue')
+
+    ax1.plot(range(len(eq_col))[results['t0']:], 
+            results['equilibrated'], 
+            label = 'Equilibrated data', 
+            color='red')
+
+    ax1.plot([0, len(eq_col)], 
+            [results['average'], results['average']], 
+            color='green', zorder=4, 
+            label='Equilibrated average')
+
+    ax1.fill_between(range(len(eq_col)), 
+                    results['average'] - results['uncertainty'], 
+                    results['average'] + results['uncertainty'], 
+                    color='lightgreen', alpha=0.3, zorder=4)
+
+    ax1.set_yticks(np.arange(0, eq_col.max()*1.1, eq_col.max()/10))
+    ax1.set_xlim(-len(eq_col)*0.02, len(eq_col)*1.02)
+    ax1.tick_params(axis="y", labelcolor="black")
+
+    ax1.grid(alpha=0.3)
+    ax1.legend()
+
+    ax2.hist(eq_col, 
+            orientation=u'horizontal', 
+            bins=30, 
+            edgecolor='blue', 
+            lw=1.5, 
+            facecolor='white', 
+            zorder=3)
+
+    ax2.hist(results['equilibrated'], 
+            orientation=u'horizontal', 
+            bins=3, 
+            edgecolor='red', 
+            lw=1.5, 
+            facecolor='white', 
+            zorder=3)
+
+    ymax = int(ax2.get_xlim()[-1])
+
+    ax2.plot([0, ymax], 
+            [results['average'], results['average']],
+            color='green', zorder=4, label='Equilibrated average')
+
+    ax2.fill_between(range(ymax), 
+                    results['average'] - results['uncertainty'],
+                    results['average'] + results['uncertainty'],
+                    color='lightgreen', alpha=0.3, zorder=4)
+
+    ax2.set_xlim(0, ymax)
+
+    ax2.grid(alpha=0.5, zorder=1)
+
+    fig.set_size_inches(9,5)
+    fig.set_dpi(100)
+    fig.tight_layout()
+    fig.savefig(job.fn('MSER_eq.png'), dpi=300, facecolor='white')
+    plt.close(fig)
+
+def check_equil_converge(job):
+    equil_matrix = []
+    res_matrix = []
+    prop_cols = [5]
+    prop_names = ["Number of Moles"]
+    try:
+        # Load data for both boxes
+        df_box1 = np.genfromtxt(job.fn("gemc.eq.out.box1.prp"))
+        df_box2 = np.genfromtxt(job.fn("gemc.eq.out.box2.prp"))
+
+        # Process both boxes in one loop
+        for box in [df_box1, df_box2]:
+            for prop_index in prop_cols:
+                eq_col = box[:, prop_index - 1]
+                # print(len(eq_col))
+                batch_size = max(1, int(len(eq_col) * 0.0005))
+
+                # Try with ADF test enabled, fallback without it if it fails
+                try:
+                    results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=True, uncertainty='uSD', print_results=False)
+                    adf_test_failed = results["critical_values"]["1%"] <= results["adf"]
+                except:
+                    results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=False, uncertainty='uSD', print_results=False)
+                    results["adf"], results["critical_values"], adf_test_failed = None, None, False
+
+                equilibrium = len(eq_col) - results['t0'] >= len(eq_col) / 4
+                equil_matrix.append(equilibrium and not adf_test_failed)
+                res_matrix.append(results)
+
+        # Log results
+        # print("ID", job.id, "AT", job.sp.atom_type, "T", job.sp.T)
+        # print(equil_matrix)
+        # log_text = '==============================================================================\n'
+        
+        for i, is_equilibrated in enumerate(equil_matrix):
+            box = df_box1 if i < len(prop_cols) else df_box2
+            box_name = "Liquid Box" if i < len(prop_cols) else "Vapor Box"
+            col_vals = box[:, prop_cols[i % len(prop_cols)] - 1]
+            #plot all
+
+            # if not all(equil_matrix):
+            plot_res_pymser(job, col_vals, res_matrix[i], prop_names[i % len(prop_cols)])
+
+            # Display outcome
+            prod_cycles = len(col_vals) - res_matrix[i]['t0']
+            if is_equilibrated:
+                #Plot successful equilibration
+                # plot_res_pymser(col_vals, res_matrix[i], prop_names[i % len(prop_cols)])
+                statement = f"       > Success! Found {prod_cycles} production cycles."
+            else:
+                #Plot failed equilibration
+                statement = f"       > {box_name} Failure! "
+                # plot_res_pymser(col_vals, res_matrix[i], prop_names[i % len(prop_cols)])
+                if res_matrix[i]["adf"] is None:
+                    # Note: ADF test failed to complete
+                    statement += f"ADF test failed to complete! "
+                elif res_matrix[i]['adf'] > res_matrix[i]['critical_values']['1%']:
+                    adf, one_pct = res_matrix[i]['adf'], res_matrix[i]['critical_values']['1%']
+                    statement += f"ADF value: {adf}, 99% confidence value: {one_pct}! "
+                if len(col_vals) - res_matrix[i]['t0'] < len(col_vals) / 4:
+                   statement += f"Only {prod_cycles} production cycles found."
+                
+            print(statement)
+
+    except Exception as e:
+        #This will cause an error in the GEMC operation which lets us know that the job failed
+        raise Exception(f"Error processing job {job.id}: {e}")
+
+    return all(equil_matrix)
 
 @Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.pre.after(extract_final_NPT_config)
@@ -734,8 +878,13 @@ def run_gemc(job):
 
     # Move into the job dir and start doing things
     try:
+        #Inititalize counter and number of eq_steps
+        count = 1
+        total_eq_steps = job.sp.nsteps_eq
+        #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
+        job.doc.nsteps_eq = int(job.sp.nsteps_eq*4+1)
         with job:
-            # Run equilibration
+            # Run initial equilibration
             mc.run(
                 system=system,
                 moveset=moves,
@@ -744,10 +893,33 @@ def run_gemc(job):
                 temperature=job.sp.T * u.K,
                 **custom_args
             )
+            #While we are using at most 12 attempts to equilibrate
+            while count <= 13:
+                # Check if equilibration is reached via the pymser algorithms
+                is_equil = check_equil_converge(job)
+                #If equilibration is reached, break the loop and start production
+                if is_equil:
+                    break
+                else:
+                    #Increase the total number of eq steps by 25% of the original value and restart the simulation
+                    total_eq_steps += int(job.sp.nsteps_eq/4)
+                    #If we've exceeded the maximum number of equilibrium steps, raise an exception
+                    #This forces a retry with critical conditions or will note complete GEMC failure
+                    if count == 13:
+                        raise Exception(f"GEMC equilibration failed to converge after {job.sp.nsteps_eq*4} steps")
+                    #Otherwise continue equilibration
+                    else:
+                        mc.restart(
+                            restart_from="gemc.eq",
+                            run_type="equilibration",
+                            total_run_length=total_eq_steps,
+                            run_name="gemc.eq", #Check if this is ok w/ Eliseo
+                        )
+                #Increase the counter
+                count += 1
 
-            # Adjust custom args for production
-            # custom_args["run_name"] = "prod"
-            # custom_args["restart_name"] = "equil"
+            #Set the step counter to whatever the final number of equilibration steps was
+            job.doc.nsteps_eq = total_eq_steps
 
             # Run production
             mc.restart(
