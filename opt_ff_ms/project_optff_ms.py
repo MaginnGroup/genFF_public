@@ -906,6 +906,7 @@ def run_gemc(job):
                     #If we've exceeded the maximum number of equilibrium steps, raise an exception
                     #This forces a retry with critical conditions or will note complete GEMC failure
                     if count == 13:
+                        job.doc.equil_fail = True
                         raise Exception(f"GEMC equilibration failed to converge after {job.sp.nsteps_eq*4} steps")
                     #Otherwise continue equilibration
                     else:
@@ -920,6 +921,7 @@ def run_gemc(job):
 
             #Set the step counter to whatever the final number of equilibration steps was
             job.doc.nsteps_eq = total_eq_steps
+            job.doc.equil_fail = False
 
             # Run production
             mc.restart(
