@@ -621,14 +621,36 @@ def extract_final_NPT_config(job):
 def gemc_equil_complete(job):
     "Confirm gemc equilibration has completed"
     import numpy as np
+    import glob
+    import re
+    
+    # Find all files matching the restart pattern
+    restart_pattern = job.fn("gemc.eq.rst.*.out.box1.prp")
+    fallback_file = job.fn("gemc.eq.out.box1.prp")
+    restart_files = glob.glob(restart_pattern)
+    
+    # Determine the file to use
+    if restart_files:
+        # Extract the highest restart value from filenames
+        restart_numbers = [
+            int(re.search(r"\.rst\.(\d+)\.out\.box1\.prp", f).group(1))
+            for f in restart_files
+        ]
+        max_restart = max(restart_numbers)
+        selected_file = job.fn(f"gemc.eq.rst.{max_restart:03d}.out.box1.prp")
+    else:
+        # Use fallback file if no restart files are found
+        selected_file = fallback_file
 
     try:
-        thermo_data = np.genfromtxt(job.fn("equil.out.box1.prp"), skip_header=2)
+        thermo_data = np.genfromtxt(selected_file, skip_header=2)
         #This line will fail until job.doc.nsteps_eq is defined
-        completed = int(thermo_data[-1][0]) == job.doc.nsteps_eq
+        if hasattr(job.doc, 'nsteps_eq'):
+            completed = int(thermo_data[-1][0]) == job.doc.nsteps_eq
+        else:
+            completed = False
     except:
         completed = False
-        pass
 
     return completed
 
@@ -647,7 +669,7 @@ def gemc_prod_complete(job):
 
     return completed
 
-def plot_res_pymser(job, eq_col, results, name):
+def plot_res_pymser(job, eq_col, results, name, box_name):
     fig, [ax1, ax2] = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, sharey=True)
 
     ax1.set_ylabel(name, color="black", fontsize=14, fontweight='bold')
@@ -714,37 +736,40 @@ def plot_res_pymser(job, eq_col, results, name):
     fig.set_size_inches(9,5)
     fig.set_dpi(100)
     fig.tight_layout()
-    fig.savefig(job.fn('MSER_eq.png'), dpi=300, facecolor='white')
+    save_name = 'MSER_eq_'+ box_name +'.png'
+    fig.savefig(job.fn(save_name), dpi=300, facecolor='white')
     plt.close(fig)
 
-def check_equil_converge(job):
+def check_equil_converge(job, eq_data_dict):
     equil_matrix = []
     res_matrix = []
     prop_cols = [5]
     prop_names = ["Number of Moles"]
     try:
         # Load data for both boxes
-        df_box1 = np.genfromtxt(job.fn("gemc.eq.out.box1.prp"))
-        df_box2 = np.genfromtxt(job.fn("gemc.eq.out.box2.prp"))
+        for key in list(eq_data_dict.keys()):
+            eq_col = eq_data_dict[key]["data"]
+        # df_box1 = np.genfromtxt(job.fn("gemc.eq.out.box1.prp"))
+        # df_box2 = np.genfromtxt(job.fn("gemc.eq.out.box2.prp"))
 
         # Process both boxes in one loop
-        for box in [df_box1, df_box2]:
-            for prop_index in prop_cols:
-                eq_col = box[:, prop_index - 1]
-                # print(len(eq_col))
-                batch_size = max(1, int(len(eq_col) * 0.0005))
+        # for box in [df_box1, df_box2]:
+            # for prop_index in prop_cols:
+            #     eq_col = box[:, prop_index - 1]
+            # print(len(eq_col))
+            batch_size = max(1, int(len(eq_col) * 0.0005))
 
-                # Try with ADF test enabled, fallback without it if it fails
-                try:
-                    results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=True, uncertainty='uSD', print_results=False)
-                    adf_test_failed = results["critical_values"]["1%"] <= results["adf"]
-                except:
-                    results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=False, uncertainty='uSD', print_results=False)
-                    results["adf"], results["critical_values"], adf_test_failed = None, None, False
+            # Try with ADF test enabled, fallback without it if it fails
+            try:
+                results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=True, uncertainty='uSD', print_results=False)
+                adf_test_failed = results["critical_values"]["1%"] <= results["adf"]
+            except:
+                results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=False, uncertainty='uSD', print_results=False)
+                results["adf"], results["critical_values"], adf_test_failed = None, None, False
 
-                equilibrium = len(eq_col) - results['t0'] >= len(eq_col) / 4
-                equil_matrix.append(equilibrium and not adf_test_failed)
-                res_matrix.append(results)
+            equilibrium = len(eq_col) - results['t0'] >= len(eq_col) / 4
+            equil_matrix.append(equilibrium and not adf_test_failed)
+            res_matrix.append(results)
 
         # Log results
         # print("ID", job.id, "AT", job.sp.atom_type, "T", job.sp.T)
@@ -752,24 +777,25 @@ def check_equil_converge(job):
         # log_text = '==============================================================================\n'
         
         for i, is_equilibrated in enumerate(equil_matrix):
-            box = df_box1 if i < len(prop_cols) else df_box2
-            box_name = "Liquid Box" if i < len(prop_cols) else "Vapor Box"
-            col_vals = box[:, prop_cols[i % len(prop_cols)] - 1]
+            # box = df_box1 if i < len(prop_cols) else df_box2
+            # box_name = "Liquid" if i < len(prop_cols) else "Vapor"
+            # col_vals = box[:, prop_cols[i % len(prop_cols)] - 1]
+            key_name = list(eq_data_dict.keys())[i]
+            box_name = key_name.rsplit("_", 1)[0]
+            col_vals = eq_data_dict[key_name]["data"]
             #plot all
 
             # if not all(equil_matrix):
-            plot_res_pymser(job, col_vals, res_matrix[i], prop_names[i % len(prop_cols)])
+            plot_res_pymser(job, col_vals, res_matrix[i], prop_names[i % len(prop_cols)], box_name)
 
             # Display outcome
             prod_cycles = len(col_vals) - res_matrix[i]['t0']
             if is_equilibrated:
                 #Plot successful equilibration
-                # plot_res_pymser(col_vals, res_matrix[i], prop_names[i % len(prop_cols)])
                 statement = f"       > Success! Found {prod_cycles} production cycles."
             else:
                 #Plot failed equilibration
-                statement = f"       > {box_name} Failure! "
-                # plot_res_pymser(col_vals, res_matrix[i], prop_names[i % len(prop_cols)])
+                statement = f"       > {box_name} Box Failure! "
                 if res_matrix[i]["adf"] is None:
                     # Note: ADF test failed to complete
                     statement += f"ADF test failed to complete! "
@@ -893,10 +919,29 @@ def run_gemc(job):
                 temperature=job.sp.T * u.K,
                 **custom_args
             )
+
+            prop_cols = [5] #Use number of moles to decide equilibrium
+            # Load initial eq data from both boxes
+            df_box1 = np.genfromtxt(job.fn("gemc.eq.out.box1.prp"))
+            df_box2 = np.genfromtxt(job.fn("gemc.eq.out.box2.prp"))
+
+            # Process both boxes in one loop
+            eq_data_dict = {}
+            for b, box in enumerate([df_box1, df_box2]):
+                box_name = "Liquid" if b == 0 else "Vapor"
+                for prop_index in prop_cols:
+                    eq_col = box[:, prop_index - 1]
+                    #Save eq_col as a csv for later analysis
+                    key = f"{box_name}_{prop_index}"
+                    eq_col_file = job.fn(f"{box_name}_eq_col_{prop_index}.csv")
+                    np.savetxt(eq_col_file, eq_col, delimiter=",")
+                    #Save the eq_col and file to a dictionary for later use
+                    eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
+
             #While we are using at most 12 attempts to equilibrate
             while count <= 13:
                 # Check if equilibration is reached via the pymser algorithms
-                is_equil = check_equil_converge(job)
+                is_equil = check_equil_converge(job, eq_data_dict)
                 #If equilibration is reached, break the loop and start production
                 if is_equil:
                     break
@@ -914,8 +959,30 @@ def run_gemc(job):
                             restart_from="gemc.eq",
                             run_type="equilibration",
                             total_run_length=total_eq_steps,
-                            run_name="gemc.eq", #Check if this is ok w/ Eliseo
+                            run_name="gemc.eq", #This will be overwritten by the restart gemc.eq.rst.xxx
                         )
+                        #Add restart data to eq_col
+                        # After each restart, load the updated properties data for both boxes
+                        sim_box1 =  "gemc.eq" + f".rst.{count:03d}" + ".out.box1.prp"
+                        sim_box2 =  "gemc.eq" + f".rst.{count:03d}" + ".out.box2.prp"
+                        df_box1r = np.genfromtxt(job.fn(sim_box1))
+                        df_box2r = np.genfromtxt(job.fn(sim_box2))
+                        # df_box1 = np.genfromtxt(job.fn("gemc.eq.out.box1.prp"))
+                        # df_box2 = np.genfromtxt(job.fn("gemc.eq.out.box2.prp"))
+
+                        # Process and add the restart data to eq_col for each property in each box
+                        for b, box in enumerate([df_box1r, df_box2r]):
+                            box_name = "Liquid" if b == 0 else "Vapor"
+                            for i, prop_index in enumerate(prop_cols):
+                                #Get the key from the property and box name
+                                key = f"{box_name}_{prop_index}"
+                                # Extract the column data for this restart and append to accumulated data
+                                eq_col_restart = box[:, prop_index - 1]
+                                all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
+                                #Save the new data to the eq_col file
+                                np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
+                                #Overwite the current data in the eq_data_dict with restart data
+                                eq_data_dict[key]["data"] = all_eq_data
                 #Increase the counter
                 count += 1
 
