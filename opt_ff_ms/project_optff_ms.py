@@ -740,7 +740,7 @@ def plot_res_pymser(job, eq_col, results, name, box_name):
     fig.savefig(job.fn(save_name), dpi=300, facecolor='white')
     plt.close(fig)
 
-def check_equil_converge(job, eq_data_dict):
+def check_equil_converge(job, eq_data_dict, prod_tol):
     equil_matrix = []
     res_matrix = []
     prop_cols = [5]
@@ -767,7 +767,7 @@ def check_equil_converge(job, eq_data_dict):
                 results = pymser.equilibrate(eq_col, LLM=False, batch_size=batch_size, ADF_test=False, uncertainty='uSD', print_results=False)
                 results["adf"], results["critical_values"], adf_test_failed = None, None, False
 
-            equilibrium = len(eq_col) - results['t0'] >= len(eq_col) / 4
+            equilibrium = len(eq_col) - results['t0'] >= prod_tol
             equil_matrix.append(equilibrium and not adf_test_failed)
             res_matrix.append(results)
 
@@ -802,7 +802,7 @@ def check_equil_converge(job, eq_data_dict):
                 elif res_matrix[i]['adf'] > res_matrix[i]['critical_values']['1%']:
                     adf, one_pct = res_matrix[i]['adf'], res_matrix[i]['critical_values']['1%']
                     statement += f"ADF value: {adf}, 99% confidence value: {one_pct}! "
-                if len(col_vals) - res_matrix[i]['t0'] < len(col_vals) / 4:
+                if len(col_vals) - res_matrix[i]['t0'] < prod_tol:
                    statement += f"Only {prod_cycles} production cycles found."
                 
             print(statement)
@@ -907,6 +907,7 @@ def run_gemc(job):
         #Inititalize counter and number of eq_steps
         count = 1
         total_eq_steps = job.sp.nsteps_eq
+        eq_extend = int(job.sp.nsteps_eq/4)
         #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
         job.doc.nsteps_eq = int(job.sp.nsteps_eq*4+1)
         with job:
@@ -939,15 +940,17 @@ def run_gemc(job):
                     eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
 
             #While we are using at most 12 attempts to equilibrate
+            #Set production start tolerance as at least 25% of the original number of data points
+            prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
             while count <= 13:
                 # Check if equilibration is reached via the pymser algorithms
-                is_equil = check_equil_converge(job, eq_data_dict)
+                is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 #If equilibration is reached, break the loop and start production
                 if is_equil:
                     break
                 else:
                     #Increase the total number of eq steps by 25% of the original value and restart the simulation
-                    total_eq_steps += int(job.sp.nsteps_eq/4)
+                    total_eq_steps += int(eq_extend)
                     #If we've exceeded the maximum number of equilibrium steps, raise an exception
                     #This forces a retry with critical conditions or will note complete GEMC failure
                     if count == 13:
