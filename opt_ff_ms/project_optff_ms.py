@@ -961,17 +961,17 @@ def run_gemc(job):
                         raise Exception(f"GEMC equilibration failed to converge after {job.sp.nsteps_eq*4} steps")
                     #Otherwise continue equilibration
                     else:
-                        if count == 1:
-                            #Restart the simulation from the initial conditions
-                            restart_from_name = "gemc.eq"
-                        else:
-                            #Restart the simulation from the last successful equilibration
-                            restart_from_name = f"gemc.eq.rst.{count-1:03d}"
+                        # if count == 1:
+                        #     #Restart the simulation from the initial conditions
+                        #     restart_from_name = "gemc.eq"
+                        # else:
+                        #     #Restart the simulation from the last successful equilibration
+                        #     restart_from_name = f"gemc.eq.rst.{count-1:03d}"
                         mc.restart(
-                            restart_from=restart_from_name,
-                            run_type="equilibration",
-                            total_run_length=total_eq_steps,
-                        )
+                        restart_from="gemc.eq",
+                        run_type="equilibration",
+                        total_run_length=total_eq_steps,
+                        run_name = f"gemc.eq.rst.{count:03d}" )
                         #Add restart data to eq_col
                         # After each restart, load the updated properties data for both boxes
                         sim_box1 =  "gemc.eq" + f".rst.{count:03d}" + ".out.box1.prp"
