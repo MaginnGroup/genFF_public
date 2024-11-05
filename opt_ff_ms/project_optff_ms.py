@@ -914,7 +914,7 @@ def run_gemc(job):
             # Run initial equilibration if it does not exxist
             init_gemc_liq = job.fn("gemc.eq.out.box1.prp")
             init_gemc_vap = job.fn("gemc.eq.out.box2.prp")
-            if not os.isfile(init_gemc_liq) or not os.isfile(init_gemc_vap):
+            if not os.path.exists(init_gemc_liq) or not os.path.exists(init_gemc_vap):
                 mc.run(
                     system=system,
                     moveset=moves,
