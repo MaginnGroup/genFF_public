@@ -911,20 +911,23 @@ def run_gemc(job):
         #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
         job.doc.nsteps_eq = int(job.sp.nsteps_eq*4+1)
         with job:
-            # Run initial equilibration
-            mc.run(
-                system=system,
-                moveset=moves,
-                run_type="equilibration",
-                run_length=job.sp.nsteps_eq,
-                temperature=job.sp.T * u.K,
-                **custom_args
-            )
+            # Run initial equilibration if it does not exxist
+            init_gemc_liq = job.fn("gemc.eq.out.box1.prp")
+            init_gemc_vap = job.fn("gemc.eq.out.box2.prp")
+            if not os.isfile(init_gemc_liq) or not os.isfile(init_gemc_vap):
+                mc.run(
+                    system=system,
+                    moveset=moves,
+                    run_type="equilibration",
+                    run_length=job.sp.nsteps_eq,
+                    temperature=job.sp.T * u.K,
+                    **custom_args
+                )
 
             prop_cols = [5] #Use number of moles to decide equilibrium
             # Load initial eq data from both boxes
-            df_box1 = np.genfromtxt(job.fn("gemc.eq.out.box1.prp"))
-            df_box2 = np.genfromtxt(job.fn("gemc.eq.out.box2.prp"))
+            df_box1 = np.genfromtxt(init_gemc_liq)
+            df_box2 = np.genfromtxt(init_gemc_vap)
 
             # Process both boxes in one loop
             eq_data_dict = {}
