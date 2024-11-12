@@ -76,6 +76,19 @@ class R170Constants:
         }
 
         return lit_param_set
+    
+    @property
+    def gaff_param_set(self):
+        """Adjustable parameter names"""
+
+        gaff_param_set = {
+            "sigma_C1":3.400,
+            "sigma_H1":2.471,
+            "epsilon_C1":55.052,
+            "epsilon_H1":7.901,
+        }
+
+        return gaff_param_set
 
     @property
     def param_bounds(self):

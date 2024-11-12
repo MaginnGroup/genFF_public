@@ -61,6 +61,25 @@ class R161Constants:
         return param_names
     
     @property
+    def gaff_param_set(self):
+        """Adjustable parameter names"""
+
+        gaff_param_set = {
+            "sigma_C1":3.400,
+            "sigma_C2":3.400,
+            "sigma_F1":3.118,
+            "sigma_H1":2.471,
+            "sigma_H2":2.650,
+            "epsilon_C1":55.052,
+            "epsilon_C2":55.052,
+            "epsilon_F1":30.696,
+            "epsilon_H1":7.901,
+            "epsilon_H2":7.901,
+        }
+
+        return gaff_param_set
+    
+    @property
     def param_bounds(self):
         """Bounds on sigma and epsilon in units of nm and kJ/mol"""
 

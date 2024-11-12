@@ -74,6 +74,21 @@ class R41Constants:
         return lit_param_set
 
     @property
+    def gaff_param_set(self):
+        """Adjustable parameter names"""
+
+        gaff_param_set = {
+            "sigma_C1":3.400,
+            "sigma_F1":3.118,
+            "sigma_H1":2.471,
+            "epsilon_C1":55.052,
+            "epsilon_F1":30.696,
+            "epsilon_H1":7.901,
+        }
+
+        return gaff_param_set
+    
+    @property
     def param_bounds(self):
         """Bounds on sigma and epsilon in units of nm and kJ/mol"""
 

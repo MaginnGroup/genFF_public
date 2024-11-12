@@ -1267,6 +1267,16 @@ class Analyze_opt_res(Problem_Setup):
 
         param_dict["Literature"] = paper_best_gp
 
+        molec_gaff = np.array(
+            list(self.molec_data_dict[molec_ind].gaff_param_set.values())
+        )
+        gaff_real = self.values_pref_to_real(molec_gaff)
+        gaff_best_gp = values_real_to_scaled(
+            gaff_real.reshape(1, -1), self.all_train_molec_data[molec_ind].param_bounds
+        )
+        gaff_best_gp = tf.convert_to_tensor(gaff_best_gp, dtype=tf.float64)
+        param_dict["GAFF"] = gaff_best_gp
+
         return param_dict
 
     def approx_jac(self, x, scale_theta=True, save_data=False, x_label=None):
@@ -1447,7 +1457,7 @@ class Analyze_opt_res(Problem_Setup):
         df = pd.DataFrame(columns=["Molecule", "Property", "Model", "MAPD"])
         # Make pdf
         dir_name = self.make_results_dir(list(self.molec_data_dict.keys()))
-        all_data_lists = {"Opt_All": [], "Opt_One": [], "Literature": []}
+        all_data_lists = {"Opt_All": [], "Opt_One": [], "Literature": [], "GAFF": []}
         # Loop over all molecules of interest
         for molec in all_molec_list:
             # Get constants for molecule
@@ -1457,7 +1467,7 @@ class Analyze_opt_res(Problem_Setup):
             test_params = self.get_best_results(molec, theta_guess)
 
             # Loop over gps (1 per property)
-            mapd_vals = {"Opt_All": [], "Opt_One": [], "Literature": []}
+            mapd_vals = {"Opt_All": [], "Opt_One": [], "Literature": [], "GAFF": []}
             for key in list(molec_gps_dict.keys()):
                 # Set label
                 label = molec + "_" + key
@@ -2171,7 +2181,7 @@ class Vis_Results(Analyze_opt_res):
                 plt.close()
         pdf.close()
         return
-
+    
     def compare_T_prop_best(self, theta_guess, all_molec_list):
         """
         Compares T vs Property for a given set

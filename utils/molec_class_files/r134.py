@@ -68,6 +68,21 @@ class R134Constants:
         }
 
         return lit_param_set
+    
+    @property
+    def gaff_param_set(self):
+        """Adjustable parameter names"""
+
+        gaff_param_set = {
+            "sigma_C":3.400, 
+            "sigma_F":3.118,  
+            "sigma_H":2.293,
+            "epsilon_C":55.052,
+            "epsilon_F":30.696,
+            "epsilon_H":7.901,
+        }
+
+        return gaff_param_set
 
     @property
     def param_bounds(self):
