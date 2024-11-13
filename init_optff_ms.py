@@ -23,8 +23,8 @@ from utils.molec_class_files import (
 )
 from utils import atom_type, opt_atom_types
 
-at_number = 6
-num_restarts = 1  # Number of restarts for replications
+at_number = 6 #1,2,6,8
+num_restarts = 3  # Number of restarts for replications
 n_vap = 160  # number of molecules in vapor phase
 n_liq = 640
 obj_choice = "ExpVal"  # Objective to consider
