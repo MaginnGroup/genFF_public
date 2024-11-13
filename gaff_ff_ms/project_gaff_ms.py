@@ -479,7 +479,7 @@ def GEMC(job):
                 run_type="equilibration",
                 run_length=job.sp.nsteps_gemc_eq,
                 temperature=job.sp.T * u.K,
-                **custom_args
+                **custom_args_gemc
             )
 
         prop_cols = [5] #Use number of moles to decide equilibrium
