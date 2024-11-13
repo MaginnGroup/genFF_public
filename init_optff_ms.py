@@ -23,7 +23,7 @@ from utils.molec_class_files import (
 )
 from utils import atom_type, opt_atom_types
 
-at_number = 6 #1,2,6,8
+at_numbers = [1,2,6,8] #1,2,6,8
 num_restarts = 3  # Number of restarts for replications
 n_vap = 160  # number of molecules in vapor phase
 n_liq = 640
@@ -115,67 +115,58 @@ for molec_name, molec_data in molec_dict.items():
     ]  # Training data to consider
     # molec_data_dict = {"R14":R14, "R32":R32, "R50":R50, "R170":R170, "R125":R125, "R134a":R134a, "R143a":R143a}
     # all_gp_dict = opt_atom_types.get_gp_data_from_pkl(list(molec_data_dict.keys()))
-    setup = opt_atom_types.Problem_Setup(molec_names, at_number, obj_choice)
-    all_molec_dir = setup.use_dir_name
-    all_df = pd.read_csv(all_molec_dir / "unique_best_set.csv", header=0)
+    for at_number in at_numbers:
+        setup = opt_atom_types.Problem_Setup(molec_names, at_number, obj_choice)
+        all_molec_dir = setup.use_dir_name
+        all_df = pd.read_csv(all_molec_dir / "unique_best_set.csv", header=0)
 
-    # Loop over best molecules
-    for i in range(1):
-        full_opt_best = all_df.iloc[i].values
-        # Convert to units of nm and kJ/mol
-        param_matrix = setup.at_class.get_transformation_matrix(
-            {molec_name: molec_data}
-        )
-        all_best_real = setup.values_pref_to_real(full_opt_best)
-        # Parameters in units nm and kJ/mol
-        scaled_params = all_best_real.reshape(-1, 1).T @ param_matrix
+        # Loop over best molecules
+        for i in range(1):
+            full_opt_best = all_df.iloc[i].values
+            # Convert to units of nm and kJ/mol
+            param_matrix = setup.at_class.get_transformation_matrix(
+                {molec_name: molec_data}
+            )
+            all_best_real = setup.values_pref_to_real(full_opt_best)
+            # Parameters in units nm and kJ/mol
+            scaled_params = all_best_real.reshape(-1, 1).T @ param_matrix
 
-        for restart in range(num_restarts):
-            # Loop over temperatures
-            for temp in temps:
-                # Theoretically, we could examine more than just the best
-                for sample in scaled_params:
-                    # Define the initial state point
-                    state_point = {
-                        "atom_type": at_number,
-                        "obj_choice": obj_choice,
-                        "mol_name": molec_name,
-                        "mol_weight": molec_data.molecular_weight,  # amu
-                        "smiles": molec_data.smiles_str,
-                        "N_atoms": molec_data.n_atoms,
-                        "T": float(temp),  # K
-                        "P": float(press[int(temp)]),  # bar
-                        "N_vap": n_vap,
-                        "N_liq": n_liq,
-                        "expt_liq_density": molec_data.expt_liq_density[
-                            int(temp)
-                        ],  # kg/m^3
-                        "nsteps_eq": 10000,
-                        "nsteps_prod": 100000,
-                        "restart": restart + 1,
-                        "param_set": i + 1,
-                    }
-                    state_point = unpack_molec_values(
-                        molec_name, setup.at_class, sample, state_point
-                    )
+            for restart in range(num_restarts):
+                # Loop over temperatures
+                for temp in temps:
+                    # Theoretically, we could examine more than just the best
+                    for sample in scaled_params:
+                        # Define the initial state point
+                        state_point = {
+                            "atom_type": at_number,
+                            "obj_choice": obj_choice,
+                            "mol_name": molec_name,
+                            "mol_weight": molec_data.molecular_weight,  # amu
+                            "smiles": molec_data.smiles_str,
+                            "N_atoms": molec_data.n_atoms,
+                            "T": float(temp),  # K
+                            "P": float(press[int(temp)]),  # bar
+                            "N_vap": n_vap,
+                            "N_liq": n_liq,
+                            "expt_liq_density": molec_data.expt_liq_density[
+                                int(temp)
+                            ],  # kg/m^3
+                            "nsteps_eq": 10000,
+                            "nsteps_prod": 100000,
+                            "restart": restart + 1,
+                            "param_set": i + 1,
+                        }
+                        state_point = unpack_molec_values(
+                            molec_name, setup.at_class, sample, state_point
+                        )
 
-                    state_point["nsteps_liqeq"] = 10000
-                    state_point["nsteps_nvt"] = 2500000
+                        state_point["nsteps_liqeq"] = 10000
+                        state_point["nsteps_nvt"] = 2500000                        
 
-                    # if molec_name in ["R23","R152a","R134", "R152"]:
-                    #     state_point["nsteps_nvt"] = 2500000
-                    #     state_point["nsteps_liqeq"]= 10000
-                    # elif molec_name in "R161" and temp == 240.0:
-                    #     state_point["nsteps_nvt"] = 2500000
-                    #     state_point["nsteps_liqeq"]= 5000
-                    # else:
-                    # state_point["nsteps_nvt"] = 2500000
-                    
-
-                    # print(state_point)
-                    job = project.open_job(state_point)
-                    job.init()
-                    # Add weights to job document
-                    if obj_choice == "ExpValPrior":
-                        job.doc.weights = setup.at_class.at_weights
-                        job.doc.wt_params = setup.at_class.weighted_params
+                        # print(state_point)
+                        job = project.open_job(state_point)
+                        job.init()
+                        # Add weights to job document
+                        if obj_choice == "ExpValPrior":
+                            job.doc.weights = setup.at_class.at_weights
+                            job.doc.wt_params = setup.at_class.weighted_params
