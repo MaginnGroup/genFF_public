@@ -861,7 +861,7 @@ def run_gemc(job):
             mc.restart(
                 restart_from=prior_run,
                 run_type="production",
-                total_run_length=job.sp.nsteps_prod,
+                total_run_length=job.sp.nsteps_prod + job.doc.nsteps_eq,
                 run_name="prod",
             )
     except:
