@@ -52,7 +52,6 @@ def create_forcefield(job):
     with open(job.fn("ff.xml"), "w") as ff:
         ff.write(content)
 
-
 def calc_box_helper(job):
     "Calculate the initial box length of the boxes"
 
@@ -115,44 +114,6 @@ def calc_boxes(job):
     "Calculate the initial box length of the boxes"
     liqbox, vapbox = calc_box_helper(job)
 
-
-# @Project.post(lambda job: "vapboxl" in job.doc)
-# @Project.operation
-# def calc_vapboxl(job):
-#     "Calculate the initial box length of the vapor box"
-
-#     import unyt as u
-
-#     pressure = job.sp.P * u.bar
-#     temperature = job.sp.T * u.K
-#     nmols_vap = job.sp.N_vap
-
-#     vol_vap = nmols_vap * u.kb * temperature / pressure
-#     boxl = vol_vap ** (1.0 / 3.0)
-#     # Strip unyts and round to 0.1 angstrom
-#     boxl = round(float(boxl.in_units(u.nm).value), 2)
-#     # Save to job document file
-#     job.doc.vapboxl = boxl  # nm, compatible with mbuild
-
-# @Project.post(lambda job: "liqboxl" in job.doc)
-# @Project.operation
-# def calc_liqboxl(job):
-#     "Calculate the initial box length of the liquid box"
-
-#     import unyt as u
-
-#     nmols_liq = job.sp.N_liq
-#     liq_density = job.sp.expt_liq_density * u.Unit("kg/m**3")
-#     molweight = job.sp.mol_weight * u.amu
-#     mol_density = liq_density / molweight
-#     vol_liq = nmols_liq / mol_density
-#     boxl = vol_liq ** (1.0 / 3.0)
-#     # Strip unyts and round to 0.1 angstrom
-#     boxl = round(float(boxl.in_units(u.nm).value), 2)
-#     # Save to job document file
-#     job.doc.liqboxl = boxl  # nm, compatible with mbuild
-
-
 @Project.label
 def nvt_finished(job):
     "Confirm a given nvt simulation is completed or not necessary"
@@ -168,7 +129,7 @@ def nvt_finished(job):
                 thermo_data = np.genfromtxt("nvt.eq.out.prp", skip_header=3)
                 completed = (
                     int(thermo_data[-1][0]) == job.sp.nsteps_nvt
-                )  # job.sp.nsteps_liqeq
+                )
             except:
                 completed = False
                 pass
@@ -201,7 +162,7 @@ def NVT_liqbox(job):
     species_list = [compound_ff]
     moves = mc.MoveSet("nvt", species_list)
 
-    # Property outputs relevant for NPT simulations
+    # Property outputs relevant for NVT simulations
     thermo_props = ["energy_total", "pressure"]
 
     custom_args = {
@@ -212,9 +173,10 @@ def NVT_liqbox(job):
         "charge_cutoff": 12.0 * u.angstrom,
         "ewald_accuracy": 1.0e-5,
         "mixing_rule": "lb",
-        "units": "steps",
-        "coord_freq": 1000,
-        "prop_freq": 1000,
+        "units": "sweeps",
+        "steps_per_sweep": job.sp.N_liq,
+        "coord_freq": 500,
+        "prop_freq": 10,
     }
     custom_args["run_name"] = "nvt.eq"
     custom_args["properties"] = thermo_props
@@ -311,10 +273,7 @@ def npt_finished(job):
 
     with job:
         try:
-            if job.isfile("liqbox-equil/equil.out.prp") and "nsteps_nvt" not in job.sp:
-                thermo_data = np.genfromtxt("liqbox-equil/equil.out.prp", skip_header=3)
-            else:
-                thermo_data = np.genfromtxt("npt.eq.out.prp", skip_header=3)
+            thermo_data = np.genfromtxt("npt.eq.out.prp", skip_header=3)
             completed = (
                 int(thermo_data[-1][0]) == job.sp.nsteps_liqeq
             ) 
@@ -324,11 +283,8 @@ def npt_finished(job):
 
     return completed
 
-
-# @Project.pre.after(extract_final_NVT_config)
-@Project.pre.after(create_forcefield, calc_boxes)
+@Project.pre.after(create_forcefield, calc_boxes, extract_final_NVT_config)
 @Project.pre(lambda job: "gemc_failed" not in job.doc)
-@Project.pre(nvt_finished)
 @Project.post(npt_finished)
 @Project.operation(directives={"omp_num_threads": 12})
 def NPT_liqbox(job):
@@ -395,8 +351,8 @@ def NPT_liqbox(job):
         "vdw_cutoff": 12.0 * u.angstrom,
         "units": "sweeps",
         "steps_per_sweep": job.sp.N_liq,
-        "coord_freq": 1000,
-        "prop_freq": 500,
+        "coord_freq": 500,
+        "prop_freq": 10,
         "properties": thermo_props,
     }
 
@@ -411,7 +367,7 @@ def NPT_liqbox(job):
                 system=system,
                 moveset=moves,
                 run_type="equilibration",
-                run_length=job.sp.nsteps_liqeq,
+                run_length=job.sp.nsteps_npt,
                 temperature=job.sp.T * u.K,
                 pressure=job.sp.P * u.bar,
                 **custom_args
@@ -440,7 +396,7 @@ def NPT_liqbox(job):
         else:  # Otherwise, try with critical conditions
             job.doc.use_crit = True
             # Ensure that you will do an nvt simulation before the next gemc simulation
-            job.sp.nsteps_nvt = 2500000
+            job.sp.nsteps_nvt = 2500
             # If GEMC fails, remove files in post conditions of previous operations
             del job.doc["vapboxl"]  # calc_boxes
             del job.doc["liqboxl"]  # calc_boxes
@@ -452,144 +408,9 @@ def NPT_liqbox(job):
                     del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
                     os.remove("liqbox.xyz")  # extract_final_NPT_config
 
-
-# @Project.label
-# def liqbox_equilibrated(job):
-#     "Confirm liquid box equilibration completed"
-
-#     import numpy as np
-
-#     try:
-#         thermo_data = np.genfromtxt(
-#             job.fn("liqbox-equil/equil.out.prp"), skip_header=3
-#         )
-#         completed = int(thermo_data[-1][0]) == job.sp.nsteps_liqeq
-#     except:
-#         completed = False
-#         pass
-
-#     return completed
-
-# @Project.pre.after(create_forcefield, calc_liqboxl, calc_vapboxl)
-# @Project.post(liqbox_equilibrated)
-# @Project.operation(directives={"omp_num_threads": 2})
-# def equilibrate_liqbox(job):
-#     "Equilibrate the liquid box"
-
-#     import os
-#     import errno
-#     import mbuild
-#     import foyer
-#     import mosdef_cassandra as mc
-#     import unyt as u
-#     ff = foyer.Forcefield(job.fn("ff.xml"))
-
-#     # Load the compound and apply the ff
-#     compound = mbuild.load(job.sp.smiles, smiles=True)
-#     compound_ff = ff.apply(compound)
-
-#     # Create box list and species list
-#     boxl = job.doc.liqboxl
-#     box = mbuild.Box(lengths=[boxl, boxl, boxl])
-
-#     box_list = [box]
-#     species_list = [compound_ff]
-
-#     mols_to_add = [[job.sp.N_liq]]
-
-#     system = mc.System(box_list, species_list, mols_to_add=mols_to_add)
-
-#     # Create a new moves object
-#     moves = mc.MoveSet("npt", species_list)
-
-#     # Edit the volume move probability to be more reasonable
-#     orig_prob_volume = moves.prob_volume
-#     new_prob_volume = 1.0 / job.sp.N_liq
-#     moves.prob_volume = new_prob_volume
-
-#     moves.prob_translate = (
-#         moves.prob_translate + orig_prob_volume - new_prob_volume
-#     )
-
-#     # Define thermo output props
-#     thermo_props = [
-#         "energy_total",
-#         "pressure",
-#         "volume",
-#         "nmols",
-#         "mass_density",
-#     ]
-
-#     # Define custom args
-#     custom_args = {
-#         "run_name": "equil",
-#         "charge_style": "ewald",
-#         "rcut_min": 1.0 * u.angstrom,
-#         "vdw_cutoff": 12.0 * u.angstrom,
-#         "units": "sweeps",
-#         "steps_per_sweep": job.sp.N_liq,
-#         "coord_freq": 500,
-#         "prop_freq": 10,
-#         "properties": thermo_props,
-#     }
-
-#     # Move into the job dir and start doing things
-#     with job:
-#         liq_dir = "liqbox-equil"
-#         try:
-#             os.mkdir(liq_dir)
-#         except OSError as e:
-#             if e.errno != errno.EEXIST:
-#                 raise
-#         os.chdir(liq_dir)
-#         # Run equilibration
-#         mc.run(
-#             system=system,
-#             moveset=moves,
-#             run_type="equilibration",
-#             run_length=job.sp.nsteps_liqeq,
-#             temperature=job.sp.T * u.K,
-#             pressure=job.sp.P * u.bar,
-#             **custom_args
-#         )
-
-
-# @Project.pre.after(equilibrate_liqbox)
-# @Project.post.isfile("liqbox.xyz")
-# @Project.post(lambda job: "liqbox_final_dim" in job.doc)
-# @Project.operation
-# def extract_final_liqbox(job):
-#     "Extract final coords and box dims from the liquid box simulation"
-
-#     import subprocess
-
-#     n_atoms = job.sp.N_liq * job.sp.N_atoms
-#     cmd = [
-#         "tail",
-#         "-n",
-#         str(n_atoms + 2),
-#         job.fn("liqbox-equil/equil.out.xyz"),
-#     ]
-
-#     # Save final liuqid box xyz file
-#     xyz = subprocess.check_output(cmd).decode("utf-8")
-#     with open(job.fn("liqbox.xyz"), "w") as xyzfile:
-#         xyzfile.write(xyz)
-
-#     # Save final box dims to job.doc
-#     box_data = []
-#     with open(job.fn("liqbox-equil/equil.out.H")) as f:
-#         for line in f:
-#             box_data.append(line.strip().split())
-#     job.doc.liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
-
-
 @Project.pre.after(NPT_liqbox)
-@Project.post(
-    lambda job: job.isfile("npt.final.xyz")
-    or (job.isfile("liqbox.xyz") and "nsteps_nvt" not in job.sp)
-)
-@Project.post(lambda job: "npt_liqbox_final_dim" or "liqbox_final_dim" in job.doc)
+@Project.post(lambda job: "npt_liqbox_final_dim" in job.doc)
+@Project.post.isfile("npt.final.xyz")
 @Project.operation
 def extract_final_NPT_config(job):
     "Extract final coords and box dims from the liquid box simulation"
@@ -644,9 +465,9 @@ def gemc_equil_complete(job):
 
     try:
         thermo_data = np.genfromtxt(selected_file, skip_header=2)
-        #This line will fail until job.doc.nsteps_eq is defined
-        if hasattr(job.doc, 'nsteps_eq'):
-            completed = int(thermo_data[-1][0]) == job.doc.nsteps_eq
+        #This line will fail until job.doc.nsteps_gemc_eq is defined
+        if hasattr(job.doc, 'nsteps_gemc_eq'):
+            completed = int(thermo_data[-1][0]) == job.doc.nsteps_gemc_eq
         else:
             completed = False
     except:
@@ -662,7 +483,7 @@ def gemc_prod_complete(job):
 
     try:
         thermo_data = np.genfromtxt(job.fn("prod.out.box1.prp"), skip_header=3)
-        completed = int(thermo_data[-1][0]) == job.sp.nsteps_prod
+        completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod
     except:
         completed = False
         pass
@@ -688,10 +509,7 @@ def run_gemc(job):
     compound_ff = ff.apply(compound)
 
     # Create box list and species list
-    if "liqbox_final_dim" in job.doc:
-        boxl_liq = job.doc.liqbox_final_dim  # saved in nm
-    else:
-        boxl_liq = job.doc.npt_liqbox_final_dim  # saved in nm
+    boxl_liq = job.doc.npt_liqbox_final_dim  # saved in nm
     # liq_box = mbuild.load(job.fn("liqbox.xyz"))
     with job:
         liq_box = mbuild.formats.xyz.read_xyz(job.fn("npt.final.xyz"))
@@ -759,140 +577,154 @@ def run_gemc(job):
     }
 
     # Move into the job dir and start doing things
-    try:
-        #Inititalize counter and number of eq_steps
+    # try:
+    #Inititalize counter and number of eq_steps
+    count = 1
+    total_eq_steps = job.sp.nsteps_gemc_eq
+    max_eq_steps = job.sp.nsteps_gemc_eq*6
+    eq_extend = int(job.sp.nsteps_gemc_eq/4)
+    #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
+    job.doc.nsteps_gemc_eq = int(job.sp.nsteps_gemc_eq*4+1)
+    with job:
+        first_run = custom_args["run_name"] #gemc.eq
+        # Run initial equilibration if it does not exxist
+        if not has_checkpoint(first_run):
+            mc.run(
+                system=system,
+                moveset=moves,
+                run_type="equilibration",
+                run_length=job.sp.nsteps_gemc_eq,
+                temperature=job.sp.T * u.K,
+                **custom_args
+            )
+        elif not check_complete(first_run):
+            mc.restart(
+                restart_from=get_last_checkpoint(first_run),
+            )
+
+        init_gemc_liq = job.fn(first_run + ".out.box1.prp")
+        init_gemc_vap = job.fn(first_run + ".out.box2.prp")
+        prop_cols = [5] #Use number of moles to decide equilibrium
+        # Load initial eq data from both boxes
+        df_box1 = np.genfromtxt(init_gemc_liq)
+        df_box2 = np.genfromtxt(init_gemc_vap)
+
+        # Process both boxes in one loop
+        eq_data_dict = {}
+        for b, box in enumerate([df_box1, df_box2]):
+            box_name = "Liquid" if b == 0 else "Vapor"
+            for prop_index in prop_cols:
+                eq_col = box[:, prop_index - 1]
+                #Save eq_col as a csv for later analysis
+                key = f"{box_name}_{prop_index}"
+                eq_col_file = job.fn(f"{box_name}_eq_col_{prop_index}.csv")
+                np.savetxt(eq_col_file, eq_col, delimiter=",")
+                #Save the eq_col and file to a dictionary for later use
+                eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
+
+        #Set production start tolerance as at least 25% of the original number of data points
+        prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
         count = 1
-        total_eq_steps = job.sp.nsteps_eq
-        eq_extend = int(job.sp.nsteps_eq/4)
-        #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
-        job.doc.nsteps_eq = int(job.sp.nsteps_eq*4+1)
-        with job:
-            prior_run = custom_args["run_name"] #gemc.eq
-            # Run initial equilibration if it does not exxist
-            init_gemc_liq = job.fn(prior_run + ".out.box1.prp")
-            init_gemc_vap = job.fn(prior_run + ".out.box2.prp")
-            if not os.path.exists(init_gemc_liq) or not os.path.exists(init_gemc_vap):
-                mc.run(
-                    system=system,
-                    moveset=moves,
-                    run_type="equilibration",
-                    run_length=job.sp.nsteps_eq,
-                    temperature=job.sp.T * u.K,
-                    **custom_args
-                )
-
-            prop_cols = [5] #Use number of moles to decide equilibrium
-            # Load initial eq data from both boxes
-            df_box1 = np.genfromtxt(init_gemc_liq)
-            df_box2 = np.genfromtxt(init_gemc_vap)
-
-            # Process both boxes in one loop
-            eq_data_dict = {}
-            for b, box in enumerate([df_box1, df_box2]):
-                box_name = "Liquid" if b == 0 else "Vapor"
-                for prop_index in prop_cols:
-                    eq_col = box[:, prop_index - 1]
-                    #Save eq_col as a csv for later analysis
-                    key = f"{box_name}_{prop_index}"
-                    eq_col_file = job.fn(f"{box_name}_eq_col_{prop_index}.csv")
-                    np.savetxt(eq_col_file, eq_col, delimiter=",")
-                    #Save the eq_col and file to a dictionary for later use
-                    eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
-
-            #While we are using at most 12 attempts to equilibrate
-            #Set production start tolerance as at least 25% of the original number of data points
-            prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
-            while count <= 13:
-                # Check if equilibration is reached via the pymser algorithms
-                is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
-                this_run = custom_args["run_name"] + f".rst.{count:03d}"
-                if count > 1:
-                    #Restart the simulation from the last successful equilibration
-                    prior_run = custom_args["run_name"] + f".rst.{count-1:03d}"
-                if is_equil:
-                    break
+        #While the max number of eq steps has not been reached
+        while total_eq_steps <= max_eq_steps:
+            # Check if equilibration is reached via the pymser algorithms
+            is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
+            #Set this run and last last run
+            this_run = custom_args["run_name"] + f".rst.{count:03d}"
+            prior_run = get_last_checkpoint(custom_args["run_name"])
+            if is_equil:
+                break
+            else:
+                #Increase the total number of eq steps by 25% of the original value and restart the simulation
+                total_eq_steps += int(eq_extend)
+                #If we've exceeded the maximum number of equilibrium steps, raise an exception
+                #This forces a retry with critical conditions or will note complete GEMC failure
+                if total_eq_steps > max_eq_steps:
+                    job.doc.equil_fail = True
+                    raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
+                #Otherwise continue equilibration
                 else:
-                    #Increase the total number of eq steps by 25% of the original value and restart the simulation
-                    total_eq_steps += int(eq_extend)
-                    #If we've exceeded the maximum number of equilibrium steps, raise an exception
-                    #This forces a retry with critical conditions or will note complete GEMC failure
-                    if count == 13:
-                        job.doc.equil_fail = True
-                        raise Exception(f"GEMC equilibration failed to converge after {job.sp.nsteps_eq*4} steps")
-                    #Otherwise continue equilibration
-                    else:
-                        #Check if checkpoint file exists, if not, restart the simulation
-                        check_file = this_run + ".out.chk"
-                        # if not os.path.exists(check_file):
+                    #Check if checkpoint file exists, if so, we've already done this restart
+                    # if not, restart the simulation
+                    if not has_checkpoint(this_run):
                         mc.restart(
                         restart_from=prior_run,
                         run_type="equilibration",
                         total_run_length=total_eq_steps,
                         run_name = this_run )
+                    elif not check_complete(this_run):
+                        mc.restart(
+                            restart_from=get_last_checkpoint(this_run),
+                        )
 
-                        #Add restart data to eq_col
-                        # After each restart, load the updated properties data for both boxes
-                        sim_box1 =  this_run + ".out.box1.prp"
-                        sim_box2 =  this_run + ".out.box2.prp"
-                        df_box1r = np.genfromtxt(job.fn(sim_box1))
-                        df_box2r = np.genfromtxt(job.fn(sim_box2))
+                    #Add restart data to eq_col
+                    # After each restart, load the updated properties data for both boxes
+                    sim_box1 =  this_run + ".out.box1.prp"
+                    sim_box2 =  this_run + ".out.box2.prp"
+                    df_box1r = np.genfromtxt(job.fn(sim_box1))
+                    df_box2r = np.genfromtxt(job.fn(sim_box2))
 
-                        # Process and add the restart data to eq_col for each property in each box
-                        for b, box in enumerate([df_box1r, df_box2r]):
-                            box_name = "Liquid" if b == 0 else "Vapor"
-                            for i, prop_index in enumerate(prop_cols):
-                                #Get the key from the property and box name
-                                key = f"{box_name}_{prop_index}"
-                                # Extract the column data for this restart and append to accumulated data
-                                eq_col_restart = box[:, prop_index - 1]
-                                all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
-                                #Save the new data to the eq_col file
-                                np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
-                                #Overwite the current data in the eq_data_dict with restart data
-                                eq_data_dict[key]["data"] = all_eq_data
-                #Increase the counter
-                count += 1
+                    # Process and add the restart data to eq_col for each property in each box
+                    for b, box in enumerate([df_box1r, df_box2r]):
+                        box_name = "Liquid" if b == 0 else "Vapor"
+                        for i, prop_index in enumerate(prop_cols):
+                            #Get the key from the property and box name
+                            key = f"{box_name}_{prop_index}"
+                            # Extract the column data for this restart and append to accumulated data
+                            eq_col_restart = box[:, prop_index - 1]
+                            all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
+                            #Save the new data to the eq_col file
+                            np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
+                            #Overwite the current data in the eq_data_dict with restart data
+                            eq_data_dict[key]["data"] = all_eq_data
+            #Increase the counter
+            count += 1
 
-            #Set the step counter to whatever the final number of equilibration steps was
-            job.doc.nsteps_eq = total_eq_steps
-            job.doc.equil_fail = False
-
-            # Run production
+        #Set the step counter to whatever the final number of equilibration steps was
+        job.doc.nsteps_gemc_eq = total_eq_steps
+        job.doc.equil_fail = False
+        total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
+        # Run production
+        if not has_checkpoint("prod"):
             mc.restart(
                 restart_from=prior_run,
                 run_type="production",
-                total_run_length=job.sp.nsteps_prod + job.doc.nsteps_eq,
+                total_run_length=total_sim_steps,
                 run_name="prod",
             )
-    except:
-        # if GEMC failed with critical conditions as intial conditions, terminate with error
-        if "use_crit" in job.doc and job.doc.use_crit == True:
-            # If so, terminate with error and log failure in job document
-            job.doc.gemc_failed = True
-            raise Exception(
-                "GEMC failed with critical and experimental starting conditions and the molecule is "
-                + job.sp.mol_name
-                + " at temperature "
-                + str(job.sp.T)
+        elif not check_complete("prod"):
+            mc.restart(
+                restart_from=get_last_checkpoint("prod"),
             )
-        else:
-            # Otherwise, try with critical conditions
-            job.doc.use_crit = True
-            # Ensure that you will do an nvt simulation before the next gemc simulation
-            job.sp.nsteps_nvt = 2500000
-            # If GEMC fails, remove files in post conditions of previous operations
-            del job.doc["vapboxl"]  # calc_boxes
-            del job.doc["liqboxl"]  # calc_boxes
-            with job:
-                if job.isfile("nvt.eq.out.prp"):
-                    os.remove("nvt.eq.out.prp")  # NVT_liqbox
-                    os.remove("nvt.final.xyz")  # extract_final_NVT_config
-                if job.isfile("npt.eq.out.prp"):
-                    os.remove("npt.eq.out.prp")  # NPT_liqbox
-                    os.remove("npt.final.xyz")  # extract_final_NPT_config
-                if "liqbox_final_dim" in job.doc:
-                    del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
-                    os.remove("liqbox.xyz")  # extract_final_NPT_config
+    # except:
+    #     # if GEMC failed with critical conditions as intial conditions, terminate with error
+    #     if "use_crit" in job.doc and job.doc.use_crit == True:
+    #         # If so, terminate with error and log failure in job document
+    #         job.doc.gemc_failed = True
+    #         raise Exception(
+    #             "GEMC failed with critical and experimental starting conditions and the molecule is "
+    #             + job.sp.mol_name
+    #             + " at temperature "
+    #             + str(job.sp.T)
+    #         )
+    #     else:
+    #         # Otherwise, try with critical conditions
+    #         job.doc.use_crit = True
+    #         # Ensure that you will do an nvt simulation before the next gemc simulation
+    #         job.sp.nsteps_nvt = 2500000
+    #         # If GEMC fails, remove files in post conditions of previous operations
+    #         del job.doc["vapboxl"]  # calc_boxes
+    #         del job.doc["liqboxl"]  # calc_boxes
+    #         with job:
+    #             if job.isfile("nvt.eq.out.prp"):
+    #                 os.remove("nvt.eq.out.prp")  # NVT_liqbox
+    #                 os.remove("nvt.final.xyz")  # extract_final_NVT_config
+    #             if job.isfile("npt.eq.out.prp"):
+    #                 os.remove("npt.eq.out.prp")  # NPT_liqbox
+    #                 os.remove("npt.final.xyz")  # extract_final_NPT_config
+    #             if "liqbox_final_dim" in job.doc:
+    #                 del job.doc["liqbox_final_dim"]  # extract_final_NPT_config
+    #                 os.remove("liqbox.xyz")  # extract_final_NPT_config
 
 #Create operation to delete failed jobs
 @Project.label
@@ -1707,6 +1539,48 @@ def _generate_r143_xml(job):
     )
 
     return content
+
+def has_checkpoint(run_name):
+    """Check whether there is a checkpoint for run_name."""
+    fname = run_name + ".out.chk"
+    return os.path.exists(fname)
+
+def check_complete(run_name):
+    """Check whether MoSDeF Cassandra simulation with run_name or its last restart has completed."""
+    complete = False
+    fname = run_name + ".out.log"
+    loglist = list_with_restarts(fname)
+    if not loglist:
+        return complete
+    with loglist[-1].open() as f:
+        for line in f:
+            if "Cassandra simulation complete" in line:
+                complete = True
+                break
+    return complete
+
+def list_with_restarts(fpath):
+    """List fpath and its restart versions in order as pathlib Path objects."""
+    fpath = Path(fpath)
+    if not fpath.exists():
+        return []
+    parent = fpath.parent
+    fname = fpath.name
+    fnamesplit = fname.split(".out.")
+    run_name = fnamesplit[0]
+    suffix = fnamesplit[1]
+    restarts = [
+        Path(parent, f)
+        for f in sorted(list(parent.glob(run_name + ".rst.*.out." + suffix)))
+    ]
+    restarts.insert(0, fpath)  # prepend fpath to list of restarts
+    return restarts
+
+def get_last_checkpoint(run_name):
+    """Get name of last restart based on run_name."""
+    fname = run_name + ".out.chk"
+    return list_with_restarts(fname)[-1].name.split(".out.")[0]
+
 
 def plot_res_pymser(job, eq_col, results, name, box_name):
     fig, [ax1, ax2] = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, sharey=True)

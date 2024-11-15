@@ -27,9 +27,6 @@ class ProjectGAFF(FlowProject):
         #Set Project Path to be that of the current working directory
         super().__init__(path = current_path)
         
-vle = ProjectGAFF.make_group(name="vle")
-
-@vle
 @ProjectGAFF.post.isfile("ff.xml")
 @ProjectGAFF.operation
 def create_gaff_forcefield(job):
@@ -78,7 +75,7 @@ def npt_finished(job):
     return completed
 
 @ProjectGAFF.label
-def gemc_finished(job):
+def gemc_prod_complete(job):
     "Confirm a given simulation is completed"
     import numpy as np
     import os
@@ -95,7 +92,7 @@ def gemc_finished(job):
 
     return completed
 
-def calc_boxl_helper(job):
+def calc_box_helper(job):
     "Calculate the initial box length of the boxes"
 
     import unyt as u
@@ -143,16 +140,14 @@ def calc_boxl_helper(job):
 
     return job.doc.liqboxl, job.doc.vapboxl
 
-@vle
 @ProjectGAFF.post(lambda job: "vapboxl" in job.doc)
 @ProjectGAFF.post(lambda job: "liqboxl" in job.doc)
 @ProjectGAFF.operation
-def calc_boxl(job):
+def calc_boxes(job):
     "Calculate the initial box length of the boxes"
-    liqbox, vapbox = calc_boxl_helper(job)
+    liqbox, vapbox = calc_box_helper(job)
 
-@vle
-@ProjectGAFF.pre.after(calc_boxl)
+@ProjectGAFF.pre.after(calc_boxes)
 @ProjectGAFF.post(nvt_finished)
 @ProjectGAFF.operation(directives={"omp_num_threads": 12})
 def NVT_liqbox(job):
@@ -181,7 +176,7 @@ def NVT_liqbox(job):
             "pressure"
             ]
 
-    custom_args, custom_args_gemc = _get_custom_args()
+    custom_args, custom_args_gemc = _get_custom_args(job)
     custom_args["run_name"] = "nvt.eq"
     custom_args["properties"] = thermo_props
     mols_to_add = [[job.sp.N_liq]]
@@ -211,7 +206,7 @@ def NVT_liqbox(job):
             
     except:
         #Note this overwrites liquid and vapor box lengths in job.doc
-        liqbox, vapbox = calc_boxl_helper(job)
+        liqbox, vapbox = calc_box_helper(job)
         # Create system with box lengths based on critical points
         boxl = job.doc.liqboxl
         box = mbuild.Box(lengths=[boxl, boxl, boxl])
@@ -234,7 +229,6 @@ def NVT_liqbox(job):
             job.doc.nvt_failed == True
             raise Exception("NVT failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
 
-@vle
 @ProjectGAFF.pre.after(NVT_liqbox)
 @ProjectGAFF.post.isfile("nvt.final.xyz")
 @ProjectGAFF.post(lambda job: "nvt_liqbox_final_dim" in job.doc)
@@ -264,8 +258,6 @@ def extract_final_NVT_config(job):
             box_data.append(line.strip().split())
     job.doc.nvt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
-
-@vle
 @ProjectGAFF.pre.after(extract_final_NVT_config)
 @ProjectGAFF.post(npt_finished)
 @ProjectGAFF.operation(directives={"omp_num_threads": 12})
@@ -322,7 +314,7 @@ def NPT_liqbox(job):
     ]
 
     # Define custom args
-    custom_args, custom_args_gemc = _get_custom_args()
+    custom_args, custom_args_gemc = _get_custom_args(job)
     custom_args["run_name"] = "npt.eq"
     custom_args["properties"] = thermo_props
 
@@ -348,7 +340,6 @@ def NPT_liqbox(job):
             **custom_args
         )
 
-@vle
 @ProjectGAFF.pre.after(NPT_liqbox)
 @ProjectGAFF.post.isfile("npt.final.xyz")
 @ProjectGAFF.post(lambda job: "npt_liqbox_final_dim" in job.doc)
@@ -378,12 +369,10 @@ def extract_final_NPT_config(job):
             box_data.append(line.strip().split())
     job.doc.npt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
-
-@vle
 @ProjectGAFF.pre.after(extract_final_NPT_config)
-@ProjectGAFF.post(gemc_finished)
-@ProjectGAFF.operation(directives={"omp_num_threads": 12})
-def GEMC(job):
+@ProjectGAFF.post(gemc_prod_complete)
+@ProjectGAFF.operation(directives={"omp_num_threads": 2})
+def run_gemc(job):
     "Equilibrate GEMC"
 
     import os
@@ -452,7 +441,7 @@ def GEMC(job):
     ]
 
     # Define custom args
-    custom_args, custom_args_gemc = _get_custom_args()
+    custom_args, custom_args_gemc = _get_custom_args(job)
     custom_args_gemc["run_name"] = "gemc.eq"
     custom_args_gemc["properties"] = thermo_props
 
@@ -464,24 +453,29 @@ def GEMC(job):
         #Inititalize counter and number of eq_steps
         count = 1
         total_eq_steps = job.sp.nsteps_gemc_eq
+        max_eq_steps = job.sp.nsteps_gemc_eq*6
         eq_extend = int(job.sp.nsteps_gemc_eq/4)
         #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
         job.doc.nsteps_gemc_eq = int(job.sp.nsteps_gemc_eq*4+1)
         with job:
-            prior_run = custom_args_gemc["run_name"] #gemc.eq
+            first_run = custom_args["run_name"] #gemc.eq
             # Run initial equilibration if it does not exxist
-            init_gemc_liq = job.fn(prior_run + ".out.box1.prp")
-            init_gemc_vap = job.fn(prior_run + ".out.box2.prp")
-            if not os.path.exists(init_gemc_liq) or not os.path.exists(init_gemc_vap):
+            if not has_checkpoint(first_run):
                 mc.run(
                     system=system,
                     moveset=moves,
                     run_type="equilibration",
                     run_length=job.sp.nsteps_gemc_eq,
                     temperature=job.sp.T * u.K,
-                    **custom_args_gemc
+                    **custom_args
+                )
+            elif not check_complete(first_run):
+                mc.restart(
+                    restart_from=get_last_checkpoint(first_run),
                 )
 
+            init_gemc_liq = job.fn(first_run + ".out.box1.prp")
+            init_gemc_vap = job.fn(first_run + ".out.box2.prp")
             prop_cols = [5] #Use number of moles to decide equilibrium
             # Load initial eq data from both boxes
             df_box1 = np.genfromtxt(init_gemc_liq)
@@ -500,16 +494,16 @@ def GEMC(job):
                     #Save the eq_col and file to a dictionary for later use
                     eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
 
-            #While we are using at most 12 attempts to equilibrate
             #Set production start tolerance as at least 25% of the original number of data points
             prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
-            while count <= 13:
+            count = 1
+            #While the max number of eq steps has not been reached
+            while total_eq_steps <= max_eq_steps:
                 # Check if equilibration is reached via the pymser algorithms
                 is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
-                this_run = custom_args_gemc["run_name"] + f".rst.{count:03d}"
-                if count > 1:
-                    #Restart the simulation from the last successful equilibration
-                    prior_run = custom_args_gemc["run_name"] + f".rst.{count-1:03d}"
+                #Set this run and last last run
+                this_run = custom_args["run_name"] + f".rst.{count:03d}"
+                prior_run = get_last_checkpoint(custom_args["run_name"])
                 if is_equil:
                     break
                 else:
@@ -517,19 +511,23 @@ def GEMC(job):
                     total_eq_steps += int(eq_extend)
                     #If we've exceeded the maximum number of equilibrium steps, raise an exception
                     #This forces a retry with critical conditions or will note complete GEMC failure
-                    if count == 13:
+                    if total_eq_steps > max_eq_steps:
                         job.doc.equil_fail = True
-                        raise Exception(f"GEMC equilibration failed to converge after {job.sp.nsteps_gemc_eq*4} steps")
+                        raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
                     #Otherwise continue equilibration
                     else:
-                        #Check if checkpoint file exists, if not, restart the simulation
-                        check_file = this_run + ".out.chk"
-                        # if not os.path.exists(check_file):
-                        mc.restart(
-                        restart_from=prior_run,
-                        run_type="equilibration",
-                        total_run_length=total_eq_steps,
-                        run_name = this_run )
+                        #Check if checkpoint file exists, if so, we've already done this restart
+                        # if not, restart the simulation
+                        if not has_checkpoint(this_run):
+                            mc.restart(
+                            restart_from=prior_run,
+                            run_type="equilibration",
+                            total_run_length=total_eq_steps,
+                            run_name = this_run )
+                        elif not check_complete(this_run):
+                            mc.restart(
+                                restart_from=get_last_checkpoint(this_run),
+                            )
 
                         #Add restart data to eq_col
                         # After each restart, load the updated properties data for both boxes
@@ -557,14 +555,19 @@ def GEMC(job):
             #Set the step counter to whatever the final number of equilibration steps was
             job.doc.nsteps_gemc_eq = total_eq_steps
             job.doc.equil_fail = False
-
+            total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
             # Run production
-            mc.restart(
-                restart_from=prior_run,
-                run_type="production",
-                total_run_length=job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq,
-                run_name="prod",
-            )
+            if not has_checkpoint("prod"):
+                mc.restart(
+                    restart_from=prior_run,
+                    run_type="production",
+                    total_run_length=total_sim_steps,
+                    run_name="prod",
+                )
+            elif not check_complete("prod"):
+                mc.restart(
+                    restart_from=get_last_checkpoint("prod"),
+                )
 
     except:
         #if GEMC failed with critical conditions as intial conditions, terminate with error
@@ -602,8 +605,7 @@ def del_job(job):
     "Delete job if gemc failed"
     job.remove()
 
-@vle
-@ProjectGAFF.pre.after(GEMC)
+@ProjectGAFF.pre.after(run_gemc)
 @ProjectGAFF.post.isfile("energy.png")
 @ProjectGAFF.post(lambda job: "liq_density" in job.doc)
 @ProjectGAFF.post(lambda job: "vap_density" in job.doc)
@@ -750,8 +752,7 @@ def plot_finished(job):
 
     return completed
 
-@vle
-@ProjectGAFF.pre.after(GEMC)
+@ProjectGAFF.pre.after(run_gemc)
 @ProjectGAFF.post(plot_finished)
 @ProjectGAFF.operation
 def plot(job):
@@ -971,7 +972,7 @@ def plot(job):
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
 #####################################################################
-def _get_custom_args():
+def _get_custom_args(job):
     # Define custom args
     # See page below for all options 
     # https://mosdef-cassandra.readthedocs.io/en/latest/guides/kwargs.html
@@ -983,15 +984,14 @@ def _get_custom_args():
         "charge_cutoff": 12.0 * u.angstrom, 
         "ewald_accuracy": 1.0e-5, 
         "mixing_rule": "lb",
-        "units": "steps",
-        "coord_freq": 1000,
-        "prop_freq": 1000,
+        "units": "sweeps",
+        "steps_per_sweep": job.sp.N_liq,
+        "coord_freq": 500,
+        "prop_freq": 10,
     }
 
     custom_args_gemc = copy.deepcopy(custom_args)
-    custom_args_gemc["units"] = "steps"
-    custom_args_gemc["coord_freq"] = 500000
-    custom_args_gemc["prop_freq"] = 10000
+    custom_args_gemc["steps_per_sweep"] = job.sp.N_liq + job.sp.N_vap
     custom_args_gemc["vdw_cutoff_box1"] = custom_args["vdw_cutoff"] 
     custom_args_gemc["charge_cutoff_box1"] = custom_args["charge_cutoff"]
 
@@ -1638,6 +1638,47 @@ def _generate_r143_xml(job):
     )
 
     return content
+
+def has_checkpoint(run_name):
+    """Check whether there is a checkpoint for run_name."""
+    fname = run_name + ".out.chk"
+    return os.path.exists(fname)
+
+def check_complete(run_name):
+    """Check whether MoSDeF Cassandra simulation with run_name or its last restart has completed."""
+    complete = False
+    fname = run_name + ".out.log"
+    loglist = list_with_restarts(fname)
+    if not loglist:
+        return complete
+    with loglist[-1].open() as f:
+        for line in f:
+            if "Cassandra simulation complete" in line:
+                complete = True
+                break
+    return complete
+
+def list_with_restarts(fpath):
+    """List fpath and its restart versions in order as pathlib Path objects."""
+    fpath = Path(fpath)
+    if not fpath.exists():
+        return []
+    parent = fpath.parent
+    fname = fpath.name
+    fnamesplit = fname.split(".out.")
+    run_name = fnamesplit[0]
+    suffix = fnamesplit[1]
+    restarts = [
+        Path(parent, f)
+        for f in sorted(list(parent.glob(run_name + ".rst.*.out." + suffix)))
+    ]
+    restarts.insert(0, fpath)  # prepend fpath to list of restarts
+    return restarts
+
+def get_last_checkpoint(run_name):
+    """Get name of last restart based on run_name."""
+    fname = run_name + ".out.chk"
+    return list_with_restarts(fname)[-1].name.split(".out.")[0]
 
 def plot_res_pymser(job, eq_col, results, name, box_name):
     fig, [ax1, ax2] = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, sharey=True)

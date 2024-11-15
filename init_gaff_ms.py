@@ -63,10 +63,10 @@ def init_project():
                     "N_vap": n_vap,
                     "N_liq": n_liq,
                     "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
-                    "nsteps_nvt": 2500000,
-                    "nsteps_npt": 2000,
-                    "nsteps_gemc_eq":10000000,
-                    "nsteps_gemc_prod": 25000000,
+                    "nsteps_nvt": 2500,
+                    "nsteps_npt": 5000,
+                    "nsteps_gemc_eq":10000,
+                    "nsteps_gemc_prod": 100000,
                     "restart": restart+1,
                 }            
 

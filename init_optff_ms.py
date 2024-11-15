@@ -151,17 +151,16 @@ for molec_name, molec_data in molec_dict.items():
                             "expt_liq_density": molec_data.expt_liq_density[
                                 int(temp)
                             ],  # kg/m^3
-                            "nsteps_eq": 10000,
-                            "nsteps_prod": 100000,
+                            "nsteps_nvt": 2500,
+                            "nsteps_npt": 5000,
+                            "nsteps_gemc_eq": 10000, #We will actually be using sweeps and not steps as units here
+                            "nsteps_gemc_prod": 100000, #Sweeps
                             "restart": restart + 1,
                             "param_set": i + 1,
                         }
                         state_point = unpack_molec_values(
                             molec_name, setup.at_class, sample, state_point
-                        )
-
-                        state_point["nsteps_liqeq"] = 10000
-                        state_point["nsteps_nvt"] = 2500000                        
+                        )                
 
                         # print(state_point)
                         job = project.open_job(state_point)
