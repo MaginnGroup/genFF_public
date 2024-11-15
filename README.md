@@ -47,9 +47,9 @@ To run vapor-liquid-equilibrium iterations, follow the following steps:
 6. Run simulation
    ```
      python project_optff_ms.py submit -o NVT_liqbox --bundle=12 --parallel
-     python project_optff_ms.py run -o extract_final_NVT_config
-     python project_optff_ms.py submit -o NPT_liqbox
-     python project_optff_ms.py run -o extract_final_NPT_config
+     python project_optff_ms.py submit -o extract_final_NVT_config
+     python project_optff_ms.py submit -o NPT_liqbox --bundle=12 --parallel
+     python project_optff_ms.py submit -o extract_final_NPT_config
      python project_optff_ms.py submit -o run_gemc --bundle=12 --parallel
    ```   
 7. Calculate VLE Properties
@@ -79,10 +79,10 @@ To run vapor-liquid-equilibrium iterations, follow the following steps:
    ```         
 6. Run simulation
    ```
-     python project_gaff_ms.py submit -o NVT_liqbox
-     python project_gaff_ms.py run -o extract_final_NVT_config
-     python project_gaff_ms.py submit -o NPT_liqbox
-     python project_gaff_ms.py run -o extract_final_NPT_config
+     python project_gaff_ms.py submit -o NVT_liqbox --bundle=12 --parallel
+     python project_gaff_ms.py submit -o extract_final_NVT_config
+     python project_gaff_ms.py submit -o NPT_liqbox --bundle=12 --parallel
+     python project_gaff_ms.py submit -o extract_final_NPT_config
      python project_gaff_ms.py submit -o run_gemc --bundle=12 --parallel
    ```   
 7. Calculate VLE Properties

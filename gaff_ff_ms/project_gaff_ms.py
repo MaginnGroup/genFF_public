@@ -149,7 +149,7 @@ def calc_boxes(job):
 
 @ProjectGAFF.pre.after(calc_boxes)
 @ProjectGAFF.post(nvt_finished)
-@ProjectGAFF.operation(directives={"omp_num_threads": 12})
+@ProjectGAFF.operation(directives={"omp_num_threads": 2})
 def NVT_liqbox(job):
     "Equilibrate the liquid box using NVT simulation"
 
@@ -260,7 +260,7 @@ def extract_final_NVT_config(job):
 
 @ProjectGAFF.pre.after(extract_final_NVT_config)
 @ProjectGAFF.post(npt_finished)
-@ProjectGAFF.operation(directives={"omp_num_threads": 12})
+@ProjectGAFF.operation(directives={"omp_num_threads": 2})
 def NPT_liqbox(job):
     "Equilibrate the liquid box"
 
