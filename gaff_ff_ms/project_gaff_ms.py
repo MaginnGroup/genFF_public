@@ -29,7 +29,7 @@ class ProjectGAFF(FlowProject):
         
 @ProjectGAFF.post.isfile("ff.xml")
 @ProjectGAFF.operation
-def create_gaff_forcefield(job):
+def create_forcefield(job):
     """Create the forcefield .xml file for the job"""
     #Generate content based on job sp molecule name
     molec_xml_function = _get_xml_from_molecule(job.sp.mol_name)       
