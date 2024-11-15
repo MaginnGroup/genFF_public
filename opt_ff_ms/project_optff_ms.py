@@ -275,7 +275,7 @@ def npt_finished(job):
         try:
             thermo_data = np.genfromtxt("npt.eq.out.prp", skip_header=3)
             completed = (
-                int(thermo_data[-1][0]) == job.sp.nsteps_liqeq
+                int(thermo_data[-1][0]) == job.sp.nsteps_npt
             ) 
         except:
             completed = False
