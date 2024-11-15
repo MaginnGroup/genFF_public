@@ -141,7 +141,7 @@ def nvt_finished(job):
 @Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.pre.after(create_forcefield, calc_boxes)
 @Project.post(nvt_finished)
-@Project.operation(directives={"omp_num_threads": 12})
+@Project.operation(directives={"omp_num_threads": 2})
 def NVT_liqbox(job):
     "Equilibrate the liquid box using NVT simulation"
 
@@ -286,7 +286,7 @@ def npt_finished(job):
 @Project.pre.after(create_forcefield, calc_boxes, extract_final_NVT_config)
 @Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.post(npt_finished)
-@Project.operation(directives={"omp_num_threads": 12})
+@Project.operation(directives={"omp_num_threads": 2})
 def NPT_liqbox(job):
     "Equilibrate the liquid box"
 
