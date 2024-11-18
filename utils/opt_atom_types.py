@@ -2456,14 +2456,16 @@ class Vis_Results(Analyze_opt_res):
             ax.set_title(name, fontsize=18)
             ax.set_xticks(indices + bar_width)
             ax.set_xticklabels(molec_names, fontsize=14)
-            if name == "Liquid Density":
-                ax.legend(loc="upper right", fontsize=18)
             ax.axhline(y=5, label="5% MAPD", color="black", linestyle="--")
+            if name == "Liquid Density":
+                # ax.legend(loc="upper right", fontsize=18)
+                handles, labels = ax.get_legend_handles_labels()
             ax.grid()
 
         # Adjust layout
         fig.supxlabel("Molecule", fontsize=20)
         fig.supylabel("MAPD", fontsize=20)
+        fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=4, fontsize = 18)
         if title:
             fig.suptitle(title, fontsize=18)
         plt.tight_layout(rect=[0.01, 0.0, 1, 1])
