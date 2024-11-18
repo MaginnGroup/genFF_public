@@ -381,6 +381,7 @@ def run_gemc(job):
     import foyer
     import mosdef_cassandra as mc
     import unyt as u
+    import glob
 
     ff = foyer.Forcefield(job.fn("ff.xml"))
 
@@ -449,143 +450,155 @@ def run_gemc(job):
     custom_args_gemc["vdw_cutoff_box2"] = 0.4 * (boxl_vap * u.nanometer).to("angstrom")
 
     # Move into the job dir and start doing things
-    # try:
-    #Inititalize counter and number of eq_steps
-    count = 1
-    total_eq_steps = job.sp.nsteps_gemc_eq
-    max_eq_steps = job.sp.nsteps_gemc_eq*6
-    eq_extend = int(job.sp.nsteps_gemc_eq/4)
-    #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
-    job.doc.nsteps_gemc_eq = int(job.sp.nsteps_gemc_eq*4+1)
-    with job:
-        first_run = custom_args_gemc["run_name"] #gemc.eq
-        # Run initial equilibration if it does not exxist
-        if not has_checkpoint(first_run):
-            mc.run(
-                system=system,
-                moveset=moves,
-                run_type="equilibration",
-                run_length=job.sp.nsteps_gemc_eq,
-                temperature=job.sp.T * u.K,
-                **custom_args_gemc
-            )
-        elif not check_complete(first_run):
-            mc.restart(
-                restart_from=get_last_checkpoint(first_run),
-            )
-
-        init_gemc_liq = job.fn(first_run + ".out.box1.prp")
-        init_gemc_vap = job.fn(first_run + ".out.box2.prp")
-        prop_cols = [5] #Use number of moles to decide equilibrium
-        # Load initial eq data from both boxes
-        df_box1 = np.genfromtxt(init_gemc_liq)
-        df_box2 = np.genfromtxt(init_gemc_vap)
-
-        # Process both boxes in one loop
-        eq_data_dict = {}
-        for b, box in enumerate([df_box1, df_box2]):
-            box_name = "Liquid" if b == 0 else "Vapor"
-            for prop_index in prop_cols:
-                eq_col = box[:, prop_index - 1]
-                #Save eq_col as a csv for later analysis
-                key = f"{box_name}_{prop_index}"
-                eq_col_file = job.fn(f"{box_name}_eq_col_{prop_index}.csv")
-                np.savetxt(eq_col_file, eq_col, delimiter=",")
-                #Save the eq_col and file to a dictionary for later use
-                eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
-
-        #Set production start tolerance as at least 25% of the original number of data points
-        prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
+    try:
+        #Inititalize counter and number of eq_steps
         count = 1
-        #While the max number of eq steps has not been reached
-        while total_eq_steps <= max_eq_steps:
-            # Check if equilibration is reached via the pymser algorithms
-            is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
-            #Set this run and last last run
-            this_run = custom_args_gemc["run_name"] + f".rst.{count:03d}"
-            prior_run = get_last_checkpoint(custom_args_gemc["run_name"])
-            if is_equil:
-                break
-            else:
-                #Increase the total number of eq steps by 25% of the original value and restart the simulation
-                total_eq_steps += int(eq_extend)
-                #If we've exceeded the maximum number of equilibrium steps, raise an exception
-                #This forces a retry with critical conditions or will note complete GEMC failure
-                if total_eq_steps > max_eq_steps:
-                    job.doc.equil_fail = True
-                    raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
-                #Otherwise continue equilibration
+        total_eq_steps = job.sp.nsteps_gemc_eq
+        max_eq_steps = job.sp.nsteps_gemc_eq*6
+        eq_extend = int(job.sp.nsteps_gemc_eq/4)
+        #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
+        job.doc.nsteps_gemc_eq = int(job.sp.nsteps_gemc_eq*4+1)
+        with job:
+            first_run = custom_args_gemc["run_name"] #gemc.eq
+            # Run initial equilibration if it does not exxist
+            if not has_checkpoint(first_run):
+                mc.run(
+                    system=system,
+                    moveset=moves,
+                    run_type="equilibration",
+                    run_length=job.sp.nsteps_gemc_eq,
+                    temperature=job.sp.T * u.K,
+                    **custom_args_gemc
+                )
+            elif not check_complete(first_run):
+                mc.restart(
+                    restart_from=get_last_checkpoint(first_run),
+                )
+
+            init_gemc_liq = job.fn(first_run + ".out.box1.prp")
+            init_gemc_vap = job.fn(first_run + ".out.box2.prp")
+            prop_cols = [5] #Use number of moles to decide equilibrium
+            # Load initial eq data from both boxes
+            df_box1 = np.genfromtxt(init_gemc_liq)
+            df_box2 = np.genfromtxt(init_gemc_vap)
+
+            # Process both boxes in one loop
+            eq_data_dict = {}
+            for b, box in enumerate([df_box1, df_box2]):
+                box_name = "Liquid" if b == 0 else "Vapor"
+                for prop_index in prop_cols:
+                    eq_col = box[:, prop_index - 1]
+                    #Save eq_col as a csv for later analysis
+                    key = f"{box_name}_{prop_index}"
+                    eq_col_file = job.fn(f"{box_name}_eq_col_{prop_index}.csv")
+                    np.savetxt(eq_col_file, eq_col, delimiter=",")
+                    #Save the eq_col and file to a dictionary for later use
+                    eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
+
+            #Set production start tolerance as at least 25% of the original number of data points
+            prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
+            count = 1
+            #While the max number of eq steps has not been reached
+            while total_eq_steps <= max_eq_steps:
+                # Check if equilibration is reached via the pymser algorithms
+                is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
+                #Set this run and last last run
+                this_run = custom_args_gemc["run_name"] + f".rst.{count:03d}"
+                prior_run = get_last_checkpoint(custom_args_gemc["run_name"])
+                if is_equil:
+                    break
                 else:
-                    #Check if checkpoint file exists, if so, we've already done this restart
-                    # if not, restart the simulation
-                    if not has_checkpoint(this_run):
-                        mc.restart(
-                        restart_from=prior_run,
-                        run_type="equilibration",
-                        total_run_length=total_eq_steps,
-                        run_name = this_run )
-                    elif not check_complete(this_run):
-                        mc.restart(
-                            restart_from=get_last_checkpoint(this_run),
-                        )
+                    #Increase the total number of eq steps by 25% of the original value and restart the simulation
+                    total_eq_steps += int(eq_extend)
+                    #If we've exceeded the maximum number of equilibrium steps, raise an exception
+                    #This forces a retry with critical conditions or will note complete GEMC failure
+                    if total_eq_steps > max_eq_steps:
+                        job.doc.equil_fail = True
+                        raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
+                    #Otherwise continue equilibration
+                    else:
+                        #Check if checkpoint file exists, if so, we've already done this restart
+                        # if not, restart the simulation
+                        if not has_checkpoint(this_run):
+                            mc.restart(
+                            restart_from=prior_run,
+                            run_type="equilibration",
+                            total_run_length=total_eq_steps,
+                            run_name = this_run )
+                        elif not check_complete(this_run):
+                            mc.restart(
+                                restart_from=get_last_checkpoint(this_run),
+                            )
 
-                    #Add restart data to eq_col
-                    # After each restart, load the updated properties data for both boxes
-                    sim_box1 =  this_run + ".out.box1.prp"
-                    sim_box2 =  this_run + ".out.box2.prp"
-                    df_box1r = np.genfromtxt(job.fn(sim_box1))
-                    df_box2r = np.genfromtxt(job.fn(sim_box2))
+                        #Add restart data to eq_col
+                        # After each restart, load the updated properties data for both boxes
+                        sim_box1 =  this_run + ".out.box1.prp"
+                        sim_box2 =  this_run + ".out.box2.prp"
+                        df_box1r = np.genfromtxt(job.fn(sim_box1))
+                        df_box2r = np.genfromtxt(job.fn(sim_box2))
 
-                    # Process and add the restart data to eq_col for each property in each box
-                    for b, box in enumerate([df_box1r, df_box2r]):
-                        box_name = "Liquid" if b == 0 else "Vapor"
-                        for i, prop_index in enumerate(prop_cols):
-                            #Get the key from the property and box name
-                            key = f"{box_name}_{prop_index}"
-                            # Extract the column data for this restart and append to accumulated data
-                            eq_col_restart = box[:, prop_index - 1]
-                            all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
-                            #Save the new data to the eq_col file
-                            np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
-                            #Overwite the current data in the eq_data_dict with restart data
-                            eq_data_dict[key]["data"] = all_eq_data
-            #Increase the counter
-            count += 1
+                        # Process and add the restart data to eq_col for each property in each box
+                        for b, box in enumerate([df_box1r, df_box2r]):
+                            box_name = "Liquid" if b == 0 else "Vapor"
+                            for i, prop_index in enumerate(prop_cols):
+                                #Get the key from the property and box name
+                                key = f"{box_name}_{prop_index}"
+                                # Extract the column data for this restart and append to accumulated data
+                                eq_col_restart = box[:, prop_index - 1]
+                                all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
+                                #Save the new data to the eq_col file
+                                np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
+                                #Overwite the current data in the eq_data_dict with restart data
+                                eq_data_dict[key]["data"] = all_eq_data
+                #Increase the counter
+                count += 1
 
-        #Set the step counter to whatever the final number of equilibration steps was
-        job.doc.nsteps_gemc_eq = total_eq_steps
-        job.doc.equil_fail = False
-        total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
-        # Run production
-        if not has_checkpoint("prod"):
-            mc.restart(
-                restart_from=prior_run,
-                run_type="production",
-                total_run_length=total_sim_steps,
-                run_name="prod",
+            #Set the step counter to whatever the final number of equilibration steps was
+            job.doc.nsteps_gemc_eq = total_eq_steps
+            job.doc.equil_fail = False
+            total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
+            # Run production
+            if not has_checkpoint("prod"):
+                mc.restart(
+                    restart_from=prior_run,
+                    run_type="production",
+                    total_run_length=total_sim_steps,
+                    run_name="prod",
+                )
+            elif not check_complete("prod"):
+                mc.restart(
+                    restart_from=get_last_checkpoint("prod"),
+                )
+
+    except:
+        #if GEMC failed with critical conditions as intial conditions, terminate with error
+        if "use_crit" in job.doc and job.doc.use_crit == True:
+            #If so, terminate with error and log failure in job document
+            job.doc.gemc_failed = True
+            raise Exception(
+                "GEMC failed with critical and experimental starting conditions and the molecule is "
+                + job.sp.mol_name
+                + " at temperature "
+                + str(job.sp.T)
             )
-        elif not check_complete("prod"):
-            mc.restart(
-                restart_from=get_last_checkpoint("prod"),
-            )
 
-    # except:
-    #     #if GEMC failed with critical conditions as intial conditions, terminate with error
-    #     if "use_crit" in job.doc and job.doc.use_crit == True:
-    #         #If so, terminate with error and log failure in job document
-    #         job.doc.gemc_failed = True
-    #         raise Exception("GEMC failed with critical and experimental starting conditions and the molecule is " + job.sp.mol_name)
-
-    #     #Otherwise, try with critical conditions
-    #     job.doc.use_crit = True
-    #     #If GEMC fails, remove files in post conditions of previous operations
-    #     del job.doc["vapboxl"] #calc_boxl
-    #     del job.doc["liqboxl"] #calc_boxl
-    #     with job:
-    #         os.remove("nvt.eq.out.prp") #NVT_liqbox
-    #         os.remove("npt.eq.out.prp") #NPT_liqbox
-    #         os.remove("nvt.final.xyz") #extract_final_NVT_config
-    #         os.remove("npt.final.xyz") #extract_final_NPT_config
+        else:
+            # Otherwise, try with critical conditions
+            job.doc.use_crit = True
+            # If GEMC fails, remove files in post conditions of previous operations
+            del job.doc["vapboxl"]  # calc_boxes
+            del job.doc["liqboxl"]  # calc_boxes
+            del job.doc["nsteps_gemc_eq"]  # run_gemc
+            with job:
+                #Delete nvt, npt, and gemc equil/prod data
+                for file_path in glob.glob("nvt.*"):
+                    os.remove(file_path)
+                for file_path in glob.glob("npt.*"):
+                    os.remove(file_path)
+                for file_path in glob.glob(custom_args_gemc["run_name"] + ".*"):
+                    os.remove(file_path)
+                for file_path in glob.glob("prod.*"):
+                    os.remove(file_path)
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
 #@Project.post(lambda job: "vap_density_unc" in job.doc)
