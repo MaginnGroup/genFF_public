@@ -1854,30 +1854,30 @@ def plot_res_pymser(job, eq_col, results, name, box_name):
     fig, [ax1, ax2] = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, sharey=True)
 
     ax1.set_ylabel(name, color="black", fontsize=14, fontweight='bold')
-    ax1.set_xlabel("GEMC step", fontsize=14, fontweight='bold')
+    ax1.set_xlabel("GEMC Steps", fontsize=14, fontweight='bold')
 
-    ax1.plot(range(len(eq_col)), 
+    ax1.plot(range(0, len(eq_col)*10, 10), 
             eq_col, 
             label = 'Raw data', 
             color='blue')
 
-    ax1.plot(range(len(eq_col))[results['t0']:], 
+    ax1.plot(range(0, len(eq_col)*10, 10)[results['t0']:], 
             results['equilibrated'], 
             label = 'Equilibrated data', 
             color='red')
 
-    ax1.plot([0, len(eq_col)], 
+    ax1.plot([0, len(eq_col)*10], 
             [results['average'], results['average']], 
             color='green', zorder=4, 
             label='Equilibrated average')
 
-    ax1.fill_between(range(len(eq_col)), 
+    ax1.fill_between(range(0, len(eq_col)*10, 10), 
                     results['average'] - results['uncertainty'], 
                     results['average'] + results['uncertainty'], 
                     color='lightgreen', alpha=0.3, zorder=4)
 
     ax1.set_yticks(np.arange(0, eq_col.max()*1.1, eq_col.max()/10))
-    ax1.set_xlim(-len(eq_col)*0.02, len(eq_col)*1.02)
+    ax1.set_xlim(-len(eq_col)*10*0.02, len(eq_col)*10*1.02)
     ax1.tick_params(axis="y", labelcolor="black")
 
     ax1.grid(alpha=0.3)
@@ -1891,9 +1891,10 @@ def plot_res_pymser(job, eq_col, results, name, box_name):
             facecolor='white', 
             zorder=3)
 
+    bin_red = 10
     ax2.hist(results['equilibrated'], 
             orientation=u'horizontal', 
-            bins=3, 
+            bins=bin_red, 
             edgecolor='red', 
             lw=1.5, 
             facecolor='white', 
