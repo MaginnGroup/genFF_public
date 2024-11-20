@@ -494,7 +494,7 @@ def run_gemc(job):
         max_eq_steps = job.sp.nsteps_gemc_eq*6
         eq_extend = int(job.sp.nsteps_gemc_eq/4)
         #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
-        job.doc.nsteps_gemc_eq = int(job.sp.nsteps_gemc_eq*4+1)
+        job.doc.nsteps_gemc_eq = int(max_eq_steps+1)
         with job:
             first_run = custom_args_gemc["run_name"] #gemc.eq
             # Run initial equilibration if it does not exxist
