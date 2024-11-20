@@ -666,7 +666,7 @@ def del_job(job):
 @ProjectGAFF.post(lambda job: "nmols_liq" in job.doc)
 @ProjectGAFF.post(lambda job: "nmols_vap" in job.doc)
 @ProjectGAFF.operation
-def calculate_props_gaff(job):
+def calculate_props(job):
     """Calculate the density"""
 
     import numpy as np
