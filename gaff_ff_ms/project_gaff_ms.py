@@ -369,6 +369,43 @@ def extract_final_NPT_config(job):
             box_data.append(line.strip().split())
     job.doc.npt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
+@ProjectGAFF.label
+def gemc_equil_complete(job):
+    "Confirm gemc equilibration has completed"
+    import numpy as np
+    import glob
+    import re
+    
+    # Find all files matching the restart pattern
+    restart_pattern = job.fn("gemc.eq.rst.*.out.box1.prp")
+    fallback_file = job.fn("gemc.eq.out.box1.prp")
+    restart_files = glob.glob(restart_pattern)
+    
+    # Determine the file to use
+    if restart_files:
+        # Extract the highest restart value from filenames
+        restart_numbers = [
+            int(re.search(r"\.rst\.(\d+)\.out\.box1\.prp", f).group(1))
+            for f in restart_files
+        ]
+        max_restart = max(restart_numbers)
+        selected_file = job.fn(f"gemc.eq.rst.{max_restart:03d}.out.box1.prp")
+    else:
+        # Use fallback file if no restart files are found
+        selected_file = fallback_file
+
+    try:
+        thermo_data = np.genfromtxt(selected_file, skip_header=2)
+        #This line will fail until job.doc.nsteps_gemc_eq is defined
+        if hasattr(job.doc, 'nsteps_gemc_eq'):
+            completed = int(thermo_data[-1][0]) == job.doc.nsteps_gemc_eq
+        else:
+            completed = False
+    except:
+        completed = False
+
+    return completed
+
 @ProjectGAFF.pre.after(extract_final_NPT_config)
 @ProjectGAFF.post(gemc_prod_complete)
 @ProjectGAFF.operation(directives={"omp_num_threads": 2})
