@@ -448,10 +448,19 @@ def gemc_equil_complete(job):
 
     #Check that the last step was completed
     try:
-        thermo_data = np.genfromtxt(selected_file, skip_header=2)
+        with open(selected_file, "rb") as f:
+            # Move the pointer to the end of the file, but leave space to find the last line
+            f.seek(-2, os.SEEK_END)
+            # Read backward until a newline is found
+            while f.read(1) != b'\n':
+                f.seek(-2, os.SEEK_CUR)
+            # Read the last line after finding the newline
+            last_line = f.readline().decode()
+        # Split the last line and extract the first number
+        first_value = int(last_line.split()[0])
         #This line will fail until job.doc.nsteps_gemc_eq is defined
         if hasattr(job.doc, 'nsteps_gemc_eq'):
-            completed = int(thermo_data[-1][0]) == job.doc.nsteps_gemc_eq
+            completed = first_value == job.doc.nsteps_gemc_eq
         else:
             completed = False
     except:
@@ -466,8 +475,17 @@ def gemc_prod_complete(job):
     import numpy as np
 
     try:
-        thermo_data = np.genfromtxt(job.fn("prod.out.box1.prp"), skip_header=3)
-        completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq
+        with open(job.fn("prod.out.box1.prp"), "rb") as f:
+            # Move the pointer to the end of the file, but leave space to find the last line
+            f.seek(-2, os.SEEK_END)
+            # Read backward until a newline is found
+            while f.read(1) != b'\n':
+                f.seek(-2, os.SEEK_CUR)
+            # Read the last line after finding the newline
+            last_line = f.readline().decode()
+        # Split the last line and extract the first number
+        first_value = int(last_line.split()[0])
+        completed = first_value == job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq
     except:
         completed = False
         pass
