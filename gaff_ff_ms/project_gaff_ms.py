@@ -76,19 +76,24 @@ def npt_finished(job):
 
 @ProjectGAFF.label
 def gemc_prod_complete(job):
-    "Confirm a given simulation is completed"
+    "Confirm gemc production has completed"
     import numpy as np
-    import os
-    
-    with job:
-        try:
-            thermo_data = np.genfromtxt(
-                "prod.out.box1.prp", skip_header=3
-            )
-            completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq#job.sp.nsteps_liqeq
-        except:
-            completed = False
-            pass
+
+    try:
+        with open(job.fn("prod.out.box1.prp"), "rb") as f:
+            # Move the pointer to the end of the file, but leave space to find the last line
+            f.seek(-2, os.SEEK_END)
+            # Read backward until a newline is found
+            while f.read(1) != b'\n':
+                f.seek(-2, os.SEEK_CUR)
+            # Read the last line after finding the newline
+            last_line = f.readline().decode()
+        # Split the last line and extract the first number
+        first_value = int(last_line.split()[0])
+        completed = first_value == job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq
+    except:
+        completed = False
+        pass
 
     return completed
 
@@ -373,32 +378,29 @@ def extract_final_NPT_config(job):
 def gemc_equil_complete(job):
     "Confirm gemc equilibration has completed"
     import numpy as np
-    import glob
-    import re
     
-    # Find all files matching the restart pattern
-    restart_pattern = job.fn("gemc.eq.rst.*.out.box1.prp")
-    fallback_file = job.fn("gemc.eq.out.box1.prp")
-    restart_files = glob.glob(restart_pattern)
-    
-    # Determine the file to use
-    if restart_files:
-        # Extract the highest restart value from filenames
-        restart_numbers = [
-            int(re.search(r"\.rst\.(\d+)\.out\.box1\.prp", f).group(1))
-            for f in restart_files
-        ]
-        max_restart = max(restart_numbers)
-        selected_file = job.fn(f"gemc.eq.rst.{max_restart:03d}.out.box1.prp")
-    else:
-        # Use fallback file if no restart files are found
-        selected_file = fallback_file
-
+    #Get last restart file
     try:
-        thermo_data = np.genfromtxt(selected_file, skip_header=2)
+        last_file = get_last_checkpoint(job.fn("gemc.eq"))
+        selected_file = job.fn(last_file + ".out.box1.prp")
+    except:
+        selected_file = job.fn("gemc.eq.out.box1.prp")
+
+    #Check that the last step was completed
+    try:
+        with open(selected_file, "rb") as f:
+            # Move the pointer to the end of the file, but leave space to find the last line
+            f.seek(-2, os.SEEK_END)
+            # Read backward until a newline is found
+            while f.read(1) != b'\n':
+                f.seek(-2, os.SEEK_CUR)
+            # Read the last line after finding the newline
+            last_line = f.readline().decode()
+        # Split the last line and extract the first number
+        first_value = int(last_line.split()[0])
         #This line will fail until job.doc.nsteps_gemc_eq is defined
         if hasattr(job.doc, 'nsteps_gemc_eq'):
-            completed = int(thermo_data[-1][0]) == job.doc.nsteps_gemc_eq
+            completed = first_value == job.doc.nsteps_gemc_eq
         else:
             completed = False
     except:
