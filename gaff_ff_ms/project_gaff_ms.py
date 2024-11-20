@@ -85,7 +85,7 @@ def gemc_prod_complete(job):
             thermo_data = np.genfromtxt(
                 "prod.out.box1.prp", skip_header=3
             )
-            completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod #job.sp.nsteps_liqeq
+            completed = int(thermo_data[-1][0]) == job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq#job.sp.nsteps_liqeq
         except:
             completed = False
             pass
