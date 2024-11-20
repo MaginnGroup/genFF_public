@@ -38,7 +38,6 @@ def create_forcefield(job):
     with open(job.fn("ff.xml"), "w") as ff:
         ff.write(content)
         
-@ProjectGAFF.label
 def nvt_finished(job):
     "Confirm a given simulation is completed"
     import numpy as np
@@ -56,7 +55,6 @@ def nvt_finished(job):
 
     return completed
 
-@ProjectGAFF.label
 def npt_finished(job):
     "Confirm a given simulation is completed"
     import numpy as np
