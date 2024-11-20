@@ -138,7 +138,6 @@ def nvt_finished(job):
     return completed
 
 @Project.pre.after(create_forcefield, calc_boxes)
-# @Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.post(nvt_finished)
 @Project.operation(directives={"omp_num_threads": 2})
 def NVT_liqbox(job):
@@ -282,7 +281,6 @@ def npt_finished(job):
     return completed
 
 @Project.pre.after(extract_final_NVT_config)
-# @Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.post(npt_finished)
 @Project.operation(directives={"omp_num_threads": 2})
 def NPT_liqbox(job):
