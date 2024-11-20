@@ -685,14 +685,12 @@ def run_gemc(job):
     except:
         # if GEMC failed with critical conditions as intial conditions, terminate with error
         if "use_crit" in job.doc and job.doc.use_crit == True:
-#             #If the simulation ran out of iterations, delete data and retry without crit conditions
-#             #If they also hit the budget we'll extend it
+#             #If the simulation ran out of iterations, delete data and retry without crit conditions + more eq steps
             if "equil_fail" in job.doc and job.doc.equil_fail == True:
                 del job.doc["equil_fail"]
                 del job.doc["use_crit"]
                 delete_data(job, custom_args["run_name"])
                 job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
-                job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
             #Otherwise log the failure and raise an exception
             else:
                 job.doc.gemc_failed = True
