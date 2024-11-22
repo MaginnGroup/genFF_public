@@ -3,6 +3,7 @@ import templates.ndcrc
 import warnings
 from pathlib import Path
 import os
+import glob
 import sys
 import unyt as u
 import copy
@@ -406,6 +407,23 @@ def gemc_equil_complete(job):
 
     return completed
 
+def delete_data(job, run_name):
+    "Delete data from previous operations"
+    del job.doc["vapboxl"]  # calc_boxes
+    del job.doc["liqboxl"]  # calc_boxes
+    del job.doc["nsteps_gemc_eq"]  # run_gemc
+    with job:
+        #Delete nvt, npt, and gemc equil/prod data
+        for file_path in glob.glob("nvt.*"):
+            os.remove(file_path)
+        for file_path in glob.glob("npt.*"):
+            os.remove(file_path)
+        for file_path in glob.glob(run_name + ".*"):
+            os.remove(file_path)
+        for file_path in glob.glob("prod.*"):
+            os.remove(file_path)
+
+
 @ProjectGAFF.pre.after(extract_final_NPT_config)
 @ProjectGAFF.post(gemc_prod_complete)
 @ProjectGAFF.operation(directives={"omp_num_threads": 2})
@@ -491,7 +509,9 @@ def run_gemc(job):
         #Inititalize counter and number of eq_steps
         count = 1
         total_eq_steps = job.sp.nsteps_gemc_eq
-        max_eq_steps = job.sp.nsteps_gemc_eq*6
+        if "max_eq_steps" not in job.doc:
+            job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*6
+        max_eq_steps = job.doc.max_eq_steps
         eq_extend = int(job.sp.nsteps_gemc_eq/4)
         #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
         job.doc.nsteps_gemc_eq = int(max_eq_steps+1)
@@ -610,32 +630,32 @@ def run_gemc(job):
     except:
         #if GEMC failed with critical conditions as intial conditions, terminate with error
         if "use_crit" in job.doc and job.doc.use_crit == True:
-            #If so, terminate with error and log failure in job document
-            job.doc.gemc_failed = True
-            raise Exception(
-                "GEMC failed with critical and experimental starting conditions and the molecule is "
-                + job.sp.mol_name
-                + " at temperature "
-                + str(job.sp.T)
-            )
+#             #If the simulation ran out of iterations, delete data and retry without crit conditions + more eq steps
+            if "equil_fail" in job.doc and job.doc.equil_fail == True:
+                del job.doc["equil_fail"]
+                del job.doc["use_crit"]
+                delete_data(job, custom_args_gemc["run_name"])
+                job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
+            #Otherwise log the failure and raise an exception
+            else:
+                job.doc.gemc_failed = True
+                raise Exception(
+                    "GEMC failed with critical and experimental starting conditions and the molecule is "
+                    + job.sp.mol_name
+                    + " at temperature "
+                    + str(job.sp.T)
+                )
 
         else:
-            # Otherwise, try with critical conditions
-            job.doc.use_crit = True
-            # If GEMC fails, remove files in post conditions of previous operations
-            del job.doc["vapboxl"]  # calc_boxes
-            del job.doc["liqboxl"]  # calc_boxes
-            del job.doc["nsteps_gemc_eq"]  # run_gemc
-            with job:
-                #Delete nvt, npt, and gemc equil/prod data
-                for file_path in glob.glob("nvt.*"):
-                    os.remove(file_path)
-                for file_path in glob.glob("npt.*"):
-                    os.remove(file_path)
-                for file_path in glob.glob(custom_args_gemc["run_name"] + ".*"):
-                    os.remove(file_path)
-                for file_path in glob.glob("prod.*"):
-                    os.remove(file_path)
+            #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
+            if "equil_fail" in job.doc and job.doc.equil_fail == True:
+                job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq -1
+                job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
+            # If the simulation failed for another reason, try with critical conditions
+            else:
+                job.doc.use_crit = True
+                # If GEMC fails, remove files in post conditions of previous operations
+                delete_data(job, custom_args_gemc["run_name"])
 
 #@Project.post(lambda job: "liq_density_unc" in job.doc)
 #@Project.post(lambda job: "vap_density_unc" in job.doc)
