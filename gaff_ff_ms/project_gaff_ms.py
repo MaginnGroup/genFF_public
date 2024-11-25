@@ -152,6 +152,7 @@ def calc_boxes(job):
     liqbox, vapbox = calc_box_helper(job)
 
 @ProjectGAFF.pre.after(calc_boxes)
+@ProjectGAFF.pre(lambda job: "gemc_failed" not in job.doc)
 @ProjectGAFF.post(nvt_finished)
 @ProjectGAFF.operation(directives={"omp_num_threads": 2})
 def NVT_liqbox(job):
@@ -263,6 +264,7 @@ def extract_final_NVT_config(job):
     job.doc.nvt_liqbox_final_dim = float(box_data[-6][0]) / 10.0  # nm
 
 @ProjectGAFF.pre.after(extract_final_NVT_config)
+@ProjectGAFF.pre(lambda job: "gemc_failed" not in job.doc)
 @ProjectGAFF.post(npt_finished)
 @ProjectGAFF.operation(directives={"omp_num_threads": 2})
 def NPT_liqbox(job):
