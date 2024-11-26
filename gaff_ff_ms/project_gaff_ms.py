@@ -336,7 +336,10 @@ def NPT_liqbox(job):
             if t == job.sp.T:
                 pressure = pvap * u.bar
 
-        mc.run(
+        # Move into the job dir and start doing things
+        try:
+            # Run equilibration
+            mc.run(
             system=system,
             moveset=moves,
             run_type="equilibration",
@@ -344,7 +347,28 @@ def NPT_liqbox(job):
             temperature=job.sp.T * u.K,
             pressure= pressure,
             **custom_args
-        )
+            )
+        except:
+            # if GEMC failed with critical conditions as intial conditions, terminate with error
+            if "use_crit" in job.doc and job.doc.use_crit == True:
+                # If so, terminate with error and log failure in job document
+                job.doc.gemc_failed = True
+                raise Exception(
+                    "NPT failed with critical and experimental starting conditions and the molecule is "
+                    + job.sp.mol_name
+                    + " at temperature "
+                    + str(job.sp.T)
+                )
+            else:  # Otherwise, try with critical conditions
+                job.doc.use_crit = True
+                del job.doc["vapboxl"]  # calc_boxes
+                del job.doc["liqboxl"]  # calc_boxes
+                with job:
+                    #Delete nvt, npt, and gemc equil/prod data
+                    for file_path in glob.glob("nvt.*"):
+                        os.remove(file_path)
+                    for file_path in glob.glob("npt.*"):
+                        os.remove(file_path)
 
 @ProjectGAFF.pre.after(NPT_liqbox)
 @ProjectGAFF.post.isfile("npt.final.xyz")
@@ -651,7 +675,7 @@ def run_gemc(job):
         else:
             #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
             if "equil_fail" in job.doc and job.doc.equil_fail == True:
-                job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq -1
+                job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq
                 job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
             # If the simulation failed for another reason, try with critical conditions
             else:

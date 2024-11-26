@@ -722,7 +722,7 @@ def run_gemc(job):
         else:
             #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
             if "equil_fail" in job.doc and job.doc.equil_fail == True:
-                job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq -1
+                job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq
                 job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
             # If the simulation failed for another reason, try with critical conditions
             else:
