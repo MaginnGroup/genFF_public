@@ -451,6 +451,7 @@ def delete_data(job, run_name):
 
 
 @ProjectGAFF.pre.after(extract_final_NPT_config)
+@ProjectGAFF.pre(lambda job: "gemc_failed" not in job.doc)
 @ProjectGAFF.post(gemc_prod_complete)
 @ProjectGAFF.operation(directives={"omp_num_threads": 2})
 def run_gemc(job):

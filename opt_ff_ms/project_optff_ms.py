@@ -494,6 +494,7 @@ def gemc_prod_complete(job):
     return completed
 
 @Project.pre.after(extract_final_NPT_config)
+@Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.post(gemc_prod_complete)
 @Project.operation(directives={"omp_num_threads": 2})
 def run_gemc(job):
@@ -704,21 +705,21 @@ def run_gemc(job):
     except:
         # if GEMC failed with critical conditions as intial conditions, terminate with error
         if "use_crit" in job.doc and job.doc.use_crit == True:
-#             #If the simulation ran out of iterations, delete data and retry without crit conditions + more eq steps
-            if "equil_fail" in job.doc and job.doc.equil_fail == True:
-                del job.doc["equil_fail"]
-                del job.doc["use_crit"]
-                delete_data(job, custom_args["run_name"])
-                job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
-            #Otherwise log the failure and raise an exception
-            else:
-                job.doc.gemc_failed = True
-                raise Exception(
-                    "GEMC failed with critical and experimental starting conditions and the molecule is "
-                    + job.sp.mol_name
-                    + " at temperature "
-                    + str(job.sp.T)
-                )
+# #             #If the simulation ran out of iterations, delete data and retry without crit conditions + more eq steps
+#             if "equil_fail" in job.doc and job.doc.equil_fail == True:
+#                 del job.doc["equil_fail"]
+#                 del job.doc["use_crit"]
+#                 delete_data(job, custom_args["run_name"])
+#                 job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
+#             #Otherwise log the failure and raise an exception
+#             else:
+            job.doc.gemc_failed = True
+            raise Exception(
+                "GEMC failed with critical and experimental starting conditions and the molecule is "
+                + job.sp.mol_name
+                + " at temperature "
+                + str(job.sp.T)
+            )
         else:
             #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
             if "equil_fail" in job.doc and job.doc.equil_fail == True:
@@ -2006,7 +2007,8 @@ def check_equil_converge(job, eq_data_dict, prod_tol):
                 if len(col_vals) - res_matrix[i]['t0'] < prod_tol:
                    statement += f"Only {prod_cycles} production cycles found."
                 
-            print(statement)
+            with open("Equil_Output.txt", "a") as f:
+                print(statement, file=f)
 
     except Exception as e:
         #This will cause an error in the GEMC operation which lets us know that the job failed
