@@ -746,6 +746,8 @@ def delete_data(job, run_name):
             os.remove(file_path)
         for file_path in glob.glob("prod.*"):
             os.remove(file_path)
+        if os.path.exists("Equil_Output.txt"):
+            os.remove("Equil_Output.txt")
 
 # @Project.pre(lambda job: "gemc_failed" not in job.doc)
 # @Project.pre.after(extract_final_NPT_config)
