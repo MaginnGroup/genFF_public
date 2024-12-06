@@ -381,7 +381,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
     df_labels = list(df_keys)
     df_ff_list = list(df_ffs)
 
-    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
     df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'deeppink', 'olive', 'olive']
     # df_labels, df_ffs = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
     # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
@@ -503,7 +503,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
     df_labels = list(df_keys)
     df_ff_list = list(df_ffs)
 
-    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
     df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'deeppink', 'olive', 'olive']
 
     # df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
@@ -686,8 +686,8 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
     df_labels = list(df_keys)
     df_mse_list = list(df_ffs)
 
-    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-3)] + ['gray', 'olive', 'olive']
+    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-3)] + ['gray', 'red', 'red']
 
     train_molecs = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"]
     #Get indeces where train molecules are in all molecules
@@ -761,7 +761,7 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
     df_labels = list(df_keys)
     df_mse_list = list(df_ffs)
 
-    cmap = plt.get_cmap("rainbow")  # Get the rainbow colormap
+    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
     df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-3)] + ['gray', 'olive', 'olive']
 
     train_molecs = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"]

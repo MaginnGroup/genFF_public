@@ -36,7 +36,7 @@ R134 = r134.R134Constants()
 R116 = r116.R116Constants()
 
 obj_choice = "ExpVal"
-at_numbers = [6]
+at_numbers = [1,2,6,8]
 param_set = 1
 ff_dict = {}
 err_path_dict = {}

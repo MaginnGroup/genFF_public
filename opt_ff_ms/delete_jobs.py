@@ -13,8 +13,8 @@ def delete_data(job):
         for file_path in glob.glob("prod.*"):
             os.remove(file_path)
 
-for job in project.find_jobs({"mol_name": "R23", "T": 230, "atom_type": 8, "restart": 3}):
+for job in project.find_jobs({"mol_name": "R152", "T": 260, "atom_type": 6, "restart": 1}):
     # if job.sp.mol_name == "R134" and job.sp.T in [240]:
     print(job.id)
-    # delete_data(job)
-    job.remove()
+    delete_data(job)
+    # job.remove()
