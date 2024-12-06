@@ -36,7 +36,7 @@ R134 = r134.R134Constants()
 R116 = r116.R116Constants()
 
 obj_choice = "ExpVal"
-at_numbers = [1,2,6,8]
+at_numbers = [6]
 param_set = 1
 ff_dict = {}
 err_path_dict = {}
@@ -180,7 +180,7 @@ pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
 #For each molecule
 pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict), bbox_inches='tight')
 plt.close()
-pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict), bbox_inches='tight')
-plt.close()
+# pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict), bbox_inches='tight')
+# plt.close()
 # #Close figures 
 pdf_MAPD.close()   
