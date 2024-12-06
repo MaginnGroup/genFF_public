@@ -628,10 +628,12 @@ def run_gemc(job):
                     eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
 
             #Set production start tolerance as at least 25% of the original number of data points
-            prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
+            # prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
             count = 1
             #While the max number of eq steps has not been reached
             while total_eq_steps <= max_eq_steps:
+                #Must have equiliobrium for 1/4 of total iterations to be counted as equilibrated
+                prod_tol_eq = int(total_eq_steps/4)
                 # Check if equilibration is reached via the pymser algorithms
                 is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 #Set this run and last last run
@@ -703,16 +705,12 @@ def run_gemc(job):
                     restart_from=get_last_checkpoint(this_run),
                 )
     except:
+        #If equilibration wasn't long enough, don't delete, just extend the simulation regardless of using use_crit or not
+        if "equil_fail" in job.doc and job.doc.equil_fail == True:
+            job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq
+            job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
         # if GEMC failed with critical conditions as intial conditions, terminate with error
-        if "use_crit" in job.doc and job.doc.use_crit == True:
-# #             #If the simulation ran out of iterations, delete data and retry without crit conditions + more eq steps
-#             if "equil_fail" in job.doc and job.doc.equil_fail == True:
-#                 del job.doc["equil_fail"]
-#                 del job.doc["use_crit"]
-#                 delete_data(job, custom_args["run_name"])
-#                 job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
-#             #Otherwise log the failure and raise an exception
-#             else:
+        elif "use_crit" in job.doc and job.doc.use_crit == True:
             job.doc.gemc_failed = True
             raise Exception(
                 "GEMC failed with critical and experimental starting conditions and the molecule is "
@@ -720,16 +718,13 @@ def run_gemc(job):
                 + " at temperature "
                 + str(job.sp.T)
             )
-        else:
-            #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
-            if "equil_fail" in job.doc and job.doc.equil_fail == True:
-                job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq
-                job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
+        else: 
             # If the simulation failed for another reason, try with critical conditions
-            else:
-                job.doc.use_crit = True
-                # If GEMC fails, remove files in post conditions of previous operations
-                delete_data(job, custom_args["run_name"])
+            job.doc.use_crit = True
+            if "equil_fail" in job.doc:
+                del job.doc["equil_fail"]
+            # If GEMC fails, remove files in post conditions of previous operations
+            delete_data(job, custom_args["run_name"])
 
 def delete_data(job, run_name):
     "Delete data from previous operations"

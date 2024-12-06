@@ -210,26 +210,28 @@ def calc_critical(df):
         liq_density = values["sim_liq_density"].values
         vap_density = values["sim_vap_density"].values
 
-        # Critical Point (Law of rectilinear diameters)
-        slope1, intercept1, r_value1, p_value1, std_err1 = linregress(
-            temps,(liq_density + vap_density) / 2.0,)
+        #Check that all temps are not the same
+        if all(x == temps[0] for x in temps):
+            Tc += [np.nan]*len(temps)
+            rhoc += [np.nan]*len(temps)
+        else:
+            # Critical Point (Law of rectilinear diameters)
+            slope1, intercept1, r_value1, p_value1, std_err1 = linregress(
+                temps,(liq_density + vap_density) / 2.0,)
 
-        try:
-            slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
-                temps,(liq_density - vap_density)**(1/0.32),)
-        except:
-            slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
-                temps,abs((liq_density - vap_density))**(1/0.32),)
+            try:
+                slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
+                    temps,(liq_density - vap_density)**(1/0.32),)
+            except:
+                slope2, intercept2, r_value2, p_value2, std_err2 = linregress(
+                    temps,abs((liq_density - vap_density))**(1/0.32),)
 
-        Tc_mol = np.abs(intercept2 / slope2)
-        rhoc_mol = intercept1 + slope1 * Tc_mol
+            Tc_mol = np.abs(intercept2 / slope2)
+            rhoc_mol = intercept1 + slope1 * Tc_mol
 
-        # if len(temps) == 5:
-        Tc += list([Tc_mol])*len(temps)
-        rhoc += list([rhoc_mol])*len(temps)
-        # else:
-        #     Tc += [np.nan]*len(temps)
-        #     rhoc += [np.nan]*len(temps)
+            # if len(temps) == 5:
+            Tc += list([Tc_mol])*len(temps)
+            rhoc += list([rhoc_mol])*len(temps)
         
     return Tc, rhoc
 
@@ -318,17 +320,56 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
 
     return new_df
 
-def get_min_max(curr_min, curr_max, new_vals, std_dev = None):
-    if isinstance(new_vals, float):
+# def get_min_max(curr_min, curr_max, new_vals, std_dev = None):
+#     if isinstance(new_vals, float):
+#         new_vals = [new_vals]
+#     if std_dev is not None:
+#         min_new_val = np.maximum(np.nanmin(new_vals - 2 * std_dev), 1e-6) #Avoid negative values for Pvap
+#         max_new_val = np.nanmax(new_vals + 2 * std_dev)
+#     else:
+#         min_new_val = np.nanmin(new_vals)
+#         max_new_val = np.nanmax(new_vals)
+#     # print(min_new_val, max_new_val)
+#     if min_new_val < curr_min and np.isfinite(min_new_val):
+#         curr_min = min_new_val
+#     if max_new_val > curr_max:
+#         curr_max = max_new_val
+#     return curr_min, curr_max
+
+
+def get_min_max(curr_min, curr_max, new_vals, std_dev=None):
+    # Ensure new_vals is iterable
+    if isinstance(new_vals, (float, int)):
         new_vals = [new_vals]
-    min_new_val = min(new_vals - 2*std_dev) if std_dev is not None else min(new_vals)
-    max_new_val = max(new_vals + 2*std_dev) if std_dev is not None else max(new_vals)
-    # print(min_new_val, max_new_val)
-    if min_new_val < curr_min:
+
+    # Convert to NumPy array for easier handling
+    new_vals = np.array(new_vals)
+    
+    # Filter finite values to avoid issues with NaN or Inf
+    finite_indices = np.where(np.isfinite(new_vals))[0]
+    valid_vals = new_vals[finite_indices]
+    
+    if valid_vals.size == 0:  # If no valid values exist, return current bounds
+        return curr_min, curr_max
+
+    # Compute adjusted min and max
+    if std_dev is not None:
+        valid_stds = std_dev[finite_indices]
+        adjusted_vals = valid_vals - 1.96 * valid_stds
+        min_new_val = np.nanmin(adjusted_vals)  # Avoid negative Pvap
+        max_new_val = np.nanmax(valid_vals + 1.96 * valid_stds)
+    else:
+        min_new_val = np.nanmin(valid_vals)
+        max_new_val = np.nanmax(valid_vals)
+    
+    # Update curr_min and curr_max
+    if min_new_val < curr_min and np.isfinite(min_new_val):
         curr_min = min_new_val
-    if max_new_val > curr_max:
+    if max_new_val > curr_max and np.isfinite(max_new_val):
         curr_max = max_new_val
+    
     return curr_min, curr_max
+
 
 def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
     molec = list(molec_dict.keys())[0]
@@ -481,8 +522,10 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
             if df is not None:
                 min_temp = min(df["temperature"].values)
                 max_temp = max(df["temperature"].values)
-                min_pvap = min(np.log(df["sim_Pvap"].values))
-                max_pvap = max(np.log(df["sim_Pvap"].values))
+                pvap_data = df["sim_Pvap"].values
+                finite_pvap = pvap_data[np.isfinite(np.log(pvap_data))]
+                min_pvap = np.nanmin(np.log(finite_pvap)) if finite_pvap.size > 0 else 0
+                max_pvap = np.nanmax(np.log(df["sim_Pvap"].values))
                 break
 
     if molec not in ["R152", "R134", "R143"]:
@@ -491,7 +534,9 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
     else:
         for df in df_ff_list:
             if df is not None:
-                min_hvap = min(df["sim_Hvap"].values)
+                hvap_data = df["sim_Hvap"].values
+                finite_hvap = hvap_data[np.isfinite(hvap_data)]
+                min_hvap = np.min(finite_hvap) if finite_hvap.size > 0 else 0
                 max_hvap = max(df["sim_Hvap"].values)
                 break
 
@@ -521,23 +566,58 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
         if df_ff is not None:
             x_props = ["sim_Pvap", "sim_Hvap"]
+            df_ff.replace("", np.nan, inplace=True)
+            df_ff.dropna(subset=["sim_Pvap", "sim_Hvap"], inplace=True)
             grouped = df_ff.groupby(["temperature", "atom_type"])[x_props]
             
             # Calculate mean and standard deviation for each group
+            # grouped = grouped.replace("", np.nan)
             means = grouped.mean().reset_index()
             stds = grouped.std(ddof=0).reset_index()
 
+            # print(df_label, molec)
+            # print(means["sim_Pvap"].values, stds["sim_Pvap"].values)
+            # print(len(means["sim_Pvap"].values), len(stds["sim_Pvap"].values))
+
             min_temp, max_temp = get_min_max(min_temp, max_temp, means["temperature"].values)
-            min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, np.log(means["sim_Pvap"]).values)
-            min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, means["sim_Hvap"].values)
+            
+            
             #Plot 1/T vs log(Pvap) 
-            axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), color=df_colors[i], 
-                        s=70,alpha=0.5, label = df_label, marker = df_marker,
-                        zorder = df_z_order)
+            #Plot if not all nan
+            finite_indices = np.where(means["sim_Pvap"].values > 0)[0]
+            log_Pvap_finite =  np.log(means["sim_Pvap"].values[finite_indices])
+            if len(log_Pvap_finite) > 0:
+                std_log_pvap = (stds["sim_Pvap"].values/means["sim_Pvap"].values)[finite_indices]
+                temps_finite = means["temperature"].values[finite_indices]
+                # print(df_label, molec)
+                # print(log_Pvap_finite, std_log_pvap)
+                # print(min_pvap, max_pvap)
+                min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, log_Pvap_finite, std_log_pvap)
+                axs[0].errorbar(1/temps_finite, log_Pvap_finite, yerr = std_log_pvap,
+                            color=df_colors[i], markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
+                            zorder = df_z_order,)
+                # axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), color=df_colors[i], 
+                #             s=70,alpha=0.5, label = df_label, marker = df_marker,
+                #             zorder = df_z_order)
             #Plot T vs Hvap
-            axs[1].scatter(means["temperature"],means["sim_Hvap"], color=df_colors[i], 
-                        s=70,alpha=0.5, marker = df_marker,
-                        zorder = df_z_order)
+            if not np.all(np.isnan(means["sim_Hvap"].values)):
+                # print(means["sim_Hvap"].values, stds["sim_Hvap"].values)
+                finite_indices = np.isfinite(means["sim_Hvap"].values)
+                Hvap_finite =  means["sim_Hvap"].values[finite_indices]
+                std_hvap = stds["sim_Hvap"].values[finite_indices]
+                temps_finite = means["temperature"].values[finite_indices]
+                
+                    
+                min_hvap, max_hvap = get_min_max(min_hvap, max_hvap, Hvap_finite, std_hvap)
+                # if "AT-" in df_label and molec == "R152":
+                #     print(min_hvap, max_hvap)
+                #     print(Hvap_finite, std_hvap)
+                axs[1].errorbar(temps_finite, Hvap_finite, yerr=1.96*std_hvap,
+                            color=df_colors[i], markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
+                            zorder = df_z_order,)
+                # axs[1].scatter(means["temperature"],means["sim_Hvap"], color=df_colors[i], 
+                #             s=70,alpha=0.5, marker = df_marker,
+                #             zorder = df_z_order)
         
     #Plot experimental pvap
     if molec not in ["R152", "R134"]:

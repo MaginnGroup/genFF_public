@@ -1,13 +1,20 @@
 import signac
-
+import glob
+import os
 # Load the project
 project = signac.get_project()
 
 # Iterate through all jobs in the project
-for job in project.find_jobs({'atom_type': 11}):
+def delete_data(job):
+    "Delete data from previous operations"
+    del job.doc["nsteps_gemc_eq"] # run_gemc
+    del job.doc["liq_density"] #Calc_props
+    with job:
+        for file_path in glob.glob("prod.*"):
+            os.remove(file_path)
+
+for job in project.find_jobs({"mol_name": "R23", "T": 230, "atom_type": 8, "restart": 3}):
+    # if job.sp.mol_name == "R134" and job.sp.T in [240]:
+    print(job.id)
+    # delete_data(job)
     job.remove()
-    # if "restart" in job.sp.keys():
-    #     if job.sp.restart > 1:
-    #         print(job.id)
-    #         # del job.doc["use_crit"]
-    #         job.remove()

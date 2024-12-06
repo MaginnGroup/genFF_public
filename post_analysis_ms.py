@@ -170,17 +170,19 @@ for label, key in zip(err_labels, list(err_path_dict.keys())):
     df_err = pd.read_csv(err_path_dict[key], header = 0, index_col = "molecule")
     df_err_dict[label] = df_err.reindex(molec_names)
 
-#Make MAPD Plots
-if len(at_numbers) == 1:
-    full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
-else:
-    full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
-os.makedirs(full_at_dir, exist_ok=True)
-pdf_MAPD = PdfPages(os.path.join(full_at_dir ,"MAPD.pdf"))
-#For each molecule
-pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict), bbox_inches='tight')
-plt.close()
-# pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict), bbox_inches='tight')
-# plt.close()
-# #Close figures 
-pdf_MAPD.close()   
+error_objs = ["mse", "mae", "mapd"]
+for error_obj in error_objs:
+    #Make error Plots
+    if len(at_numbers) == 1:
+        full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+    else:
+        full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
+    os.makedirs(full_at_dir, exist_ok=True)
+    pdf_MAPD = PdfPages(os.path.join(full_at_dir , error_obj.upper() + ".pdf"))
+    #For each molecule
+    pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict, obj = error_obj), bbox_inches='tight')
+    plt.close()
+    # pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict), bbox_inches='tight')
+    # plt.close()
+    # #Close figures 
+    pdf_MAPD.close() 
