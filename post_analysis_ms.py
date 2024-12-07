@@ -182,7 +182,7 @@ for error_obj in error_objs:
     #For each molecule
     pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict, obj = error_obj), bbox_inches='tight')
     plt.close()
-    # pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict), bbox_inches='tight')
-    # plt.close()
+    pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict, obj = error_obj), bbox_inches='tight')
+    plt.close()
     # #Close figures 
     pdf_MAPD.close() 

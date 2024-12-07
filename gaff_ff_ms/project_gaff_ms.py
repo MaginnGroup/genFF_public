@@ -539,7 +539,7 @@ def run_gemc(job):
         count = 1
         total_eq_steps = job.sp.nsteps_gemc_eq
         if "max_eq_steps" not in job.doc:
-            job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*6
+            job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
         max_eq_steps = job.doc.max_eq_steps
         eq_extend = int(job.sp.nsteps_gemc_eq/4)
         #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
