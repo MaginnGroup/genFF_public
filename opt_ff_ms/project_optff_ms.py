@@ -711,9 +711,6 @@ def run_gemc(job):
         if "equil_fail" in job.doc and job.doc.equil_fail == True:
             job.doc.max_eq_steps = round(job.doc.nsteps_gemc_eq / 10) * 10 + 4*job.sp.nsteps_gemc_eq
             job.doc.nsteps_gemc_eq = job.doc.max_eq_steps
-            with job:
-                if os.path.exists("Equil_Output.txt"):
-                    os.remove("Equil_Output.txt")
         # if GEMC failed with critical conditions as intial conditions, terminate with error
         elif "use_crit" in job.doc and job.doc.use_crit == True:
             job.doc.gemc_failed = True
