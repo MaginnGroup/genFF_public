@@ -535,15 +535,6 @@ def run_gemc(job):
 
     # Move into the job dir and start doing things
     try:
-        #Inititalize counter and number of eq_steps
-        count = 1
-        total_eq_steps = job.sp.nsteps_gemc_eq
-        if "max_eq_steps" not in job.doc:
-            job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
-        max_eq_steps = job.doc.max_eq_steps
-        eq_extend = int(job.sp.nsteps_gemc_eq/4)
-        #Originally set the document eq_steps to the max number, it will be overwritten later
-        job.doc.nsteps_gemc_eq = int(max_eq_steps)
         with job:
             first_run = custom_args_gemc["run_name"] #gemc.eq
             # Run initial equilibration if it does not exxist
@@ -584,17 +575,39 @@ def run_gemc(job):
             #Set production start tolerance as at least 25% of the total number of data points
             # prod_tol_eq = int(eq_data_dict[key]["data"].size/4)
             if os.path.exists("Equil_Output.txt"): #Remove the file if it exists
-                os.remove("Equil_Output.txt")  
+                os.remove("Equil_Output.txt") 
+
+            #Set number of iterations per extension and intitialize counter and total number of steps
+            eq_extend = int(job.sp.nsteps_gemc_eq/4)
+            total_eq_steps = job.sp.nsteps_gemc_eq
             count = 1
+
+            #Get the total number of equilibration restarts and steps so far
+            num_restarts = len(list_with_restarts(custom_args_gemc["run_name"] + ".out.chk")) -1
+            existing_eq_steps = job.sp.nsteps_gemc_eq + num_restarts*eq_extend
+            
+            #Inititalize max number of eq_steps
+            if "max_eq_steps" not in job.doc:
+                #If no value exists, set it as 10 times the original number of eq steps
+                job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
+            #The max number of steps is the larger of the number of steps + the org number of steps or the current max
+            max_eq_steps = np.maximum(job.doc.max_eq_steps, existing_eq_steps + job.sp.nsteps_gemc_eq)
+            #Originally set the document eq_steps to the max number, it will be overwritten later
+            job.doc.nsteps_gemc_eq = int(max_eq_steps)
+
             #While the max number of eq steps has not been reached
             while total_eq_steps <= max_eq_steps:
                 #Set production start tolerance as at least 25% of the total number of data points
                 prod_tol_eq = int(total_eq_steps/4)/custom_args_gemc["prop_freq"]
-                # Check if equilibration is reached via the pymser algorithms
-                is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 #Set this run and last last run
                 this_run = custom_args_gemc["run_name"] + f".rst.{count:03d}"
                 prior_run = get_last_checkpoint(custom_args_gemc["run_name"])
+                # Check if equilibration is reached via the pymser algorithms
+                if total_eq_steps >= existing_eq_steps:
+                    is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
+                else:
+                    is_equil = False
+
                 if is_equil:
                     break
                 else:
@@ -663,7 +676,7 @@ def run_gemc(job):
     except:
         #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
         if "equil_fail" in job.doc and job.doc.equil_fail == True:
-            job.doc.max_eq_steps = round(job.doc.nsteps_gemc_eq / 10) * 10 + 4*job.sp.nsteps_gemc_eq
+            job.doc.max_eq_steps = max_eq_steps + job.sp.nsteps_gemc_eq
             job.doc.nsteps_gemc_eq = job.doc.max_eq_steps
         #if GEMC failed with critical conditions as intial conditions, terminate with error
         elif "use_crit" in job.doc and job.doc.use_crit == True:
