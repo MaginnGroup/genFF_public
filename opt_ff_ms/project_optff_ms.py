@@ -588,8 +588,8 @@ def run_gemc(job):
             job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
         max_eq_steps = job.doc.max_eq_steps
         eq_extend = int(job.sp.nsteps_gemc_eq/4)
-        #Originally set the document eq_steps to 1 larger than the max number, it will be overwritten later
-        job.doc.nsteps_gemc_eq = int(max_eq_steps+1)
+        #Originally set the document eq_steps to the max number, it will be overwritten later
+        job.doc.nsteps_gemc_eq = int(max_eq_steps)
         with job:
             first_run = custom_args["run_name"] #gemc.eq
             # Run initial equilibration if it does not exxist
@@ -628,12 +628,14 @@ def run_gemc(job):
                     eq_data_dict[key] = {"data": eq_col, "file": eq_col_file}
 
             #Set production start tolerance as at least 25% of the original number of data points
-            # prod_tol_eq = int(eq_data_dict[key]["data"].size/4) 
+            # prod_tol_eq = int(eq_data_dict[key]["data"].size/4)
+            if os.path.exists("Equil_Output.txt"): #Remove the file if it exists
+                os.remove("Equil_Output.txt") 
             count = 1
             #While the max number of eq steps has not been reached
             while total_eq_steps <= max_eq_steps:
                 #Must have equilibrium for 1/4 of total iterations to be counted as equilibrated
-                prod_tol_eq = int(total_eq_steps/4)
+                prod_tol_eq = int(total_eq_steps/4)/custom_args["prop_freq"]
                 # Check if equilibration is reached via the pymser algorithms
                 is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 #Set this run and last last run
@@ -707,8 +709,11 @@ def run_gemc(job):
     except:
         #If equilibration wasn't long enough, don't delete, just extend the simulation regardless of using use_crit or not
         if "equil_fail" in job.doc and job.doc.equil_fail == True:
-            job.doc.max_eq_steps = job.doc.nsteps_gemc_eq + job.sp.nsteps_gemc_eq
-            job.doc.nsteps_gemc_eq = job.doc.max_eq_steps + 1
+            job.doc.max_eq_steps = round(job.doc.nsteps_gemc_eq / 10) * 10 + 4*job.sp.nsteps_gemc_eq
+            job.doc.nsteps_gemc_eq = job.doc.max_eq_steps
+            with job:
+                if os.path.exists("Equil_Output.txt"):
+                    os.remove("Equil_Output.txt")
         # if GEMC failed with critical conditions as intial conditions, terminate with error
         elif "use_crit" in job.doc and job.doc.use_crit == True:
             job.doc.gemc_failed = True
