@@ -170,7 +170,7 @@ for label, key in zip(err_labels, list(err_path_dict.keys())):
     df_err = pd.read_csv(err_path_dict[key], header = 0, index_col = "molecule")
     df_err_dict[label] = df_err.reindex(molec_names)
 
-error_objs = ["mse", "mae", "mapd"]
+error_objs = ["mae", "mapd"]
 for error_obj in error_objs:
     #Make error Plots
     if len(at_numbers) == 1:

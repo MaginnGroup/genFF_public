@@ -649,8 +649,8 @@ def run_gemc(job):
                 this_run = custom_args["run_name"] + f".rst.{count:03d}"
                 prior_run = get_last_checkpoint(custom_args["run_name"])
 
-                #Check for equilibrium once we iterate to the number of existing number of steps
-                if total_eq_steps >= existing_eq_steps:
+                #Check for equilibrium once we iterate to the number of existing number of steps and at least 100K
+                if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*10:
                     # Check if equilibration is reached via the pymser algorithms
                     is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 else:
@@ -1107,7 +1107,13 @@ def calculate_props(job):
     nmols_vap_ave = np.mean(nmols_vap)
 
     # calculate enthalpy of vaporization
+    # valid_indices = (nmols_liq != 0) & (nmols_vap != 0)
+    # liq_enthalpy_valid = liq_enthalpy[valid_indices]  # Adjust column index as needed
+    # vap_enthalpy_valid = vap_enthalpy[valid_indices]  # Adjust column index as needed
+    # nmols_liq_valid = nmols_liq[valid_indices]
+    # nmols_vap_valid = nmols_vap[valid_indices]
     Hvap = (vap_enthalpy / nmols_vap) - (liq_enthalpy / nmols_liq)
+    # Hvap = (vap_enthalpy_valid / nmols_vap_valid) - (liq_enthalpy_valid / nmols_liq_valid)
     Hvap_ave = np.mean(Hvap)
 
     # save average density

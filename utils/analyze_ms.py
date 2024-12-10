@@ -181,7 +181,7 @@ def prepare_df_vle(df_csv, molec_dict, csv_name = None):
         rename_col(df_csv, prop, unit)
         
     #sort by molecule and temperature -- added by Ning Wang
-    df_csv.dropna(how = "any", inplace=True)
+    df_csv.dropna(subset=["sim_liq_density", "sim_vap_density"], how = "any", inplace=True)
     df_csv.sort_values(by=["molecule", "temperature"], inplace=True)
 
     #Add Tc and Rhoc predictions
@@ -282,9 +282,11 @@ def prepare_df_vle_errors(df, molec_dict, csv_name = None):
         
             def calculate_objs(expt_values, sim_values, property_name, molecule_name):
                 try:
-                    mse = mean_squared_error(expt_values, sim_values)
-                    mapd = mean_absolute_percentage_error(expt_values, sim_values) * 100.0
-                    mae = mean_absolute_error(expt_values, sim_values)
+                    fin_sim = sim_values[np.isfinite(sim_values)]
+                    fin_expt = expt_values[np.isfinite(sim_values)]
+                    mse = mean_squared_error(fin_expt, fin_sim)
+                    mapd = mean_absolute_percentage_error(fin_expt, fin_sim) * 100.0
+                    mae = mean_absolute_error(fin_expt, fin_sim)
                 except ValueError as e:
                     print(f"Error in calculating {property_name} for {molecule_name}: {e}. Setting MSE, MAE, and MAPD to NaN")
                     print("Exp", expt_values, "\n Sim", sim_values)
@@ -537,7 +539,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
                 hvap_data = df["sim_Hvap"].values
                 finite_hvap = hvap_data[np.isfinite(hvap_data)]
                 min_hvap = np.min(finite_hvap) if finite_hvap.size > 0 else 0
-                max_hvap = max(df["sim_Hvap"].values)
+                max_hvap = max(finite_hvap) if finite_hvap.size > 0 else 0
                 break
 
     # Plot Pvap / Hvap

@@ -47,15 +47,11 @@ def main():
                 data1 = np.loadtxt(file1, usecols=(0, 4))  # Columns 1 (0-indexed) and 5 (4-indexed)
                 data2 = np.loadtxt(file2, usecols=(0, 4))  # Columns 1 (0-indexed) and 5 (4-indexed)
 
-                differences = data1[:, 1] - data2[:, 1]  # Subtract column 5 from both files
-
-                # Check if any value in the result is negative
-                has_negative = np.any(differences < 0)
-            # Execute the command
+                if np.average(data2[:, 1]) < 30:  
             
-            if has_negative:
-                print("ID", job.id, "AT", job.sp.atom_type, "T", job.sp.T, "restart", job.sp.restart)
-                subprocess.run(command, shell=True, check=True)
+                    # if has_negative:
+                    print("ID", job.id, "AT", job.sp.atom_type, "T", job.sp.T, "restart", job.sp.restart)
+                    subprocess.run(command, shell=True, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error running command for job {job.id}: {e}")
 

@@ -35,35 +35,35 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
     for params, job_group in project.groupby(job_groupby):
 
         for job in job_group:
-            if job.id not in ["774a4ae7aa53ddbb66f11011e2fd8db4","aa00caebb8334cbb5936ddbcf1664e01","0f6afbf05892836b9143d76f6ec55c7d", "ae515c14f0d4ec9488d3c1b5f7e6f8e9", "cdb2931d6b1fc793664b0b1f5dd0622e"]:
-                # Extract the parameters into a dict
-                # new_row = {
-                #     name: param for (name, param) in zip(job_groupby, params)
-                # }
-                new_row = {"molecule": job.sp.mol_name}
+            
+            # Extract the parameters into a dict
+            # new_row = {
+            #     name: param for (name, param) in zip(job_groupby, params)
+            # }
+            new_row = {"molecule": job.sp.mol_name}
 
-                # Extract the temperature for each job.
-                # Assumes temperature increments >= 1 K
-                temperature = round(job.sp.T)
-                new_row["temperature"] = temperature
-                if hasattr(job.sp, "restart"):
-                    new_row["restart"] = job.sp.restart
-                else:
-                    new_row["restart"] = 1
+            # Extract the temperature for each job.
+            # Assumes temperature increments >= 1 K
+            temperature = round(job.sp.T)
+            new_row["temperature"] = temperature
+            if hasattr(job.sp, "restart"):
+                new_row["restart"] = job.sp.restart
+            else:
+                new_row["restart"] = 1
 
-                job_fail_stat = False
-                # Extract property values. Insert N/A if not found
-                for property_name in property_names:
-                    try:
-                        property_ = job.doc[property_name]
-                        new_row[property_name] = property_
-                    except KeyError:
-                        job_fail_stat = True
-                        new_row[property_name] = np.nan
-                if job_fail_stat:
-                    print(f"Job {job.id} in project {project} failed. Molecule {job.sp.mol_name} at T = {temperature} K.")
+            job_fail_stat = False
+            # Extract property values. Insert N/A if not found
+            for property_name in property_names:
+                try:
+                    property_ = job.doc[property_name]
+                    new_row[property_name] = property_
+                except KeyError:
+                    job_fail_stat = True
+                    new_row[property_name] = np.nan
+            if job_fail_stat:
+                print(f"Job {job.id} in project {project} failed. Molecule {job.sp.mol_name} at T = {temperature} K.")
 
-                data.append(new_row)
+            data.append(new_row)
 
     # Save to csv file for record-keeping
     df = pd.DataFrame(data)

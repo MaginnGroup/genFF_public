@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import signac
+import numpy as np
 
 def main():
     # Ensure the correct number of arguments
@@ -25,21 +26,31 @@ def main():
     # Iterate over the matching jobs
     for job in jobs:
         # Construct the command using the job ID and statepoint value
-        print("ID", job.id, "T", job.sp.T)
-        if os.path.exists(f"workspace/{job.id}/gemc.eq.rst.001.out.box1.prp") and os.path.exists(f"workspace/{job.id}/gemc.eq.rst.001.out.box2.prp"):
-            command = (
-                f"xmgrace -block workspace/{job.id}/gemc.eq.rst.001.out.box1.prp -bxy 1:5 "
-                f"-block workspace/{job.id}/gemc.eq.rst.001.out.box2.prp -bxy 1:5"
-            )
-        else:
-            command = (
-                f"xmgrace -block workspace/{job.id}/prod.out.box1.prp -bxy 1:6 "
-                f"-block workspace/{job.id}/prod.out.box2.prp -bxy 1:6"
+        
+        # if os.path.exists(f"workspace/{job.id}/gemc.eq.rst.001.out.box1.prp") and os.path.exists(f"workspace/{job.id}/gemc.eq.rst.001.out.box2.prp"):
+        #     command = (
+        #         f"xmgrace -block workspace/{job.id}/gemc.eq.rst.001.out.box1.prp -bxy 1:5 "
+        #         f"-block workspace/{job.id}/gemc.eq.rst.001.out.box2.prp -bxy 1:5"
+        #     )
+        # else:
+        command = (
+            f"xmgrace -block workspace/{job.id}/prod.out.box1.prp -bxy 1:5 "
+            f"-block workspace/{job.id}/prod.out.box2.prp -bxy 1:5"
             )
 
         # Execute the command
         try:
-            subprocess.run(command, shell=True, check=True)
+            file1 = f"workspace/{job.id}/prod.out.box1.prp"
+            file2 = f"workspace/{job.id}/prod.out.box2.prp"
+            if not os.path.exists(file1) or not os.path.exists(file2):
+                has_negative = False
+            else:
+                data1 = np.loadtxt(file1, usecols=(0, 4))  # Columns 1 (0-indexed) and 5 (4-indexed)
+                data2 = np.loadtxt(file2, usecols=(0, 4))  # Columns 1 (0-indexed) and 5 (4-indexed)
+
+                if np.average(data2[:, 1]) < 30:  
+                    print("ID", job.id, "T", job.sp.T, "restart", job.sp.restart)
+                    subprocess.run(command, shell=True, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error running command for job {job.id}: {e}")
 
