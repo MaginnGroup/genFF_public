@@ -232,7 +232,6 @@ def NVT_liqbox(job):
                 + str(job.sp.T)
             )
 
-
 @Project.pre.after(NVT_liqbox)
 @Project.post(lambda job: job.isfile("nvt.final.xyz"))
 @Project.post(lambda job: "nvt_liqbox_final_dim" in job.doc)
@@ -493,6 +492,104 @@ def gemc_prod_complete(job):
 
     return completed
 
+def make_usable_xyz(job, filename, box):
+    "Make the xyz file usable for mbuild"
+    import subprocess
+
+    H_file = job.fn(filename + ".out.box" + str(box) + ".H")
+    filename_in = job.fn(filename + ".out.box" + str(box) + ".xyz")
+    filename_out = job.fn(filename + ".box" + str(box) + ".final.xyz")
+    num_molec = int(grab_last_value(job.fn(H_file)))
+    #If the file doesn't already exist, generate it, otherwise point to it
+    if not os.path.exists(filename_out):
+        lines = num_molec * job.sp.N_atoms
+        print(lines)
+        cmd = [
+            "tail",
+            "-n",
+            str(lines + 2),
+            filename_in,
+        ]
+
+        # Save final liuqid box xyz file
+        xyz = subprocess.check_output(cmd).decode("utf-8")
+        with open(filename_out, "w") as xyzfile:
+            xyzfile.write(xyz)
+
+    return filename_out, num_molec
+
+def grab_last_value(filename):
+    last_value = None
+    with open(filename, "r") as file:
+        for line in reversed(file.readlines()):  # Read lines backwards
+            stripped_line = line.strip()
+            if stripped_line:  # Skip empty lines
+                # Split the line into values
+                values = stripped_line.split()
+                if values:
+                    last_value = values[-1]  # Get the last value
+                    break
+    return last_value
+
+def get_gemc_boxes(job):
+    "Get the box from the final xyz file"
+    import mbuild
+    import signac
+    import json
+    
+    #If we are restarting from a previous (better performing job)
+    if "restart_from" in job.doc.keys():
+        project = signac.get_project()
+        job_init = project.open_job(id=job.doc.restart_from)
+        job_init_doc = job_init.fn("signac_job_document.json")
+        # Check if the file exists
+        if os.path.exists(job_init_doc):
+            with open(job_init_doc, 'r') as f:
+                statepoint = json.load(f)
+            
+            # Extract the values for the specified keys
+            boxl_liq = statepoint.get("npt_liqbox_final_dim", None)
+            boxl_vap = statepoint.get("vapboxl", None)
+
+            #Build liquid and vapor boxes from previous simulations
+            last_file = get_last_checkpoint(job_init.fn("gemc.eq"))
+            file_liq_out, N_liq_use = make_usable_xyz(job_init, last_file, 1)
+
+            file_vap_out, N_vap_use = make_usable_xyz(job_init, last_file, 2)
+            vap_box = mbuild.formats.xyz.read_xyz(file_vap_out)
+            vap_box.box = mbuild.Box(
+                lengths=[boxl_vap, boxl_vap, boxl_vap], angles=[90.0, 90.0, 90.0]
+            )
+            vap_box.periodicity = [True, True, True]
+
+            #Save a text file indicating that other job's points are used
+            job.doc.liq_boxl_use = boxl_liq
+            job.doc.vap_box1_use = boxl_vap
+            mols_in_boxes = [[N_liq_use], [N_vap_use]]
+            mols_to_add = [[0], [0]]
+        else:
+            raise Exception("The file signac_statepoint.json does not exist in the job directory. Check job ID in restart_from")
+    #Otherwise create them from this job
+    else:
+        # Create box list and species list
+        boxl_liq = job.doc.npt_liqbox_final_dim  # saved in nm
+        N_liq_use = job.sp.N_liq
+        file_liq_out = job.fn("npt.final.xyz")
+        boxl_vap = job.doc.vapboxl  # nm
+        N_vap_use = job.sp.N_vap
+        vap_box = mbuild.Box(lengths=[boxl_vap, boxl_vap, boxl_vap])
+        mols_in_boxes = [[N_liq_use], [0]]
+        mols_to_add = [[0], [N_vap_use]]
+
+    liq_box = mbuild.formats.xyz.read_xyz(file_liq_out)
+    liq_box.box = mbuild.Box(
+        lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90.0, 90.0, 90.0]
+    )
+    liq_box.periodicity = [True, True, True]
+    
+
+    return liq_box, vap_box, boxl_liq, boxl_vap, mols_in_boxes, mols_to_add
+
 @Project.pre.after(extract_final_NPT_config)
 @Project.pre(lambda job: "gemc_failed" not in job.doc)
 @Project.post(gemc_prod_complete)
@@ -512,24 +609,26 @@ def run_gemc(job):
     compound_ff = ff.apply(compound)
 
     # Create box list and species list
-    boxl_liq = job.doc.npt_liqbox_final_dim  # saved in nm
-    # liq_box = mbuild.load(job.fn("liqbox.xyz"))
-    with job:
-        liq_box = mbuild.formats.xyz.read_xyz(job.fn("npt.final.xyz"))
+    # boxl_liq = job.doc.npt_liqbox_final_dim  # saved in nm
+    # # liq_box = mbuild.load(job.fn("liqbox.xyz"))
+    # with job:
+    #     liq_box = mbuild.formats.xyz.read_xyz(job.fn("npt.final.xyz"))
 
-    liq_box.box = mbuild.Box(
-        lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90.0, 90.0, 90.0]
-    )
-    liq_box.periodicity = [True, True, True]
+    # liq_box.box = mbuild.Box(
+    #     lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90.0, 90.0, 90.0]
+    # )
+    # liq_box.periodicity = [True, True, True]
 
-    boxl_vap = job.doc.vapboxl  # nm
-    vap_box = mbuild.Box(lengths=[boxl_vap, boxl_vap, boxl_vap])
-
+    # boxl_vap = job.doc.vapboxl  # nm
+    # vap_box = mbuild.Box(lengths=[boxl_vap, boxl_vap, boxl_vap])
+    #Get liquid and vapor boxes. Some will pull system configs from previous jobs
+    liq_box, vap_box, boxl_liq, boxl_vap, mols_in_boxes, mols_to_add = get_gemc_boxes(job)
     box_list = [liq_box, vap_box]
     species_list = [compound_ff]
 
-    mols_in_boxes = [[job.sp.N_liq], [0]]
-    mols_to_add = [[0], [job.sp.N_vap]]
+    # mols_in_boxes = [[job.sp.N_liq], [0]]
+    # mols_to_add = [[0], [job.sp.N_vap]]
+    
 
     system = mc.System(
         box_list,
@@ -650,7 +749,8 @@ def run_gemc(job):
                 prior_run = get_last_checkpoint(custom_args["run_name"])
 
                 #Check for equilibrium once we iterate to the number of existing number of steps and at least 100K
-                if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*10:
+                if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*5:
+                # if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*10:
                     # Check if equilibration is reached via the pymser algorithms
                     is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 else:
