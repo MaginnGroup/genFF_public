@@ -20,9 +20,9 @@ class R134Constants:
     def expt_Tc(self):
         """
         Critical temperature in K
-        #Note: Using experimental properties of R134a since data for R134 is not available. These values will only be used as an initial guess for GEMC simulations.
+        #From M. L´ısal and V. Vacek. Molecular dynamics simulations of fluorinated ethanes. Mol. Phys., 87(1):167–187, 1996. doi: 10.1080/00268979600100091.
         """
-        return 374.21
+        return 391.74
 
     @property
     def expt_rhoc(self):
