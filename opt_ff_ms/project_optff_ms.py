@@ -749,7 +749,7 @@ def run_gemc(job):
                 prior_run = get_last_checkpoint(custom_args["run_name"])
 
                 #Check for equilibrium once we iterate to the number of existing number of steps and at least 100K
-                if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*5:
+                if total_eq_steps >= existing_eq_steps:
                 # if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*10:
                     # Check if equilibration is reached via the pymser algorithms
                     is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
