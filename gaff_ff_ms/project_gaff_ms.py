@@ -583,6 +583,9 @@ def run_gemc(job):
 
     # vap_box = mbuild.Box(lengths=[boxl_vap, boxl_vap, boxl_vap], angles=[90., 90., 90.])
 
+    run_name_eq = "gemc.eq"
+    liq_box, vap_box, boxl_liq, boxl_vap, mols_in_boxes, mols_to_add = get_gemc_boxes(job, run_name_eq)
+
     box_list = [liq_box, vap_box]
 
     species_list = [compound_ff]
@@ -590,14 +593,11 @@ def run_gemc(job):
     # mols_in_boxes = [[job.sp.N_liq], [0]]
 
     # mols_to_add = [[0], [job.sp.N_vap]]
-    run_name_eq = "gemc.eq"
-    liq_box, vap_box, boxl_liq, boxl_vap, mols_in_boxes, mols_to_add = get_gemc_boxes(job, run_name_eq)
-
+    
     system = mc.System(box_list, species_list, mols_in_boxes=mols_in_boxes, mols_to_add=mols_to_add)
 
     # Create a new moves object
     moves = mc.MoveSet("gemc", species_list)
-
 
     # Edit the volume and swap move probability to be more reasonable
     orig_prob_volume = moves.prob_volume
@@ -702,7 +702,7 @@ def run_gemc(job):
                 this_run = custom_args_gemc["run_name"] + f".rst.{count:03d}"
                 prior_run = get_last_checkpoint(custom_args_gemc["run_name"])
                 # Check if equilibration is reached via the pymser algorithms
-                if total_eq_steps >= existing_eq_steps:
+                if total_eq_steps >= existing_eq_steps and total_eq_steps >= 5*job.sp.nsteps_gemc_eq:
                 # if total_eq_steps >= existing_eq_steps and total_eq_steps >= 10*job.sp.nsteps_gemc_eq:
                     is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 else:
