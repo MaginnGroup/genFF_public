@@ -809,18 +809,28 @@ def run_gemc(job):
             job.doc.equil_fail = False
             total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
             # Run production
-            this_run = "prod"
-            if not has_checkpoint(this_run):
-                mc.restart(
-                    restart_from=prior_run,
-                    run_type="production",
-                    total_run_length=total_sim_steps,
-                    run_name=this_run,
-                )
-            elif not check_complete(this_run):
-                mc.restart(
-                    restart_from=get_last_checkpoint(this_run),
-                )
+            if np.mean(eq_col_restart) > 30:
+                this_run = "prod"
+                if not has_checkpoint(this_run):
+                    mc.restart(
+                        restart_from=prior_run,
+                        run_type="production",
+                        total_run_length=total_sim_steps,
+                        run_name=this_run,
+                    )
+                elif not check_complete(this_run):
+                    mc.restart(
+                        restart_from=get_last_checkpoint(this_run),
+                    )
+            else:
+                #Otherwise add to the job document that the production failed
+                job.doc["nmol_under_30"] = True
+                with job:
+                    #Delete gemc equil/prod data
+                    for file_path in glob.glob(custom_args["run_name"] + ".*"):
+                        os.remove(file_path)
+                    if os.path.exists("Equil_Output.txt"):
+                        os.remove("Equil_Output.txt")
     except:
         #If equilibration wasn't long enough, don't delete, just extend the simulation regardless of using use_crit or not
         if "equil_fail" in job.doc and job.doc.equil_fail == True:
