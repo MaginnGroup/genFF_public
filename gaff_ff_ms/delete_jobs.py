@@ -19,14 +19,14 @@ def delete_data(job):
     #     job.doc["nsteps_gemc_eq"] = 110000 # run_gemc
     #     job.doc["max_eq_steps"] = 110000 # run_gemc
     with job:
-        subfolder = "old_results_restart"
+        subfolder = "old_results"
         if not os.path.exists(subfolder):
             os.makedirs(subfolder)
         for file_path in glob.glob("MSER*"):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
         for file_path in glob.glob("*_eq_col_*"):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
-        for file_path in glob.glob("box1.in.xyz"):
+        for file_path in glob.glob("box*.in.xyz"):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
         for file_path in glob.glob("gemc.eq.*"):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
@@ -42,8 +42,8 @@ def delete_data(job):
 
 mol_name = "R116"
 #To replace
-T_in = 270
-restart_in = [1,2,3]
+T_in = 210
+restart_in = [1]
 #Replace with
 # T_out = 240
 # restart_out = 1
@@ -54,12 +54,13 @@ for job in project.find_jobs({"mol_name":mol_name, "T":T_in, "restart": {"$in" :
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
     # delete_data(job)
-    # job.doc["vapboxl"] = job.doc["vapboxl"]*10
-    # print(job.doc["vapboxl"])
-    try:
-        del job.doc["restart_from"]
-    except:
-        pass
+    # job.doc["vapboxl"] = job.doc["vapboxl"]*5
+    print(job.doc["vapboxl"])
+    # try:
+    #     # del job.doc["restart_from"]
+    #     del job.doc["gemc_failed"]
+    # except:
+    #     pass
 
 
     # job.doc["gemc_failed"] = True
