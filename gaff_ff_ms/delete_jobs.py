@@ -43,7 +43,7 @@ def delete_data(job):
 mol_name = "R116"
 #To replace
 T_in = 210
-restart_in = [1]
+restart_in = [2,3]
 #Replace with
 # T_out = 240
 # restart_out = 1
