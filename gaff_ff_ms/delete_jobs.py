@@ -58,8 +58,8 @@ for job in project.find_jobs({"mol_name":mol_name, "T":T_in, "restart": {"$in" :
     # job_id = list(project.find_jobs({"mol_name":mol_name, "T":T_out, "restart": restart_out}))[0].id
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
-    delete_data(job)
-    job.doc["vapboxl"] = 2*job.doc["vapboxl"]
+    # delete_data(job)
+    # job.doc["vapboxl"] = 2*job.doc["vapboxl"]
     print(job.doc["vapboxl"])
     # try:
     #     # del job.doc["restart_from"]
