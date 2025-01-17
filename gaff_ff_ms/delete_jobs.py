@@ -30,6 +30,8 @@ def delete_data(job):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
         for file_path in glob.glob("gemc.eq.*"):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
+        for file_path in glob.glob("mosdef_cassandra_*.log"):
+            shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
         for file_path in glob.glob("prod.*"):
             # os.remove(file_path)
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
@@ -47,8 +49,8 @@ def delete_data(job):
 
 mol_name = "R41"
 #To replace
-T_in = 290
-restart_in = [1,2,3]
+T_in = 210
+restart_in = [3]
 #Replace with
 # T_out = 240
 # restart_out = 1
@@ -58,8 +60,8 @@ for job in project.find_jobs({"mol_name":mol_name, "T":T_in, "restart": {"$in" :
     # job_id = list(project.find_jobs({"mol_name":mol_name, "T":T_out, "restart": restart_out}))[0].id
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
-    # delete_data(job)
-    # job.doc["vapboxl"] = 2*job.doc["vapboxl"]
+    delete_data(job)
+    job.doc["vapboxl"] = 2*job.doc["vapboxl"]
     print(job.doc["vapboxl"])
     # try:
     #     # del job.doc["restart_from"]
