@@ -23,6 +23,8 @@ def delete_data(job):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
         for file_path in glob.glob("gemc.eq.*"):
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
+        for file_path in glob.glob("mosdef_cassandra_*.log"):
+            shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
         for file_path in glob.glob("prod.*"):
             # os.remove(file_path)
             shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
