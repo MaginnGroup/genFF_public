@@ -40,11 +40,11 @@ def delete_data(job):
         except:
             pass
 
-mol_name = "R23"
+mol_name = "R152a"
 at = 8
 #To replace
-T_in = 210
-restart_in = [2]
+T_in = 260
+restart_in = [2,3]
 #Replace with
 # T_out = 210
 # restart_out = 3
@@ -55,8 +55,8 @@ for job in project.find_jobs({"mol_name":mol_name, "atom_type":at, "T":T_in, "re
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
     # delete_data(job)
-    # job.doc["vapboxl"] = 2*job.doc["vapboxl"]
-    print(job.doc["vapboxl"])
+    # job.doc["vapboxl"] = job.doc["vapboxl"]/5
+    # print(job.doc["vapboxl"])
     # job.doc["gemc_failed"] = True
 
     # job.remove()

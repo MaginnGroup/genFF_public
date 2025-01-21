@@ -19,7 +19,7 @@ def delete_data(job):
     #     job.doc["nsteps_gemc_eq"] = 110000 # run_gemc
     #     job.doc["max_eq_steps"] = 110000 # run_gemc
     with job:
-        subfolder = "old_results"
+        subfolder = "old_results_5"
         if not os.path.exists(subfolder):
             os.makedirs(subfolder)
         for file_path in glob.glob("MSER*"):
@@ -47,10 +47,10 @@ def delete_data(job):
         except:
             pass
 
-mol_name = "R41"
+mol_name = "R116"
 #To replace
 T_in = 210
-restart_in = [3]
+restart_in = [1]
 #Replace with
 # T_out = 240
 # restart_out = 1
@@ -60,8 +60,8 @@ for job in project.find_jobs({"mol_name":mol_name, "T":T_in, "restart": {"$in" :
     # job_id = list(project.find_jobs({"mol_name":mol_name, "T":T_out, "restart": restart_out}))[0].id
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
-    delete_data(job)
-    job.doc["vapboxl"] = 2*job.doc["vapboxl"]
+    # delete_data(job)
+    # job.doc["vapboxl"] = 2*job.doc["vapboxl"]/5
     print(job.doc["vapboxl"])
     # try:
     #     # del job.doc["restart_from"]

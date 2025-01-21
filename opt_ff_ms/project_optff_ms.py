@@ -723,27 +723,30 @@ def run_gemc(job):
                 os.remove("Equil_Output.txt") 
 
             #Set number of iterations per extension and intitialize counter and total number of steps
-            eq_extend = int(job.sp.nsteps_gemc_eq/4)
+            eq_extend = int(job.sp.nsteps_gemc_eq)  #int(job.sp.nsteps_gemc_eq/4)
             total_eq_steps = job.sp.nsteps_gemc_eq
             count = 1
 
-            #Get the total number of equilibration restarts and steps so far
-            num_restarts = len(list_with_restarts(custom_args["run_name"] + ".out.chk")) -1
-            existing_eq_steps = job.sp.nsteps_gemc_eq + num_restarts*eq_extend
+            # #Get the total number of equilibration restarts and steps so far
+            # num_restarts = len(list_with_restarts(custom_args["run_name"] + ".out.chk")) -1
+            # existing_eq_steps = job.sp.nsteps_gemc_eq + num_restarts*eq_extend
+            # #Get the total number of equilibration restarts and steps so far
+            existing_eq_steps = count_steps(get_last_checkpoint(custom_args["run_name"]))
             
             #Inititalize max number of eq_steps
             if "max_eq_steps" not in job.doc:
                 #If no value exists, set it as 10 times the original number of eq steps
-                job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*10
+                job.doc.max_eq_steps = job.sp.nsteps_gemc_eq*20
             #The max number of steps is the larger of the number of steps + the org number of steps or the current max
-            max_eq_steps = np.maximum(job.doc.max_eq_steps, existing_eq_steps + job.sp.nsteps_gemc_eq)
+            max_eq_steps = np.maximum(job.doc.max_eq_steps, existing_eq_steps + 2*job.sp.nsteps_gemc_eq)
             #Originally set the document eq_steps to the max number, it will be overwritten later
             job.doc.nsteps_gemc_eq = int(max_eq_steps)
             
             #While the max number of eq steps has not been reached
             while total_eq_steps <= max_eq_steps:
-                #Must have equilibrium for 1/4 of total iterations to be counted as equilibrated
+                #Set production start tolerance as at least 25% of the total number of data points
                 prod_tol_eq = int(total_eq_steps/4)/custom_args["prop_freq"]
+
                 #Set this run and last last run
                 this_run = custom_args["run_name"] + f".rst.{count:03d}"
                 prior_run = get_last_checkpoint(custom_args["run_name"])
@@ -758,49 +761,81 @@ def run_gemc(job):
                 
                 if is_equil:
                     break
+                #Otherwise continue equilibration
                 else:
-                    #Increase the total number of eq steps by 25% of the original value and restart the simulation
-                    total_eq_steps += int(eq_extend)
-                    #If we've exceeded the maximum number of equilibrium steps, raise an exception
-                    #This forces a retry with critical conditions or will note complete GEMC failure
-                    if total_eq_steps > max_eq_steps:
-                        job.doc.equil_fail = True
-                        raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
-                    #Otherwise continue equilibration
+                    # #Increase the total number of eq steps by 25% of the original value and restart the simulation
+                    # total_eq_steps += int(eq_extend)
+                    # #If we've exceeded the maximum number of equilibrium steps, raise an exception
+                    # #This forces a retry with critical conditions or will note complete GEMC failure
+                    # if total_eq_steps > max_eq_steps:
+                    #     job.doc.equil_fail = True
+                    #     raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
+
+                    #Check if this simulation exists
+                    sim_exists = has_checkpoint(this_run)
+                    
+                    #If the simulation exists
+                    if sim_exists:
+                        #Get the number of total steps in the simulation
+                        this_run_input = this_run
+                        total_eq_steps = int(count_steps(this_run_input))
                     else:
-                        #Check if checkpoint file exists, if so, we've already done this restart
-                        # if not, restart the simulation
-                        if not has_checkpoint(this_run):
+                        #Set the number of total steps given eq_extend
+                        total_eq_steps += int(eq_extend)
+
+                    #If you have enough steps, run the simulation
+                    if total_eq_steps <= max_eq_steps:
+                        #If the simulation doesn't exist, run it
+                        if not sim_exists:
                             mc.restart(
-                            restart_from=prior_run,
-                            run_type="equilibration",
-                            total_run_length=total_eq_steps,
-                            run_name = this_run )
-                        elif not check_complete(this_run):
+                                    restart_from=prior_run,
+                                    run_type="equilibration",
+                                    total_run_length=total_eq_steps,
+                                    run_name = this_run )
+                        #If the simulation exists but is not complete, restart it
+                        elif sim_exists and not check_complete(this_run):
+                            #Finish the simulation
                             mc.restart(
                                 restart_from=get_last_checkpoint(this_run),
                             )
+                    #Otherwise report an error
+                    else:
+                        job.doc.equil_fail = True
+                        raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
+                        
+                        # #Check if checkpoint file exists, if so, we've already done this restart
+                        # # if not, restart the simulation
+                        # if not has_checkpoint(this_run):
+                        #     mc.restart(
+                        #     restart_from=prior_run,
+                        #     run_type="equilibration",
+                        #     total_run_length=total_eq_steps,
+                        #     run_name = this_run )
+                        # elif not check_complete(this_run):
+                        #     mc.restart(
+                        #         restart_from=get_last_checkpoint(this_run),
+                        #     )
 
-                        #Add restart data to eq_col
-                        # After each restart, load the updated properties data for both boxes
-                        sim_box1 =  this_run + ".out.box1.prp"
-                        sim_box2 =  this_run + ".out.box2.prp"
-                        df_box1r = np.genfromtxt(job.fn(sim_box1))
-                        df_box2r = np.genfromtxt(job.fn(sim_box2))
+                    #Add restart data to eq_col
+                    # After each restart, load the updated properties data for both boxes
+                    sim_box1 =  this_run + ".out.box1.prp"
+                    sim_box2 =  this_run + ".out.box2.prp"
+                    df_box1r = np.genfromtxt(job.fn(sim_box1))
+                    df_box2r = np.genfromtxt(job.fn(sim_box2))
 
-                        # Process and add the restart data to eq_col for each property in each box
-                        for b, box in enumerate([df_box1r, df_box2r]):
-                            box_name = "Liquid" if b == 0 else "Vapor"
-                            for i, prop_index in enumerate(prop_cols):
-                                #Get the key from the property and box name
-                                key = f"{box_name}_{prop_index}"
-                                # Extract the column data for this restart and append to accumulated data
-                                eq_col_restart = box[:, prop_index - 1]
-                                all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
-                                #Save the new data to the eq_col file
-                                np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
-                                #Overwite the current data in the eq_data_dict with restart data
-                                eq_data_dict[key]["data"] = all_eq_data
+                    # Process and add the restart data to eq_col for each property in each box
+                    for b, box in enumerate([df_box1r, df_box2r]):
+                        box_name = "Liquid" if b == 0 else "Vapor"
+                        for i, prop_index in enumerate(prop_cols):
+                            #Get the key from the property and box name
+                            key = f"{box_name}_{prop_index}"
+                            # Extract the column data for this restart and append to accumulated data
+                            eq_col_restart = box[:, prop_index - 1]
+                            all_eq_data = np.concatenate((eq_data_dict[key]["data"], eq_col_restart))
+                            #Save the new data to the eq_col file
+                            np.savetxt(eq_data_dict[key]["file"], all_eq_data, delimiter=",")
+                            #Overwite the current data in the eq_data_dict with restart data
+                            eq_data_dict[key]["data"] = all_eq_data
                 #Increase the counter
                 count += 1
 
@@ -1976,6 +2011,21 @@ def check_complete(run_name):
                 complete = True
                 break
     return complete
+
+def count_steps(fpath):
+    with open(fpath + ".inp", "r") as file:
+        in_sim_length_info = False
+        for line in file:
+            # Search for the line starting with "run" in "Simulation_Length_Info"
+            if "Simulation_Length_Info" in line:
+                # Enter the relevant section
+                in_sim_length_info = True
+
+            if in_sim_length_info and line.strip().startswith("run"):
+                # Extract the run value
+                run_value = int(line.split()[1])
+                break
+    return run_value
 
 def list_with_restarts(fpath):
     """List fpath and its restart versions in order as pathlib Path objects."""
