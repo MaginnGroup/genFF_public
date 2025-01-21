@@ -56,7 +56,7 @@ for job in project.find_jobs({"mol_name":mol_name, "atom_type":at, "T":T_in, "re
     # job.doc["restart_from"] = job_id
     # delete_data(job)
     # job.doc["vapboxl"] = job.doc["vapboxl"]/5
-    # print(job.doc["vapboxl"])
+    print(job.doc["vapboxl"])
     # job.doc["gemc_failed"] = True
 
     # job.remove()
