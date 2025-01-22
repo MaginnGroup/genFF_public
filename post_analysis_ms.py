@@ -117,7 +117,7 @@ err_path_dict[project_path]= csv_name
 
 #Load csvs for Opt_FF, GAFF, NW, Trappe, and Potoff, and BBFF
 ff_names = ["Potoff", "TraPPE", "Wang_FFO", "BBFF"]
-ff_labels = ["Potoff et al.", "TraPPE", "Wang et al.", "Befort et al."]
+ff_labels = ["Potoff et al.", "TraPPE", "Previous Work", ""]
 for ff_name, ff_label in zip(ff_names, ff_labels):
     #Check that files all exist and load them if they do
     read_path = os.path.join("Results_MS/unprocessed_csv", ff_name + ".csv")

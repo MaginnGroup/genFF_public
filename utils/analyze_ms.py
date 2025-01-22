@@ -424,6 +424,8 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
         else:
             df_z_order = 4
             df_marker = "p"
+
+        df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
         
         if df_ff is not None:
             all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
@@ -447,7 +449,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
             min_temp, max_temp = get_min_max(min_temp, max_temp, means["sim_Tc"].values, stds["sim_Tc"].values)
             ax2.errorbar(means["sim_rhoc"].values[0],means["sim_Tc"].values[0], xerr=1.96*stds["sim_rhoc"].values[0],
                         color=df_colors[i],markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
-                        zorder = df_z_order, label = df_labels[i] )
+                        zorder = df_z_order, label = df_label)
 
     #Plot experimental data
     if molec not in ["R152", "R134"]:
@@ -566,6 +568,9 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
         else:
             df_z_order = 4
             df_marker = "p"
+        
+        df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
+
         if df_ff is not None:
             x_props = ["sim_Pvap", "sim_Hvap"]
             df_ff.replace("", np.nan, inplace=True)
@@ -597,7 +602,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
                 min_pvap, max_pvap = get_min_max(min_pvap, max_pvap, log_Pvap_finite, std_log_pvap)
                 axs[0].errorbar(1/temps_finite, log_Pvap_finite, yerr = std_log_pvap,
                             color=df_colors[i], markersize=10, linestyle='None', marker = df_marker, alpha=0.5, 
-                            zorder = df_z_order,label = df_labels[i])
+                            zorder = df_z_order,label = df_label)
                 # axs[0].scatter(1/means["temperature"], np.log(means["sim_Pvap"]), color=df_colors[i], 
                 #             s=70,alpha=0.5, label = df_label, marker = df_marker,
                 #             zorder = df_z_order)
