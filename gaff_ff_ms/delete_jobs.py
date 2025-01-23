@@ -47,10 +47,10 @@ def delete_data(job):
         except:
             pass
 
-mol_name = "R116"
+mol_name = "R125"
 #To replace
-T_in = 230
-restart_in = [1,2]
+T_in = 229
+restart_in = [3]
 #Replace with
 # T_out = 240
 # restart_out = 1
@@ -60,8 +60,8 @@ for job in project.find_jobs({"mol_name":mol_name, "T":T_in, "restart": {"$in" :
     # job_id = list(project.find_jobs({"mol_name":mol_name, "T":T_out, "restart": restart_out}))[0].id
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
-    delete_data(job)
-    job.doc["vapboxl"] = 3*job.doc["vapboxl"]/(2)
+    # delete_data(job)
+    # job.doc["vapboxl"] = 3*job.doc["vapboxl"]/(2)
     print(job.doc["vapboxl"])
     # try:
     #     # del job.doc["restart_from"]
