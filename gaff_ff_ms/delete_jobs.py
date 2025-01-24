@@ -47,21 +47,22 @@ def delete_data(job):
         except:
             pass
 
-mol_name = "R125"
+#comment
+mol_name = "R116"
 #To replace
-T_in = 229
-restart_in = [3]
+T_in = 210
+restart_in = [1]
 #Replace with
-# T_out = 240
-# restart_out = 1
+# T_out = 210
+# restart_out = 2
 for job in project.find_jobs({"mol_name":mol_name, "T":T_in, "restart": {"$in" : restart_in}}):
     # if "Hvap" in job.doc.keys() and job.doc["Hvap"] == "NaN":
-    print("job",  job.id)
+    # print("job",  job.id)
     # job_id = list(project.find_jobs({"mol_name":mol_name, "T":T_out, "restart": restart_out}))[0].id
     # print("rest job", job_id)
     # job.doc["restart_from"] = job_id
     # delete_data(job)
-    # job.doc["vapboxl"] = 3*job.doc["vapboxl"]/(2)
+    # job.doc["vapboxl"] = job.doc["vapboxl"]/(2)
     print(job.doc["vapboxl"])
     # try:
     #     # del job.doc["restart_from"]

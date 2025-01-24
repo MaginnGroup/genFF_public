@@ -1212,8 +1212,15 @@ def calculate_props(job):
     sys.path.remove("..")
 
     # Load the thermo data
-    df_box1 = np.genfromtxt(job.fn("prod.out.box1.prp"))
-    df_box2 = np.genfromtxt(job.fn("prod.out.box2.prp"))
+    with job:
+    #Get all production files
+        prod_files1 = sorted(glob.glob("prod.*.box1.prp"))
+        prod_files2 = sorted(glob.glob("prod.*.box2.prp"))
+        #Concatenate all production files using genfromtxt into one
+        df_box1 = np.vstack([np.genfromtxt(f) for f in prod_files1])
+        df_box2 = np.vstack([np.genfromtxt(f) for f in prod_files2])
+    # df_box1 = np.genfromtxt(job.fn("prod.out.box1.prp"))
+    # df_box2 = np.genfromtxt(job.fn("prod.out.box2.prp"))
 
     density_col = 6
     pressure_col = 3

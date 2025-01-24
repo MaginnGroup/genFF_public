@@ -895,8 +895,14 @@ def calculate_props(job):
     ]
 
     with job:
-        df_box1 = np.genfromtxt("prod.out.box1.prp")
-        df_box2 = np.genfromtxt("prod.out.box2.prp")
+        #Get all production files
+        prod_files1 = sorted(glob.glob("prod.*.box1.prp"))
+        prod_files2 = sorted(glob.glob("prod.*.box2.prp"))
+        #Concatenate all production files using genfromtxt into one
+        df_box1 = np.vstack([np.genfromtxt(f) for f in prod_files1])
+        df_box2 = np.vstack([np.genfromtxt(f) for f in prod_files2])
+        # df_box1 = np.genfromtxt("prod.out.box1.prp")
+        # df_box2 = np.genfromtxt("prod.out.box2.prp")
 
     energy_col = 1
     density_col = 5
