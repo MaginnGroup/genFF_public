@@ -79,7 +79,10 @@ def gemc_prod_complete(job):
     import numpy as np
 
     try:
-        with open(job.fn("prod.out.box1.prp"), "rb") as f:
+        #Get the last production restart file
+        last_prod_file = sorted(glob.glob(job.fn("prod.*out.box1.prp")))[-1]
+        # with open(job.fn("prod.out.box1.prp"), "rb") as f:
+        with open(last_prod_file, "rb") as f:
             # Move the pointer to the end of the file, but leave space to find the last line
             f.seek(-2, os.SEEK_END)
             # Read backward until a newline is found
@@ -895,7 +898,6 @@ def calculate_props(job):
     ]
 
     with job:
-        #Get all production files
         prod_files1 = sorted(glob.glob("prod.*.box1.prp"))
         prod_files2 = sorted(glob.glob("prod.*.box2.prp"))
         #Concatenate all production files using genfromtxt into one
