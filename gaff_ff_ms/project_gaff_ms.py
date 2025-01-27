@@ -510,13 +510,13 @@ def get_gemc_boxes(job, eq_data_name):
                 statepoint = json.load(f)
             
             # Extract the values for the specified keys
-            boxl_liq = statepoint.get("npt_liqbox_final_dim", None)
-            boxl_vap = statepoint.get("vapboxl", None)
+            # boxl_liq = statepoint.get("npt_liqbox_final_dim", None)
+            # boxl_vap = statepoint.get("vapboxl", None) #nm
+            last_file = get_last_checkpoint(job_init.fn(eq_data_name))
+            boxl_liq, boxl_vap = extract_cubic_values(job_init, last_file)
 
             #Build liquid and vapor boxes from previous simulations
-            last_file = get_last_checkpoint(job_init.fn(eq_data_name))
             file_liq_out, N_liq_use = make_usable_xyz(job_init, last_file, 1)
-
             file_vap_out, N_vap_use = make_usable_xyz(job_init, last_file, 2)
             vap_box = mbuild.formats.xyz.read_xyz(file_vap_out)
             vap_box.box = mbuild.Box(
@@ -1940,6 +1940,23 @@ def count_steps(fpath):
                 run_value = int(line.split()[1])
                 break
     return run_value
+
+def extract_cubic_values(job_init, file_path):
+    cubic_values = []
+    with open(job_init.fn(file_path + ".out.chk"), 'r') as file:
+        lines = file.readlines()
+        count_cubic = 0
+        for i, line in enumerate(lines):
+            if "CUBIC" in line:
+                # The value is on the next line, split and take the first number
+                next_line = lines[i + 1].strip()
+                value = float(next_line.split()[0])  # Extract the first number
+                value_units = float((value * u.angstrom).to("nanometer"))
+                cubic_values.append(value_units)
+                count_cubic += 1
+            if count_cubic == 2:
+                break
+    return cubic_values
 
 def list_with_restarts(fpath):
     """List fpath and its restart versions in order as pathlib Path objects."""
