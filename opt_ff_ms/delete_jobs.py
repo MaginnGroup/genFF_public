@@ -12,7 +12,7 @@ def delete_data(job):
     #     job.doc["nsteps_gemc_eq"] = 110000 # run_gemc
     #     job.doc["max_eq_steps"] = 110000 # run_gemc
     with job:
-        subfolder = "old_results_2"
+        subfolder = "old_results_5"
         if not os.path.exists(subfolder):
             os.makedirs(subfolder)
         for file_path in glob.glob("MSER*"):
@@ -34,27 +34,27 @@ def delete_data(job):
             del job.doc["gemc_failed"]
         except:
             pass
-        try:
-            # del job.doc["liq_density"]
-            del job.doc["restart_from"]
-        except:
-            pass
+        # try:
+        #     # del job.doc["liq_density"]
+        #     del job.doc["restart_from"]
+        # except:
+        #     pass
 
-mol_name = "R116"
-at = 2
+mol_name = "R14"
+at = 6
 #To replace
-T_in = 190
+T_in = 130
 restart_in = [2]
 #Replace with
-# T_out = 210
-# restart_out = 3
+T_out = 130
+restart_out = 1
 for job in project.find_jobs({"mol_name":mol_name, "atom_type":at, "T":T_in, "restart": {"$in" : restart_in}}):
     # if "Hvap" in job.doc.keys() and job.doc["Hvap"] == "NaN":
-    print("job",  job.id)
+    # print("job",  job.id)
     # job_id = list(project.find_jobs({"mol_name":mol_name, "atom_type":at, "T":T_out, "restart": restart_out}))[0].id
     # print("rest job", job_id)
-    # job.doc["restart_from"] = job_id
     # delete_data(job)
+    # job.doc["restart_from"] = job_id
     # job.doc["vapboxl"] = 5*job.doc["vapboxl"]/2
     print(job.doc["vapboxl"])
     # job.doc["gemc_failed"] = True

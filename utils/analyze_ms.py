@@ -737,7 +737,7 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
         ax.set_xticklabels(molec_names_use, fontsize=20)
     
     handles, labels = axs[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=4, fontsize = 20)
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=3, fontsize = 20)
 
     # Adjust layout
     fig.supxlabel('Molecule', fontsize = 20)
