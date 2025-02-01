@@ -554,13 +554,21 @@ def get_gemc_boxes(job):
             # Extract the values for the specified keys
             # boxl_liq = statepoint.get("npt_liqbox_final_dim", None)
             # boxl_vap = statepoint.get("vapboxl", None) #nm
-            last_file = get_last_checkpoint(job_init.fn("gemc.eq"))
-            boxl_liq, boxl_vap = extract_cubic_values(job_init, last_file)
+            try:
+                last_file = get_last_checkpoint(job_init.fn("gemc.eq"))
+                boxl_liq, boxl_vap = extract_cubic_values(job_init, last_file)
+                #Build liquid and vapor boxes from previous simulations
+                file_liq_out, N_liq_use = make_usable_xyz(job_init, last_file, 1)
+                file_vap_out, N_vap_use = make_usable_xyz(job_init, last_file, 2)
+            except:
+                #Use the second to last file if the last one doesn't exist yet
+                fname = job_init.fn("gemc.eq") + ".out.chk"
+                last_file = list_with_restarts(fname)[-2].name.split(".out.")[0]
+                boxl_liq, boxl_vap = extract_cubic_values(job_init, last_file)
+                #Build liquid and vapor boxes from previous simulations
+                file_liq_out, N_liq_use = make_usable_xyz(job_init, last_file, 1)
+                file_vap_out, N_vap_use = make_usable_xyz(job_init, last_file, 2)
 
-            #Build liquid and vapor boxes from previous simulations
-            file_liq_out, N_liq_use = make_usable_xyz(job_init, last_file, 1)
-
-            file_vap_out, N_vap_use = make_usable_xyz(job_init, last_file, 2)
             vap_box = mbuild.formats.xyz.read_xyz(file_vap_out)
             vap_box.box = mbuild.Box(
                 lengths=[boxl_vap, boxl_vap, boxl_vap], angles=[90.0, 90.0, 90.0]
