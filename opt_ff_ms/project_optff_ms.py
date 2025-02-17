@@ -771,6 +771,13 @@ def run_gemc(job):
                     is_equil = check_equil_converge(job, eq_data_dict, prod_tol_eq)
                 else:
                     is_equil = False
+
+                #Check if this simulation restarts from an equilibrated one
+                if "restart_from" in job.doc.keys():
+                    #If at least 100k steps have been run 
+                    if total_eq_steps >= existing_eq_steps and total_eq_steps >= job.sp.nsteps_gemc_eq*10:
+                        #Start production run from the last piece of the equilibration run
+                        is_equil = True
                 
                 if is_equil:
                     break
