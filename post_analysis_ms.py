@@ -155,11 +155,12 @@ for molec in molecules:
     #Get the data for the molecule from each FF
     # print(ff_molec_dict)
     #Plot Vle, Hvap, and Pvap and save to different pdfs
-    pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-    # plt.show()
-    plt.close()
-    pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-    plt.close()
+    if molec not in ["R134", "R152"]:
+        pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
+        # plt.show()
+        plt.close()
+        pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
+        plt.close()
 #Close figures    
 pdf_vle.close()
 pdf_hpvap.close()
