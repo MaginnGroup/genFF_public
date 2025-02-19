@@ -384,7 +384,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
     df_ff_list = list(df_ffs)
 
     cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'deeppink', 'olive', 'olive']
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'orange', 'olive', 'olive']
     # df_labels, df_ffs = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
     # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
     # df_markers = ['o', 's', '^', '*', 'p', 'd']
@@ -508,7 +508,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
     df_ff_list = list(df_ffs)
 
     cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'deeppink', 'olive', 'olive']
+    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs)-5)] + ['gray', 'brown', 'orange', 'olive', 'olive']
 
     # df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
     # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
