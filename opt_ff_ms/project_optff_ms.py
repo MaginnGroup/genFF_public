@@ -908,6 +908,49 @@ def run_gemc(job):
             # If GEMC fails, remove files in post conditions of previous operations
             delete_data(job, custom_args["run_name"])
 
+@Project.pre.after(run_gemc)
+@Project.post(lambda job: "no_overlap" in job.doc or ("gemc_failed" in job.doc and job.doc.gemc_failed == True))
+@Project.operation
+def check_prod_overlap(job):
+    "Check if the production files overlap"
+    import numpy as np
+    import os
+    import sys
+    import subprocess   
+    density_col = 6
+
+    if "gemc_failed" in job.doc and job.doc.gemc_failed == True:
+        pass
+    else:
+        with job:
+        #Get all production files
+            prod_files1 = sorted(glob.glob("prod.*.box1.prp"))
+            prod_files2 = sorted(glob.glob("prod.*.box2.prp"))
+            #Concatenate all production files using genfromtxt into one
+            df_box1 = np.vstack([np.genfromtxt(f) for f in prod_files1])
+            df_box2 = np.vstack([np.genfromtxt(f) for f in prod_files2])
+
+        density_liq = df_box1[:, density_col - 1]
+        density_vap = df_box2[:, density_col - 1]
+        
+        #Compare each line of nmols_liq and nmols_vap, if the row is ever bigger for the vapor box, print the job id
+        mask = density_vap > density_liq
+        # print(mask)
+        if np.any(mask):
+            print(f"Job {job.id} has a vapor box with more molecules than the liquid box")
+            # Print mol_name, T, and restart from statepont
+            print(f"Molecule: {job.sp.mol_name}, T: {job.sp.T}, Restart from: {job.sp.restart}")
+            # command = (
+            # f"xmgrace -block workspace/{job.id}/prod.out.box1.prp -bxy 1:6 "
+            # f"-block workspace/{job.id}/prod.out.box2.prp -bxy 1:6"
+            # )
+            # subprocess.run(command, shell=True, check=True)
+            #Add gemc_failed to job doc and add no_overlap to job doc
+            job.doc.gemc_failed = True
+            job.doc.no_overlap = False
+        else:
+            job.doc.no_overlap = True
+
 def delete_data(job, run_name):
     "Delete data from previous operations"
     del job.doc["vapboxl"]  # calc_boxes
