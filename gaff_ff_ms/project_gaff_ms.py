@@ -859,6 +859,7 @@ def run_gemc(job):
 
 
 @ProjectGAFF.pre.after(run_gemc)
+@ProjectGAFF.pre(gemc_prod_complete)
 @ProjectGAFF.post(lambda job: "no_overlap" in job.doc or ("gemc_failed" in job.doc and job.doc.gemc_failed == True))
 @ProjectGAFF.operation
 def check_prod_overlap(job):

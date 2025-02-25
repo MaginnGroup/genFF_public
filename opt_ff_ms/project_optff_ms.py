@@ -909,6 +909,7 @@ def run_gemc(job):
             delete_data(job, custom_args["run_name"])
 
 @Project.pre.after(run_gemc)
+@Project.pre(gemc_prod_complete)
 @Project.post(lambda job: "no_overlap" in job.doc or ("gemc_failed" in job.doc and job.doc.gemc_failed == True))
 @Project.operation
 def check_prod_overlap(job):

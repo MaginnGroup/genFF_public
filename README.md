@@ -44,13 +44,14 @@ To run vapor-liquid-equilibrium iterations, follow the following steps:
    ```
      python project_optff_ms.py run -o calc_boxes
    ```         
-6. Run simulation
+6. Run simulation and check for overlap
    ```
      python project_optff_ms.py submit -o NVT_liqbox --bundle=12 --parallel
      python project_optff_ms.py run -o extract_final_NVT_config
      python project_optff_ms.py submit -o NPT_liqbox --bundle=12 --parallel
      python project_optff_ms.py run -o extract_final_NPT_config
      python project_optff_ms.py submit -o run_gemc --bundle=12 --parallel
+     python project_optff_ms.py run -o check_prod_overlap
    ```   
 7. Calculate VLE Properties
    ```
@@ -77,13 +78,14 @@ To run vapor-liquid-equilibrium iterations, follow the following steps:
    ```
      python project_gaff_ms.py run -o calc_boxes
    ```         
-6. Run simulation
+6. Run simulation and check for overlap
    ```
      python project_gaff_ms.py submit -o NVT_liqbox --bundle=12 --parallel
      python project_gaff_ms.py run -o extract_final_NVT_config
      python project_gaff_ms.py submit -o NPT_liqbox --bundle=12 --parallel
      python project_gaff_ms.py run -o extract_final_NPT_config
      python project_gaff_ms.py submit -o run_gemc --bundle=12 --parallel
+     python project_gaff_ms.py run -o check_prod_overlap
    ```   
 7. Calculate VLE Properties
    ```
