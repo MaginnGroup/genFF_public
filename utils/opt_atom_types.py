@@ -2005,6 +2005,8 @@ class Vis_Results(Analyze_opt_res):
         dir_name = "Results/gp_val_figs/"
         os.makedirs(dir_name, exist_ok=True)
 
+        mapd_df_rows = []
+
         # Loop over molecules
         for molec in list(self.all_train_molec_data.keys()):
             # Get constants for molecule
@@ -2033,6 +2035,19 @@ class Vis_Results(Analyze_opt_res):
                     )
                 )
                 plt.close()
+
+                #Calculate and save MAPD
+                y_data_physical = values_scaled_to_real(test_data[key], y_bounds)
+                for label, model in {label: gp_model}.items():
+                    gp_mu, gp_var = model.predict_f(test_data["x"])
+                    gp_mu_physical = values_scaled_to_real(gp_mu, y_bounds)
+                    mapd = 100*np.mean(
+                            np.abs(
+                                (gp_mu_physical - y_data_physical.reshape(-1, 1))
+                                / y_data_physical.reshape(-1, 1)
+                            )
+                        )
+                    mapd_df_rows.append([molec, key, mapd])
                 if get_slices:
                     # Plot temperature slices
                     figs = plot_slices_temperature(
@@ -2117,6 +2132,9 @@ class Vis_Results(Analyze_opt_res):
                         )
                         plt.close()
             pdf.close()
+        # Make MAPD df
+        mapd_df = pd.DataFrame(mapd_df_rows, columns=["Molecule", "Property", "MAPD"])
+        mapd_df.to_csv(dir_name + "gp_mapd.csv", index=False, header=True)
 
         return
 
