@@ -54,12 +54,16 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
             job_fail_stat = False
             # Extract property values. Insert N/A if not found
             for property_name in property_names:
-                try:
-                    property_ = job.doc[property_name]
-                    new_row[property_name] = property_
-                except KeyError:
+                if "gemc_failed" in job.doc.keys() and job.doc.gemc_failed == True:
                     job_fail_stat = True
                     new_row[property_name] = np.nan
+                else:
+                    try:
+                        property_ = job.doc[property_name]
+                        new_row[property_name] = property_
+                    except KeyError:
+                        job_fail_stat = True
+                        new_row[property_name] = np.nan
             if job_fail_stat:
                 print(f"Job {job.id} in project {project} failed. Molecule {job.sp.mol_name} at T = {temperature} K.")
 
