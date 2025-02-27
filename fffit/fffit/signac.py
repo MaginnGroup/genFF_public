@@ -74,7 +74,9 @@ def save_signac_results(project, param_names, property_names, csv_name = None):
 
     #sort by molecule and temperature -- added by Ning Wang
     df.sort_values(by=["molecule", "temperature", "restart"], ignore_index=True, inplace=True)
-    
+    #Filer out temperatures which only have one restart
+    df = df.groupby(["molecule", "temperature"]).filter(lambda x: len(x) > 1)
+
     if csv_name != None:
         df.to_csv(csv_name)
 
