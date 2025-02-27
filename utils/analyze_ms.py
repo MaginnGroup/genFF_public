@@ -685,7 +685,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
 def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = None):
     props = ["liq_density", "vap_density", "Pvap", "Hvap"]
     cols = [obj + "_" + prop for prop in props]
-    names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
+    names = ["Liquid Density " + r"$(kg/m^3)$", "Vapor Density " + r"$(kg/m^3)$", "Vapor Pressure " + r"$(bar)$", "Heat of Vaporization " + r"$(kJ/kg)$"]
     cols = [item for item in cols for _ in range(2)]
     names = [item for item in names for _ in range(2)]
     
@@ -722,7 +722,7 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
             ax.bar(indices + j*bar_width, df[column].iloc[indices], bar_width, label=df_labels[j], color = df_colors[j])
         
         ax.set_ylim(0, max_val_f*1.05)
-        ax.set_title(name, fontsize = 20) 
+        ax.set_title(name, fontsize = 24) 
         ax.set_xticks(indices + bar_width)
         ax.tick_params(axis='y', labelsize=20)
 
@@ -740,10 +740,17 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
     fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.10), ncol=3, fontsize = 20)
 
     # Adjust layout
-    fig.supxlabel('Molecule', fontsize = 20)
-    fig.supylabel(obj.upper(), fontsize = 20)
+    fig.supxlabel('Molecule', fontsize = 24)
+    fig.supylabel(obj.upper(), fontsize = 24)
+
+    # Add Training and Testing labels
+    fig.text(0.075, 0.99, "Training Set", ha="left", va="top", fontsize=20)
+    fig.text(0.99, 0.99, "Testing Set", ha="right", va="top", fontsize=20)
 
     plt.tight_layout(rect=[0.01, 0.0, 1, 1])
+    #Save figure to jpg
+    if save_name is not None:
+        plt.savefig(save_name, bbox_inches='tight')
     # Show the plot
     return fig
 
@@ -760,7 +767,7 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
 
     props = ["liq_density", "vap_density", "Pvap", "Hvap"]
     cols = [obj + "_" + prop for prop in props]
-    names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
+    names = ["Liquid Density " + r"$(kg/m^3)$", "Vapor Density " + r"$(kg/m^3)$", "Vapor Pressure " + r"$(bar)$", "Heat of Vaporization " + r"$(kJ/kg)$"]
     cols = [item for item in cols for _ in range(2)]
     names = [item for item in names for _ in range(2)]
     
@@ -844,6 +851,10 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
     # ax_right.set_xticklabels([])  # Removes x-axis labels on the right subplot
     ax_left.set_xlabel('')  # Ensure no x-axis label for the left subplot
     ax_right.set_xlabel('')  # Ensure no x-axis label for the right subplot
+
+    # Add Training and Testing labels
+    fig.text(0.05, 0.99, "Training Set", ha="left", va="top", fontsize=20)
+    fig.text(0.99, 0.99, "Testing Set", ha="right", va="top", fontsize=20)
 
     fig.suptitle(obj.upper() + ' Comparison for Different Refrigerants', fontsize = 20)
     fig.supxlabel('Molecule', fontsize = 20)
