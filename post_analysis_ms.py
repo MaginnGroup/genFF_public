@@ -79,7 +79,7 @@ def get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_
     df_molec = save_signac_results(project, "mol_name", property_names, csv_name= csv_name_unproc + ".csv")
     #process data and save
     csv_name_final = os.path.join(csv_root_final, project_path)
-    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_name_final + ".csv")
+    df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_name_final + ".csv", drop_one = True)
     
     #Calculate MAPD and MSE for each T point
     df_paramsets = prepare_df_vle_errors(df_all, molec_dict, csv_name = csv_name_final + "_err.csv")
@@ -181,10 +181,10 @@ for error_obj in error_objs:
     os.makedirs(full_at_dir, exist_ok=True)
     pdf_MAPD = PdfPages(os.path.join(full_at_dir , error_obj.upper() + ".pdf"))
     #For each molecule
-    if error_obj == "mae":
-        save_name = os.path.join(full_at_dir, error_obj + "_props.png")
-    else:
-        save_name = None
+    # if error_obj == "mae":
+    save_name = os.path.join(full_at_dir, error_obj + "_props.png")
+    # else:
+    #     save_name = None
     pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict, obj = error_obj, save_name=save_name), bbox_inches='tight')
     plt.close()
     pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict, obj = error_obj), bbox_inches='tight')

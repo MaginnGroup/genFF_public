@@ -126,7 +126,7 @@ def block_average(data):
 
     return np.asarray(means), np.asarray(vars_est), np.asarray(vars_err)
 
-def prepare_df_vle(df_csv, molec_dict, csv_name = None):
+def prepare_df_vle(df_csv, molec_dict, csv_name = None, drop_one = False):
     """Prepare a pandas dataframe for fitting a GP model to density data
 
     Performs the following actions:
@@ -188,6 +188,10 @@ def prepare_df_vle(df_csv, molec_dict, csv_name = None):
     Tc, rhoc = calc_critical(df_csv)
     df_csv["sim_Tc"] = Tc
     df_csv["sim_rhoc"] = rhoc
+
+    #Drop any molecule and temperature with only 1 data point
+    if drop_one:
+        df_csv = df_csv.groupby(["molecule", "temperature"]).filter(lambda x: len(x) > 1)
 
     if csv_name != None:
         df_csv.to_csv(csv_name)
@@ -685,7 +689,10 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
 def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = None):
     props = ["liq_density", "vap_density", "Pvap", "Hvap"]
     cols = [obj + "_" + prop for prop in props]
-    names = ["Liquid Density " + r"$(kg/m^3)$", "Vapor Density " + r"$(kg/m^3)$", "Vapor Pressure " + r"$(bar)$", "Heat of Vaporization " + r"$(kJ/kg)$"]
+    if obj == "mae":
+        names = ["Liquid Density " + r"$(kg/m^3)$", "Vapor Density " + r"$(kg/m^3)$", "Vapor Pressure " + r"$(bar)$", "Heat of Vaporization " + r"$(kJ/kg)$"]
+    else:
+        names = ["Liquid Density", "Vapor Density", "Vapor Pressure", "Heat of Vaporization"]
     cols = [item for item in cols for _ in range(2)]
     names = [item for item in names for _ in range(2)]
     
@@ -741,11 +748,26 @@ def plot_err_each_prop(molec_names, err_path_dict, obj = 'mapd', save_name = Non
 
     # Adjust layout
     fig.supxlabel('Molecule', fontsize = 24)
-    fig.supylabel(obj.upper(), fontsize = 24)
+    if obj == "mapd":
+        titley = obj.upper() + " (%)"
+    else:
+        titley = obj.upper()
+    fig.supylabel(titley, fontsize = 24)
 
     # Add Training and Testing labels
     fig.text(0.075, 0.99, "Training Set", ha="left", va="top", fontsize=20)
     fig.text(0.99, 0.99, "Testing Set", ha="right", va="top", fontsize=20)
+
+    #Explain missing HFC-143 data
+    fig.text(
+    0.85, 0.1,  # Adjust these coordinates based on the image placement
+    "Experimental\n Data\n Unavailable",
+    fontsize=20,
+    color="black",
+    ha="center",  # Center horizontally
+    va="center",  # Center vertically
+    bbox=dict(facecolor="white", edgecolor="black", boxstyle="round,pad=0.3")
+)
 
     plt.tight_layout(rect=[0.01, 0.0, 1, 1])
     #Save figure to jpg
