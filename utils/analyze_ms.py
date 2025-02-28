@@ -655,7 +655,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
     axs[0].yaxis.set_ticks_position("both")
 
     axs[0].set_xlabel("1/T " + r"$\mathregular{K^{-1}}$", fontsize=16, labelpad=8)
-    axs[0].set_ylabel(r"$\mathregular{log(P_{vap})}$ (bar)", fontsize=16, labelpad=8)
+    axs[0].set_ylabel(r"$\mathregular{ln(P_{vap})}$ (bar)", fontsize=16, labelpad=8)
 
     axs[1].set_xlim(min_temp*0.95,max_temp*1.05)
     # axs[1].xaxis.set_major_locator(MultipleLocator(40))

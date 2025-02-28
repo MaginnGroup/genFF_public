@@ -134,36 +134,36 @@ for ff_name, ff_label in zip(ff_names, ff_labels):
     ff_dict[ff_label] = df_ff_final
       
 #If one atom type
-# if len(at_numbers) == 1:
-#     full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
-# else:
-#     full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
-# os.makedirs(full_at_dir, exist_ok=True)
-# pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
-# pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
-# #For each molecule
-# molecules = df_paramsets['molecule'].unique().tolist()
-# for molec in molecules:
-#     #Get the data for the molecule from each FF if it exists
-#     one_molec_dict = {molec: molec_dict[molec]}
-#     ff_molec_dict = {}
-#     for df_label, df_ff in ff_dict.items():
-#         df_molec = copy.copy(df_ff[df_ff['molecule'] == molec])
-#         if df_molec.empty:
-#             df_molec = None
-#         ff_molec_dict[df_label] = df_molec
-#     #Get the data for the molecule from each FF
-#     # print(ff_molec_dict)
-#     #Plot Vle, Hvap, and Pvap and save to different pdfs
-#     if molec not in ["R134", "R152"]:
-#         pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-#         # plt.show()
-#         plt.close()
-#         pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
-#         plt.close()
-# #Close figures    
-# pdf_vle.close()
-# pdf_hpvap.close()
+if len(at_numbers) == 1:
+    full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+else:
+    full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
+os.makedirs(full_at_dir, exist_ok=True)
+pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
+pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
+#For each molecule
+molecules = df_paramsets['molecule'].unique().tolist()
+for molec in molecules:
+    #Get the data for the molecule from each FF if it exists
+    one_molec_dict = {molec: molec_dict[molec]}
+    ff_molec_dict = {}
+    for df_label, df_ff in ff_dict.items():
+        df_molec = copy.copy(df_ff[df_ff['molecule'] == molec])
+        if df_molec.empty:
+            df_molec = None
+        ff_molec_dict[df_label] = df_molec
+    #Get the data for the molecule from each FF
+    # print(ff_molec_dict)
+    #Plot Vle, Hvap, and Pvap and save to different pdfs
+    if molec not in ["R134", "R152"]:
+        pdf_vle.savefig(plot_vle_envelopes(one_molec_dict, ff_molec_dict), bbox_inches='tight')
+        # plt.show()
+        plt.close()
+        pdf_hpvap.savefig(plot_pvap_hvap(one_molec_dict, ff_molec_dict), bbox_inches='tight')
+        plt.close()
+#Close figures    
+pdf_vle.close()
+pdf_hpvap.close()
 
 df_err_dict = {}
 molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170", "R41", "R23", "R161", "R152a",  "R143",  "R116"]
