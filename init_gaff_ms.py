@@ -49,29 +49,30 @@ def init_project():
     for restart in range(num_restarts):
         #Loop over all molecules
         for molec_name, molec_data in molec_dict.items():
-            # Define temps (from constants files)
-            temps = list(molec_data.expt_Pvap.keys())
+            if molec_name not in ["R134", "R152"]:
+                # Define temps (from constants files)
+                temps = list(molec_data.expt_Pvap.keys())
 
-            for temp in temps:
-                # Define the state point
-                state_point = {
-                    "mol_name": molec_name,
-                    "mol_weight": molec_data.molecular_weight, #amu
-                    "smiles": molec_data.smiles_str,
-                    "N_atoms": molec_data.n_atoms,
-                    "T": float(temp), #K
-                    "N_vap": n_vap,
-                    "N_liq": n_liq,
-                    "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
-                    "nsteps_nvt": 2500,
-                    "nsteps_npt": 5000,
-                    "nsteps_gemc_eq":10000,
-                    "nsteps_gemc_prod": 100000,
-                    "restart": restart+1,
-                }            
+                for temp in temps:
+                    # Define the state point
+                    state_point = {
+                        "mol_name": molec_name,
+                        "mol_weight": molec_data.molecular_weight, #amu
+                        "smiles": molec_data.smiles_str,
+                        "N_atoms": molec_data.n_atoms,
+                        "T": float(temp), #K
+                        "N_vap": n_vap,
+                        "N_liq": n_liq,
+                        "expt_liq_density": molec_data.expt_liq_density[int(temp)], #kg/m^3
+                        "nsteps_nvt": 2500,
+                        "nsteps_npt": 5000,
+                        "nsteps_gemc_eq":10000,
+                        "nsteps_gemc_prod": 100000,
+                        "restart": restart+1,
+                    }            
 
-                job = project.open_job(state_point)
-                job.init()
+                    job = project.open_job(state_point)
+                    job.init()
 
 if __name__ == "__main__":
     init_project()

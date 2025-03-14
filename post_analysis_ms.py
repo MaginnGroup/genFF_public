@@ -76,7 +76,10 @@ def get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_
 
     #Get data from molecular simulations. Group by molecule name and save
     csv_name_unproc = os.path.join(csv_root_unproc, project_path)
-    df_molec = save_signac_results(project, "mol_name", property_names, csv_name= csv_name_unproc + ".csv")
+    if os.path.exists(csv_name_unproc + ".csv"):
+        df_molec = pd.read_csv(csv_name_unproc + ".csv")
+    else:
+        df_molec = save_signac_results(project, "mol_name", property_names, csv_name= csv_name_unproc + ".csv")
     #process data and save
     csv_name_final = os.path.join(csv_root_final, project_path)
     df_all = prepare_df_vle(df_molec, molec_dict, csv_name=csv_name_final + ".csv", drop_one = True)
