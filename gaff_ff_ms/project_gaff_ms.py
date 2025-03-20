@@ -693,11 +693,6 @@ def run_gemc(job):
             count = 1
 
             #Get the total number of equilibration restarts and steps so far
-            # all_restarts = list_with_restarts(custom_args_gemc["run_name"] + ".out.chk")
-            # num_restarts = len(all_restarts) -1
-            # existing_eq_steps = job.sp.nsteps_gemc_eq + num_restarts*eq_extend
-
-            #Get the total number of equilibration restarts and steps so far
             existing_eq_steps = count_steps(get_last_checkpoint(custom_args_gemc["run_name"]))
             
             #Inititalize max number of eq_steps
@@ -736,14 +731,6 @@ def run_gemc(job):
                     break
                 #Otherwise, extend the simulation
                 else:
-                    # #Increase the total number of eq steps by 25% of the original value and restart the simulation
-                    # total_eq_steps += int(eq_extend)
-                    # #If we've exceeded the maximum number of equilibrium steps, raise an exception
-                    # #This forces a retry with critical conditions or will note complete GEMC failure
-                    # if total_eq_steps > max_eq_steps:
-                    #     job.doc.equil_fail = True
-                    #     raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
-
                     #Check if this simulation exists
                     sim_exists = has_checkpoint(this_run)
                     
@@ -775,21 +762,6 @@ def run_gemc(job):
                     else:
                         job.doc.equil_fail = True
                         raise Exception(f"GEMC equilibration failed to converge after {max_eq_steps} steps")
-                        
-                        # #Check if checkpoint file exists, if so, we've already done this restart
-                        # # If the checkpoint file doesn't exist, run it
-                        # if not has_checkpoint(this_run):
-                        #     mc.restart(
-                        #     restart_from=prior_run,
-                        #     run_type="equilibration",
-                        #     total_run_length=total_eq_steps,
-                        #     run_name = this_run )
-                        # #Restart from the checkpoint if it exists but is not complete
-                        # elif not check_complete(this_run):
-                        #     mc.restart(
-                        #         restart_from=get_last_checkpoint(this_run),
-                        #     )
-
 
                     #Add restart data to eq_col
                     # After each restart, load the updated properties data for both boxes
