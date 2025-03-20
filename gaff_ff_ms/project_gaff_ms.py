@@ -436,23 +436,31 @@ def gemc_equil_complete(job):
 
     return completed
 
-def delete_data(job, run_name):
+def delete_data(job, run_name, mv = True, subfolder = "results_old"):
     "Delete data from previous operations"
+    import os
+    import glob
+    import shutil
+    #List of files which must be moved or deleted when the job fails
+    glob_args = ["MSER*", "*_eq_col_*", "box*.in.xyz", run_name + ".*", "mosdef_cassandra_*.log", "prod.*", "nvt.*", "npt.*", "Equil_Output.txt"]
+    #If move is true, move the files to a subfolder instead of deleting them
+    with job:
+        if mv == True:
+            if not os.path.exists(subfolder):
+                os.makedirs(subfolder)
+            for glob_arg in glob_args:
+                for file_path in glob.glob(glob_arg):
+                    shutil.move(file_path, os.path.join(subfolder, os.path.basename(file_path)))
+            shutil.copy("signac_job_document.json", os.path.join(subfolder, "signac_job_document.json"))
+        else:
+            for glob_arg in glob_args:
+                for file_path in glob.glob(glob_arg):
+                    os.remove(file_path)
+
+    #Regardless of whether we remove or move the files, we want to delete the job document keys
     del job.doc["vapboxl"]  # calc_boxes
     del job.doc["liqboxl"]  # calc_boxes
     del job.doc["nsteps_gemc_eq"]  # run_gemc
-    with job:
-        #Delete nvt, npt, and gemc equil/prod data
-        for file_path in glob.glob("nvt.*"):
-            os.remove(file_path)
-        for file_path in glob.glob("npt.*"):
-            os.remove(file_path)
-        for file_path in glob.glob(run_name + ".*"):
-            os.remove(file_path)
-        for file_path in glob.glob("prod.*"):
-            os.remove(file_path)
-        if os.path.exists("Equil_Output.txt"):
-            os.remove("Equil_Output.txt")
 
 def make_usable_xyz(job, filename, box):
     "Make the xyz file usable for mbuild"
@@ -836,13 +844,23 @@ def run_gemc(job):
                         os.remove("Equil_Output.txt")
 
     except:
-        #If equilibration wasn't long enough, don't delete, we'll just extend the simulation
+        #If equilibration wasn't long enough
         if "equil_fail" in job.doc and job.doc.equil_fail == True:
-            job.doc.max_eq_steps = max_eq_steps + job.sp.nsteps_gemc_eq
-            job.doc.nsteps_gemc_eq = job.doc.max_eq_steps
+            #If using not the critical point, try again with the critical point
+            if "use_crit" not in job.doc or job.doc.use_crit == False:
+                #Move data and try again with critical conditions
+                delete_data(job, custom_args_gemc["run_name"], mv = True, subfolder = "results_no_crit")
+                job.doc.use_crit = True
+                del job.doc["equil_fail"]
+            #Otherwise, if using critical conditions, extend the simulation
+            else:
+                job.doc.max_eq_steps = max_eq_steps + job.sp.nsteps_gemc_eq
+                job.doc.nsteps_gemc_eq = job.doc.max_eq_steps
+                del job.doc["equil_fail"]
         #if GEMC failed with critical conditions as intial conditions, terminate with error
         elif "use_crit" in job.doc and job.doc.use_crit == True:
             job.doc.gemc_failed = True
+            delete_data(job, custom_args_gemc["run_name"], mv = True, subfolder = "results_crit")
             raise Exception(
                 "GEMC failed with critical and experimental starting conditions and the molecule is "
                 + job.sp.mol_name
@@ -850,13 +868,12 @@ def run_gemc(job):
                 + str(job.sp.T)
             )
         else:  
+            # If GEMC fails, remove files in post conditions of previous operations
+            delete_data(job, custom_args_gemc["run_name"], mv = True, subfolder = "results_no_crit")
             # If the simulation failed for another reason, try with critical conditions
             job.doc.use_crit = True
             if "equil_fail" in job.doc:
                 del job.doc["equil_fail"]
-            # If GEMC fails, remove files in post conditions of previous operations
-            delete_data(job, custom_args_gemc["run_name"])
-
 
 @ProjectGAFF.pre.after(run_gemc)
 @ProjectGAFF.pre(gemc_prod_complete)
