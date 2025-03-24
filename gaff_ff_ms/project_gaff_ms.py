@@ -886,8 +886,12 @@ def check_prod_overlap(job):
             # )
             # subprocess.run(command, shell=True, check=True)
             #Add gemc_failed to job doc and add no_overlap to job doc
-            job.doc.gemc_failed = True
-            job.doc.no_overlap = False
+            if "use_crit" in job.doc and job.doc.use_crit == True:
+                job.doc.gemc_failed = True
+                job.doc.no_overlap = False
+            else:
+                job.doc.use_crit = True
+                delete_data(job, "gemc.eq", mv = True, subfolder = "results_no_crit")
         else:
             job.doc.no_overlap = True
 
@@ -1061,222 +1065,222 @@ def plot_finished(job):
 
     return completed
 
-@ProjectGAFF.pre.after(run_gemc)
-@ProjectGAFF.post(plot_finished)
-@ProjectGAFF.operation
-def plot(job):
-    import pandas as pd
-    import pylab as plt
+# @ProjectGAFF.pre.after(run_gemc)
+# @ProjectGAFF.post(plot_finished)
+# @ProjectGAFF.operation
+# def plot(job):
+#     import pandas as pd
+#     import pylab as plt
 
-    with job:
+#     with job:
 
-        nvt_box1 = pd.read_table("nvt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure"], skiprows=3)
-        npt_box1 = pd.read_table("npt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure", "density"], skiprows=3)
-        gemc_eq_box1 = pd.read_table("prod.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_eq_box2 = pd.read_table("prod.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_prod_box1 = pd.read_table("prod.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
-        gemc_prod_box2 = pd.read_table("prod.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+#         nvt_box1 = pd.read_table("nvt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure"], skiprows=3)
+#         npt_box1 = pd.read_table("npt.eq.out.prp", sep="\s+", names=["step", "energy", "pressure", "density"], skiprows=3)
+#         gemc_eq_box1 = pd.read_table("prod.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+#         gemc_eq_box2 = pd.read_table("prod.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+#         gemc_prod_box1 = pd.read_table("prod.out.box1.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
+#         gemc_prod_box2 = pd.read_table("prod.out.box2.prp", sep="\s+", names=["step", "energy", "pressure", "volume", "nmols", "density", "enthalpy"], skiprows=3)
    
-    font = {'weight' : 'normal',
-                    'size'   : 12}
+#     font = {'weight' : 'normal',
+#                     'size'   : 12}
   
 
-    #####################
-    # GEMC Vapor Pressure
-    #####################
+#     #####################
+#     # GEMC Vapor Pressure
+#     #####################
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Pressure (bar)')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Pressure (bar)')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
 
-    ax.title.set_text(f"Vapor pressure vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(gemc_eq_box2["step"][20:], gemc_eq_box2["pressure"][20:], label='GEMC-eq', color='red')
-    ax.plot(gemc_prod_box2["step"], gemc_prod_box2["pressure"], label='GEMC-prod', color='indianred')
+#     ax.title.set_text(f"Vapor pressure vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(gemc_eq_box2["step"][20:], gemc_eq_box2["pressure"][20:], label='GEMC-eq', color='red')
+#     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["pressure"], label='GEMC-prod', color='indianred')
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"gemc-pvap-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"gemc-pvap-{job.sp.T}.png")
+#         plt.close(fig)
 
-    #####################
-    # GEMC nmols
-    #####################
+#     #####################
+#     # GEMC nmols
+#     #####################
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Number of molecules')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Number of molecules')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
 
-    ax.title.set_text(f"Number of molecules vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(gemc_eq_box1["step"], gemc_eq_box1["nmols"], label='GEMC-eq-box1', color='blue')
-    ax.plot(gemc_eq_box2["step"], gemc_eq_box2["nmols"], label='GEMC-eq-box2', color='red')
-    ax.plot(gemc_prod_box1["step"], gemc_prod_box1["nmols"], label='GEMC-prod-box1', color='royalblue')
-    ax.plot(gemc_prod_box2["step"], gemc_prod_box2["nmols"], label='GEMC-prod-box2', color='indianred')
+#     ax.title.set_text(f"Number of molecules vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(gemc_eq_box1["step"], gemc_eq_box1["nmols"], label='GEMC-eq-box1', color='blue')
+#     ax.plot(gemc_eq_box2["step"], gemc_eq_box2["nmols"], label='GEMC-eq-box2', color='red')
+#     ax.plot(gemc_prod_box1["step"], gemc_prod_box1["nmols"], label='GEMC-prod-box1', color='royalblue')
+#     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["nmols"], label='GEMC-prod-box2', color='indianred')
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"gemc-nmols-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"gemc-nmols-{job.sp.T}.png")
+#         plt.close(fig)
 
-    #####################
-    # GEMC volume
-    #####################
+#     #####################
+#     # GEMC volume
+#     #####################
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Volume $\AA^3$')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Volume $\AA^3$')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
 
-    ax.title.set_text(f"Volume vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(gemc_eq_box1["step"], gemc_eq_box1["volume"], label='GEMC-eq-box1', color='blue')
-    ax.plot(gemc_eq_box2["step"], gemc_eq_box2["volume"], label='GEMC-eq-box2', color='red')
-    ax.plot(gemc_prod_box1["step"], gemc_prod_box1["volume"], label='GEMC-prod-box1', color='royalblue')
-    ax.plot(gemc_prod_box2["step"], gemc_prod_box2["volume"], label='GEMC-prod-box2', color='indianred')
+#     ax.title.set_text(f"Volume vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(gemc_eq_box1["step"], gemc_eq_box1["volume"], label='GEMC-eq-box1', color='blue')
+#     ax.plot(gemc_eq_box2["step"], gemc_eq_box2["volume"], label='GEMC-eq-box2', color='red')
+#     ax.plot(gemc_prod_box1["step"], gemc_prod_box1["volume"], label='GEMC-prod-box1', color='royalblue')
+#     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["volume"], label='GEMC-prod-box2', color='indianred')
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"gemc-volume-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"gemc-volume-{job.sp.T}.png")
+#         plt.close(fig)
 
-    #####################
-    # GEMC density
-    #####################
+#     #####################
+#     # GEMC density
+#     #####################
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Density $(kg / m^3)$')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Density $(kg / m^3)$')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
 
-    ax.title.set_text(f"Density vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(gemc_eq_box1["step"], gemc_eq_box1["density"], label='GEMC-eq-box1', color='blue')
-    ax.plot(gemc_eq_box2["step"], gemc_eq_box2["density"], label='GEMC-eq-box2', color='red')
-    ax.plot(gemc_prod_box1["step"], gemc_prod_box1["density"], label='GEMC-prod-box1', color='royalblue')
-    ax.plot(gemc_prod_box2["step"], gemc_prod_box2["density"], label='GEMC-prod-box2', color='indianred')
+#     ax.title.set_text(f"Density vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(gemc_eq_box1["step"], gemc_eq_box1["density"], label='GEMC-eq-box1', color='blue')
+#     ax.plot(gemc_eq_box2["step"], gemc_eq_box2["density"], label='GEMC-eq-box2', color='red')
+#     ax.plot(gemc_prod_box1["step"], gemc_prod_box1["density"], label='GEMC-prod-box1', color='royalblue')
+#     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["density"], label='GEMC-prod-box2', color='indianred')
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"gemc-density-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"gemc-density-{job.sp.T}.png")
+#         plt.close(fig)
 
-    #####################
-    # GEMC enthalpy 
-    #####################
+#     #####################
+#     # GEMC enthalpy 
+#     #####################
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Enthalpy (kJ/mol-ext)')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Enthalpy (kJ/mol-ext)')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
 
-    ax.title.set_text(f"Enthalpy vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(gemc_eq_box1["step"], gemc_eq_box1["enthalpy"], label='GEMC-eq-box1', color='blue')
-    ax.plot(gemc_eq_box2["step"], gemc_eq_box2["enthalpy"], label='GEMC-eq-box2', color='red')
-    ax.plot(gemc_prod_box1["step"], gemc_prod_box1["enthalpy"], label='GEMC-prod-box1', color='royalblue')
-    ax.plot(gemc_prod_box2["step"], gemc_prod_box2["enthalpy"], label='GEMC-prod-box2', color='indianred')
+#     ax.title.set_text(f"Enthalpy vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(gemc_eq_box1["step"], gemc_eq_box1["enthalpy"], label='GEMC-eq-box1', color='blue')
+#     ax.plot(gemc_eq_box2["step"], gemc_eq_box2["enthalpy"], label='GEMC-eq-box2', color='red')
+#     ax.plot(gemc_prod_box1["step"], gemc_prod_box1["enthalpy"], label='GEMC-prod-box1', color='royalblue')
+#     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["enthalpy"], label='GEMC-prod-box2', color='indianred')
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"gemc-enthalpy-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"gemc-enthalpy-{job.sp.T}.png")
+#         plt.close(fig)
 
 
-    #############
-    # NPT-Density
-    #############
+#     #############
+#     # NPT-Density
+#     #############
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Density $(kg / m^3)$')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Density $(kg / m^3)$')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
     
-    ax.title.set_text(f"NPT Density vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(npt_box1["step"], npt_box1["density"], label='NpT')
+#     ax.title.set_text(f"NPT Density vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(npt_box1["step"], npt_box1["density"], label='NpT')
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"npt-density-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"npt-density-{job.sp.T}.png")
+#         plt.close(fig)
 
-    # Shift steps so that we get an overall plot of energy across 
-    # different workflow steps
+#     # Shift steps so that we get an overall plot of energy across 
+#     # different workflow steps
 
-    npt_box1["step"] += nvt_box1["step"].iloc[-1]
-    gemc_eq_box1["step"] += npt_box1["step"].iloc[-1]
-    gemc_eq_box2["step"] += npt_box1["step"].iloc[-1]
-    gemc_prod_box1["step"] += npt_box1["step"].iloc[-1]
-    gemc_prod_box2["step"] += npt_box1["step"].iloc[-1]
+#     npt_box1["step"] += nvt_box1["step"].iloc[-1]
+#     gemc_eq_box1["step"] += npt_box1["step"].iloc[-1]
+#     gemc_eq_box2["step"] += npt_box1["step"].iloc[-1]
+#     gemc_prod_box1["step"] += npt_box1["step"].iloc[-1]
+#     gemc_prod_box2["step"] += npt_box1["step"].iloc[-1]
 
-    #############
-    # Energy
-    #############
+#     #############
+#     # Energy
+#     #############
 
-    fig, ax = plt.subplots(1, 1)
+#     fig, ax = plt.subplots(1, 1)
     
-    ax.spines["bottom"].set_linewidth(3)
-    ax.spines["left"].set_linewidth(3)
-    ax.spines["right"].set_linewidth(3)
-    ax.spines["top"].set_linewidth(3)
+#     ax.spines["bottom"].set_linewidth(3)
+#     ax.spines["left"].set_linewidth(3)
+#     ax.spines["right"].set_linewidth(3)
+#     ax.spines["top"].set_linewidth(3)
     
-    ax.set_xlabel(r'MC steps or sweeps')
-    ax.set_ylabel('Energy (kJ/mol-ext)')
-    ax.yaxis.tick_left()
-    ax.yaxis.set_label_position('left')
+#     ax.set_xlabel(r'MC steps or sweeps')
+#     ax.set_ylabel('Energy (kJ/mol-ext)')
+#     ax.yaxis.tick_left()
+#     ax.yaxis.set_label_position('left')
     
-    ax.title.set_text(f"Liquid Energy vs MC Steps or Sweeps @ {job.sp.T} K")
-    ax.plot(nvt_box1["step"][20:], nvt_box1["energy"][20:], label='NVT', color="black")
+#     ax.title.set_text(f"Liquid Energy vs MC Steps or Sweeps @ {job.sp.T} K")
+#     ax.plot(nvt_box1["step"][20:], nvt_box1["energy"][20:], label='NVT', color="black")
 
-    ax.plot(npt_box1["step"], npt_box1["energy"], label='NpT', color="gray")
-    ax.plot(gemc_eq_box1["step"], gemc_eq_box1["energy"], label='GEMC-eq-box1', color="blue")
-    ax.plot(gemc_prod_box1["step"], gemc_prod_box1["energy"], label='GEMC-prod-box1', color="royalblue")
-    ax.plot(gemc_eq_box2["step"], gemc_eq_box2["energy"], label='GEMC-eq-box2', color="red")
-    ax.plot(gemc_prod_box2["step"], gemc_prod_box2["energy"], label='GEMC-prod-box2', color="indianred")
+#     ax.plot(npt_box1["step"], npt_box1["energy"], label='NpT', color="gray")
+#     ax.plot(gemc_eq_box1["step"], gemc_eq_box1["energy"], label='GEMC-eq-box1', color="blue")
+#     ax.plot(gemc_prod_box1["step"], gemc_prod_box1["energy"], label='GEMC-prod-box1', color="royalblue")
+#     ax.plot(gemc_eq_box2["step"], gemc_eq_box2["energy"], label='GEMC-eq-box2', color="red")
+#     ax.plot(gemc_prod_box2["step"], gemc_prod_box2["energy"], label='GEMC-prod-box2', color="indianred")
 
-    ax.legend(loc="best")
-    with job:
-        plt.savefig(f"all-energy-{job.sp.T}.png")
-        plt.close(fig)
+#     ax.legend(loc="best")
+#     with job:
+#         plt.savefig(f"all-energy-{job.sp.T}.png")
+#         plt.close(fig)
 
 #####################################################################
 ################# HELPER FUNCTIONS BEYOND THIS POINT ################
