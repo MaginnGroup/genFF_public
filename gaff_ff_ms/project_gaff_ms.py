@@ -808,12 +808,9 @@ def run_gemc(job):
             else:
                 #Otherwise add to the job document that the production failed
                 job.doc["nmol_under_30"] = True
-                with job:
-                    #Delete gemc equil/prod data
-                    for file_path in glob.glob(custom_args_gemc["run_name"] + ".*"):
-                        os.remove(file_path)
-                    if os.path.exists("Equil_Output.txt"):
-                        os.remove("Equil_Output.txt")
+                raise Exception(
+                    "GEMC production failed because the number of molecules in the liquid box is less than 30"
+                )
 
     except:
         #If equilibration wasn't long enough
