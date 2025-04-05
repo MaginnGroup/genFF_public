@@ -865,7 +865,7 @@ def run_gemc(job):
             total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
 
             # Only run production if nmols liquid average > 30
-            if np.mean(eq_col_restart) > 30:
+            if np.mean(eq_col_restart) > 20: #30
                 # Run production
                 if not has_checkpoint("prod"):
                     mc.restart(
@@ -880,9 +880,9 @@ def run_gemc(job):
                     )
             else:
                 # Otherwise add to the job document that the production failed
-                job.doc["nmol_under_30"] = True
+                job.doc["nmol_under_20"] = True
                 raise Exception(
-                    "GEMC production failed because the number of molecules in the liquid box is less than 30"
+                    "GEMC production failed because the number of molecules in the liquid box is less than 20"
                 )
 
     except:
