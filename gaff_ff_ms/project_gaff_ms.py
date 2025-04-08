@@ -865,7 +865,7 @@ def run_gemc(job):
             total_sim_steps = int(job.sp.nsteps_gemc_prod + job.doc.nsteps_gemc_eq)
 
             # Only run production if nmols liquid average > 30
-            if np.mean(eq_col_restart) > 20: #30
+            if np.mean(eq_col_restart) > 15:  # 30
                 # Run production
                 if not has_checkpoint("prod"):
                     mc.restart(
@@ -880,9 +880,9 @@ def run_gemc(job):
                     )
             else:
                 # Otherwise add to the job document that the production failed
-                job.doc["nmol_under_20"] = True
+                job.doc["nmol_under_15"] = True
                 raise Exception(
-                    "GEMC production failed because the number of molecules in the liquid box is less than 20"
+                    "GEMC production failed because the number of molecules in the liquid box is less than 15"
                 )
 
     except:
@@ -994,10 +994,16 @@ def check_prod_overlap(job):
                 job.doc.no_overlap = False
             else:
                 vap_box_mult_str = (
-            "_vbx_" + str(job.doc.vap_box_mult)
-            if "vap_box_mult" in job.doc.keys()
-            else "")
-                delete_data(job, "gemc.eq", mv=True, subfolder="results_no_crit" + vap_box_mult_str)
+                    "_vbx_" + str(job.doc.vap_box_mult)
+                    if "vap_box_mult" in job.doc.keys()
+                    else ""
+                )
+                delete_data(
+                    job,
+                    "gemc.eq",
+                    mv=True,
+                    subfolder="results_no_crit" + vap_box_mult_str,
+                )
                 job.doc.use_crit = True
         else:
             job.doc.no_overlap = True
