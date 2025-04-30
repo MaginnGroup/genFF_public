@@ -561,8 +561,11 @@ def get_gemc_boxes(job, eq_data_name):
         job_init_doc = job_init.fn("signac_job_document.json")
         # Check if the file exists
         if os.path.exists(job_init_doc):
-            with open(job_init_doc, "r") as f:
-                statepoint = json.load(f)
+
+            if job.sp.T == job_init.sp.T:
+                job.doc.T_rst_match = True
+            # with open(job_init_doc, "r") as f:
+            #     statepoint = json.load(f)
 
             # Extract the values for the specified keys
             # boxl_liq = statepoint.get("npt_liqbox_final_dim", None)
@@ -782,15 +785,16 @@ def run_gemc(job):
                 else:
                     is_equil = False
 
-                # Check if this simulation restarts from an equilibrated one
+                # Check if this simulation restarts from an equilibrated one at the same temperature
                 if "restart_from" in job.doc.keys():
-                    # If at least 100k steps have been run
-                    if (
-                        total_eq_steps >= existing_eq_steps
-                        and total_eq_steps >= job.sp.nsteps_gemc_eq * 10
-                    ):
-                        # Start production run from the last piece of the equilibration run
-                        is_equil = True
+                    if "T_rst_match" in job.doc.keys() and job.doc.T_rst_match == True:
+                        # If at least 100k steps have been run
+                        if (
+                            total_eq_steps >= existing_eq_steps
+                            and total_eq_steps >= job.sp.nsteps_gemc_eq * 10
+                        ):
+                            # Start production run from the last piece of the equilibration run
+                            is_equil = True
 
                 # If equilibrium is reached, break the loop
                 if is_equil:
@@ -891,6 +895,7 @@ def run_gemc(job):
             if "vap_box_mult" in job.doc.keys()
             else ""
         )
+        rst_str = "_rest_{:.4s}".format(job.doc.restart_from) if "restart_from" in job.doc.keys() else ""
         # If equilibration wasn't long enough
         if "equil_fail" in job.doc and job.doc.equil_fail == True:
             # Extend the simulation, make a flag to check this job
@@ -904,7 +909,7 @@ def run_gemc(job):
             #         job,
             #         custom_args_gemc["run_name"],
             #         mv=True,
-            #         subfolder="results_no_crit" + vap_box_mult_str,
+            #         subfolder="results_no_crit" + vap_box_mult_str + rst_str,
             #     )
             #     job.doc.use_crit = True
             #     del job.doc["equil_fail"]
@@ -920,7 +925,7 @@ def run_gemc(job):
                 job,
                 custom_args_gemc["run_name"],
                 mv=True,
-                subfolder="results_crit" + vap_box_mult_str,
+                subfolder="results_crit" + vap_box_mult_str + rst_str,
             )
             raise Exception(
                 "GEMC failed with critical and experimental starting conditions and the molecule is "
@@ -934,7 +939,7 @@ def run_gemc(job):
                 job,
                 custom_args_gemc["run_name"],
                 mv=True,
-                subfolder="results_no_crit" + vap_box_mult_str,
+                subfolder="results_no_crit" + vap_box_mult_str + rst_str,
             )
             # If the simulation failed for another reason, try with critical conditions
             job.doc.use_crit = True
@@ -998,11 +1003,12 @@ def check_prod_overlap(job):
                     if "vap_box_mult" in job.doc.keys()
                     else ""
                 )
+                rst_str = "_rest_{:.4s}".format(job.doc.restart_from) if "restart_from" in job.doc.keys() else ""
                 delete_data(
                     job,
                     "gemc.eq",
                     mv=True,
-                    subfolder="results_no_crit" + vap_box_mult_str,
+                    subfolder="results_no_crit" + vap_box_mult_str + rst_str,
                 )
                 job.doc.use_crit = True
         else:
