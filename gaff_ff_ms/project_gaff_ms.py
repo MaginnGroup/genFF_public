@@ -314,7 +314,8 @@ def NPT_liqbox(job):
     compound_ff = ff.apply(compound)
 
     with job:
-        liq_box = mbuild.formats.xyz.read_xyz(job.fn("nvt.final.xyz"))
+        # liq_box = mbuild.formats.xyz.read_xyz(job.fn("nvt.final.xyz"))
+        liq_box = mbuild.load(job.fn("nvt.final.xyz"))
 
     boxl = job.doc.nvt_liqbox_final_dim
 
@@ -576,7 +577,8 @@ def get_gemc_boxes(job, eq_data_name):
             # Build liquid and vapor boxes from previous simulations
             file_liq_out, N_liq_use = make_usable_xyz(job_init, last_file, 1)
             file_vap_out, N_vap_use = make_usable_xyz(job_init, last_file, 2)
-            vap_box = mbuild.formats.xyz.read_xyz(file_vap_out)
+            # vap_box = mbuild.formats.xyz.read_xyz(file_vap_out)
+            vap_box = mbuild.load(file_vap_out)
             vap_box.box = mbuild.Box(
                 lengths=[boxl_vap, boxl_vap, boxl_vap], angles=[90.0, 90.0, 90.0]
             )
@@ -608,7 +610,8 @@ def get_gemc_boxes(job, eq_data_name):
         mols_in_boxes = [[N_liq_use], [0]]
         mols_to_add = [[0], [N_vap_use]]
 
-    liq_box = mbuild.formats.xyz.read_xyz(file_liq_out)
+    # liq_box = mbuild.formats.xyz.read_xyz(file_liq_out)
+    liq_box = mbuild.load(file_liq_out)
     liq_box.box = mbuild.Box(
         lengths=[boxl_liq, boxl_liq, boxl_liq], angles=[90.0, 90.0, 90.0]
     )
