@@ -77,7 +77,7 @@ def get_mse_data(at_num_str, obj_choice_str, param_set_str, molec_dict, project_
     #Get data from molecular simulations. Group by molecule name and save
     csv_name_unproc = os.path.join(csv_root_unproc, project_path)
     if os.path.exists(csv_name_unproc + ".csv"):
-        df_molec = pd.read_csv(csv_name_unproc + ".csv")
+        df_molec = pd.read_csv(csv_name_unproc + ".csv", index_col=False)
     else:
         df_molec = save_signac_results(project, "mol_name", property_names, csv_name= csv_name_unproc + ".csv")
     #process data and save
@@ -140,13 +140,12 @@ for ff_name, ff_label in zip(ff_names, ff_labels):
 if len(at_numbers) == 1:
     full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "aparam_set_" + str(param_set))
 else:
-    full_at_dir = os.path.join("Results_MS", "aAT-" + "".join(map(str, at_numbers)), obj_choice)
+    full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
 os.makedirs(full_at_dir, exist_ok=True)
 pdf_vle = PdfPages(os.path.join(full_at_dir ,"vle.pdf"))
 pdf_hpvap = PdfPages(os.path.join(full_at_dir ,"h_p_vap.pdf"))
 #For each molecule
 molecules = df_paramsets['molecule'].unique().tolist()
-molecules = ["R170", "R134a"]
 for molec in molecules:
     #Get the data for the molecule from each FF if it exists
     one_molec_dict = {molec: molec_dict[molec]}
@@ -169,29 +168,29 @@ for molec in molecules:
 pdf_vle.close()
 pdf_hpvap.close()
 
-# df_err_dict = {}
-# molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170", "R41", "R23", "R161", "R152a",  "R143",  "R116"]
-# for label, key in zip(err_labels, list(err_path_dict.keys())):
-#     df_err = pd.read_csv(err_path_dict[key], header = 0, index_col = "molecule")
-#     df_err_dict[label] = df_err.reindex(molec_names)
+df_err_dict = {}
+molec_names = ["R14", "R32", "R50", "R125", "R134a", "R143a", "R170", "R41", "R23", "R161", "R152a",  "R143",  "R116"]
+for label, key in zip(err_labels, list(err_path_dict.keys())):
+    df_err = pd.read_csv(err_path_dict[key], header = 0, index_col = "molecule")
+    df_err_dict[label] = df_err.reindex(molec_names)
 
-# error_objs = ["mae", "mapd"]
-# for error_obj in error_objs:
-#     #Make error Plots
-#     if len(at_numbers) == 1:
-#         full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
-#     else:
-#         full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
-#     os.makedirs(full_at_dir, exist_ok=True)
-#     pdf_MAPD = PdfPages(os.path.join(full_at_dir , error_obj.upper() + ".pdf"))
-#     #For each molecule
-#     # if error_obj == "mae":
-#     save_name = os.path.join(full_at_dir, error_obj + "_props.png")
-#     # else:
-#     #     save_name = None
-#     pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict, obj = error_obj, save_name=save_name), bbox_inches='tight')
-#     plt.close()
-#     pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict, obj = error_obj), bbox_inches='tight')
-#     plt.close()
-#     # #Close figures 
-#     pdf_MAPD.close() 
+error_objs = ["mae", "mapd"]
+for error_obj in error_objs:
+    #Make error Plots
+    if len(at_numbers) == 1:
+        full_at_dir = os.path.join("Results_MS", at_class.scheme_name, obj_choice, "param_set_" + str(param_set))
+    else:
+        full_at_dir = os.path.join("Results_MS", "AT-" + "".join(map(str, at_numbers)), obj_choice)
+    os.makedirs(full_at_dir, exist_ok=True)
+    pdf_MAPD = PdfPages(os.path.join(full_at_dir , error_obj.upper() + ".pdf"))
+    #For each molecule
+    # if error_obj == "mae":
+    save_name = os.path.join(full_at_dir, error_obj + "_props.png")
+    # else:
+    #     save_name = None
+    pdf_MAPD.savefig(plot_err_each_prop(molec_names, df_err_dict, obj = error_obj, save_name=save_name), bbox_inches='tight')
+    plt.close()
+    pdf_MAPD.savefig(plot_err_avg_props(molec_names, df_err_dict, obj = error_obj), bbox_inches='tight')
+    plt.close()
+    # #Close figures 
+    pdf_MAPD.close() 

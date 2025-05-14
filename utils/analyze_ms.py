@@ -575,7 +575,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
         
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
 
-        if df_ff is not None and ("Potoff" in df_label or "GAFF" in df_label):
+        if df_ff is not None: #and ("Potoff" in df_label or "GAFF" in df_label)
             x_props = ["sim_Pvap", "sim_Hvap"]
             df_ff.replace("", np.nan, inplace=True)
             df_ff.dropna(subset=["sim_Pvap", "sim_Hvap"], inplace=True)
