@@ -174,6 +174,8 @@ class Problem_Setup:
             "R116": r116_class,
         }
 
+        self.all_molec_data = {**self.all_train_molec_data, **self.all_test_molec_data}
+
         try:
             self.all_train_gp_dict = get_gp_data_from_pkl(
                 list(self.all_train_molec_data.keys())
