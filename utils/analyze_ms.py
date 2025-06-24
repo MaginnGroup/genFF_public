@@ -433,7 +433,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
 
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
-        show_df = df_label in ["AT-6a", "AT-6b"]
+        show_df = df_label in ["AT-4", "AT-6b", "AT-8"]
         
         if df_ff is not None and show_df:
             all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
@@ -578,7 +578,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
         
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
-        show_df = df_label in ["AT-6a", "AT-6b"]
+        show_df = df_label in ["AT-4", "AT-6b", "AT-8"]
 
         if df_ff is not None and show_df: #and ("Potoff" in df_label or "GAFF" in df_label)
             x_props = ["sim_Pvap", "sim_Hvap"]
@@ -892,7 +892,7 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
     return fig
 
 
-def get_param_and_mapd(str_mol, at_list = ["gaff", 1, 2]):
+def get_param_and_mapd(str_mol, at_list = ["gaff", 1, 2], mapd_params = ["rho_l", "rho_v", "H_vap", "P_vap"]):
     molec_data = []
     params = ["rho_l", "rho_v", "H_vap", "P_vap"]
     result_bounds = []
@@ -939,12 +939,12 @@ def get_param_and_mapd(str_mol, at_list = ["gaff", 1, 2]):
             mapd[key] = values_real_to_scaled(err_val, np.array([mapd_bnd]))
 
         # Append the MAPD values to the parameter set
-        mapds_to_append = [mapd[key] for key in params]
+        mapds_to_append = [mapd[key] for key in mapd_params]
         param_best_with_mapd = np.append(param_best, mapds_to_append)
         molec_data.append(param_best_with_mapd)
 
     param_names = list(data_class.param_names)
-    col_names = param_names + ["MAPD " + params[i] for i in range(len(params))]
+    col_names = param_names + ["MAPD " + mapd_params[i] for i in range(len(mapd_params))]
     df = pd.DataFrame(data=molec_data, columns = col_names )
     
     return df, data_class, bnds, np.array(result_bounds)
@@ -1018,11 +1018,9 @@ def get_mapd_train_test_avg(str_mol, at_list = ["gaff", 1, 2], mode = "train"):
     return df, data_class, bnds, np.array(result_bounds)
 
 def plot_param_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_params = ["rho_l", "rho_v", "H_vap", "P_vap"]):
-    
-
     matplotlib.rc("font", family="sans-serif")
     matplotlib.rc("font", serif="Arial")
-    seaborn.set_palette('bright', n_colors=len(df))
+    
 
     NM_TO_ANGSTROM = 10
     K_B = 0.008314 # J/MOL K
@@ -1071,7 +1069,8 @@ def plot_param_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_par
         ax.tick_params("x", pad=15) 
 
     # for mode in ["train", "test"]:
-    df, data_class, bnds, result_bounds = get_param_and_mapd(str_mol, at_list)
+    df, data_class, bnds, result_bounds = get_param_and_mapd(str_mol, at_list, mapd_params)
+    seaborn.set_palette('bright', n_colors=len(df))
     data = df.to_numpy()
     # result_bounds = np.array([[0, 35], [0, 35], [0, 35], [0, 35]])  # MAPD bounds for rho_l, rho_v, H_vap, P_vap
     param_bounds = bnds.T #data_class.param_bounds
@@ -1085,6 +1084,9 @@ def plot_param_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_par
         latex_name = lambda s: fr"$\{s.split('_',1)[0]}_{{{s.split('_',1)[1]}}}$" if '_' in s else fr"${s}$"
         param_names.append(latex_name(name))
     param_names = [name.replace("1", "") for name in param_names]
+    for i, name in enumerate(param_names):
+        if "epsilon" in name:
+            param_names[i] = name.replace("}$", "}/k_{B}$")
 
     def make_mapd_name(name):
         """Create a LaTeX formatted name for MAPD"""
@@ -1108,9 +1110,8 @@ def plot_param_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_par
     x_vals = [i for i in range(n_axis)]
 
     # Create (N-1) subplots along x axis
-    fig, axes = plt.subplots(1, n_axis-1, sharey=False, figsize=(n_axis*2,6))
+    fig, axes = plt.subplots(1, n_axis-1, sharey=False, figsize=(8,6))
 
-    
     for i, ax in enumerate(axes):
         for j, line in enumerate(data):
             if j == 0:
@@ -1158,7 +1159,7 @@ def plot_param_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_par
 
     # Remove space between subplots
     plt.subplots_adjust(wspace=0, bottom=0.3)
-    ax.set_title(str_mol, fontsize=24)
+    axes[0].set_title(str_mol, fontsize=24)
     handles, labels = axes[0].get_legend_handles_labels()
     # Add legend to the figure (not to a single axis), position top right outside the plot area
     fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.02, 1), borderaxespad=0, fontsize=16)
@@ -1241,6 +1242,10 @@ def plot_mapd_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_para
             latex_name = lambda s: fr"$\{s.split('_',1)[0]}_{{{s.split('_',1)[1]}}}$" if '_' in s else fr"${s}$"
             param_names.append(latex_name(name))
         param_names = [name.replace("1", "") for name in param_names]
+        for name in param_names:
+            if "epsilon" in name:
+                #Before second $ add "/k_{B}"
+                name = name.replace("}$", r"}/k_{B}$")
 
         def make_mapd_name(name):
             """Create a LaTeX formatted name for MAPD"""
@@ -1314,12 +1319,14 @@ def plot_mapd_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_para
     plt.subplots_adjust(wspace=0, bottom=0.3)
     # ax.set_title(str_mol, fontsize=24)
     handles, labels = all_axes[0,0].get_legend_handles_labels()
+    all_axes[0,0].set_title("Training", fontsize=16)
+    all_axes[1,0].set_title("Testing", fontsize=16)
     # Add legend to the figure (not to a single axis), position top right outside the plot area
-    fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.5, 0.9), borderaxespad=0, fontsize=16)
+    fig.legend(handles, labels, loc='lower right', bbox_to_anchor=(0.85, 0.65), borderaxespad=0, fontsize=16)
     # fig.legend(handles, labels, fontsize=16)
     # plt.tight_layout()
     # fig.subplots_adjust(left=0, right=50, bottom=0, top=25)
 
-    # fig.savefig("Results_MS/" + str_mol + "-param-comp.png",dpi=360)
+    fig.savefig("Results_MS/all-mapd-line.png",dpi=360)
 
     return plt.show()
