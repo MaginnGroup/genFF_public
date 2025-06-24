@@ -6,12 +6,15 @@ import math
 import matplotlib
 import matplotlib.pyplot as plt
 import seaborn
+import matplotlib.patches as mpatch
+from matplotlib import ticker
 from scipy.stats import linregress
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error, mean_absolute_error
 from matplotlib.ticker import MultipleLocator, AutoMinorLocator
 from fffit.fffit.utils import values_real_to_scaled, values_scaled_to_real, variances_scaled_to_real
 from fffit.fffit.plot import plot_model_performance, plot_model_vs_test, plot_slices_temperature, plot_slices_params, plot_model_vs_exp, plot_obj_contour
 from .molec_class_files import r14, r32, r50, r125, r134a, r143a, r170, r41, r23, r161, r152a, r152, r134, r143, r116
+from .opt_atom_types import Vis_Results
 
 R14 = r14.R14Constants()
 R32 = r32.R32Constants()
@@ -430,8 +433,9 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
 
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
+        show_df = df_label in ["AT-6a", "AT-6b"]
         
-        if df_ff is not None:
+        if df_ff is not None and show_df:
             all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
             grouped = df_ff.groupby(["temperature", "atom_type"])[all_props]
             
@@ -574,8 +578,9 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
         
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
+        show_df = df_label in ["AT-6a", "AT-6b"]
 
-        if df_ff is not None: #and ("Potoff" in df_label or "GAFF" in df_label)
+        if df_ff is not None and show_df: #and ("Potoff" in df_label or "GAFF" in df_label)
             x_props = ["sim_Pvap", "sim_Hvap"]
             df_ff.replace("", np.nan, inplace=True)
             df_ff.dropna(subset=["sim_Pvap", "sim_Hvap"], inplace=True)
@@ -885,3 +890,182 @@ def plot_err_avg_props(molec_names, err_path_dict, obj = 'mapd', save_name = Non
 
     # Show the plot
     return fig
+
+
+def get_param_and_mapd(str_mol, at_list = ["gaff", "AT-4", "AT-6a"]):
+    molec_data = []
+    
+    result_bounds = [0, 35]
+    for at_num in at_list:
+        molec_names = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"] #Training data to consider
+        #Create visualization object
+        
+        #Get parameter sets
+        if isinstance(at_num, int):  
+            analyzer = Vis_Results(molec_names, at_num, 1, "ExpVal")
+            #Load param_set
+            param_matrix = analyzer.at_class.get_transformation_matrix(
+                    {str_mol: analyzer.molec_data_dict[str_mol]})
+            #Set parameter set of interest (in this case get the best parameter set)
+            all_molec_dir = analyzer.use_dir_name
+            data_set = pd.read_csv(os.path.join(all_molec_dir, "unique_best_set.csv"), header =0, index_col = False)
+            
+            # param_best = analyzer.values_pref_to_real()
+            bnds =  analyzer.at_class.at_bounds_nm_kjmol.T@param_matrix
+            param_best = values_real_to_scaled(analyzer.values_pref_to_real(data_set.iloc[0].values@param_matrix).reshape(1,-1), bnds.T)
+            #Get MAPD for R50 (rho_l and Hvap only)
+            err_file = os.path.join("Results_MS", analyzer.at_class.scheme_name, "ExpVal", "param_set_1", "opt_ff_ms_err.csv")
+            errs = pd.read_csv(err_file, header =0, index_col =False)
+            #Add the columns for MAPD for rho_l and Hvap to param_best
+            # Convert errs to a dictionary keyed by molecule
+            mapd_liq = values_real_to_scaled(errs.loc[errs["molecule"] == str_mol, "mapd_liq_density"].values[0], result_bounds)
+            mapd_hvap = values_real_to_scaled(errs.loc[errs["molecule"] == str_mol, "mapd_Hvap"].values[0], result_bounds)
+
+            # Concatenate the MAPD values to `param_best`
+            param_best_with_mapd = np.append(param_best, [mapd_liq, mapd_hvap])
+            print(param_best_with_mapd)
+
+        else:
+            at_num = 1
+            analyzer = Vis_Results(molec_names, at_num, 1, "ExpVal")
+            param_matrix = analyzer.at_class.get_transformation_matrix(
+                    {str_mol: analyzer.molec_data_dict[str_mol]})
+            data_class = analyzer.molec_data_dict[str_mol]
+            molec_gaff = np.array(
+                list(data_class.gaff_param_set.values())
+            )
+
+            bnds =  analyzer.at_class.at_bounds_nm_kjmol.T@param_matrix
+            param_best = values_real_to_scaled(analyzer.values_pref_to_real(molec_gaff).reshape(1,-1), bnds.T)
+
+            # param_best = analyzer.values_pref_to_real(molec_gaff)
+            err_file = os.path.join("Results_MS", "", "", "", "gaff_ff_ms_err.csv") 
+            errs = pd.read_csv(err_file, header =0, index_col =False)
+            
+            #Add the columns for MAPD for rho_l and Hvap to param_best
+            # Convert errs to a dictionary keyed by molecule
+            mapd_liq = values_real_to_scaled(errs.loc[errs["molecule"] == str_mol, "mapd_liq_density"].values[0], result_bounds)
+            mapd_hvap = values_real_to_scaled(errs.loc[errs["molecule"] == str_mol, "mapd_Hvap"].values[0], result_bounds)
+            param_best_with_mapd = np.append(param_best, [mapd_liq, mapd_hvap])
+        molec_data.append(param_best_with_mapd)
+
+    param_names = list(data_class.param_names)
+    col_names = param_names + ["MAPE\n" + r"$\rho_{l}$", "MAPE\n" + r"$H_{vap}$"]
+    df = pd.DataFrame(data=molec_data, columns = col_names )
+    
+    return df, data_class, bnds
+
+def plot_param_comp(str_mol, at_list = ["gaff", "AT-4", "AT-6a"]):
+    df, data_class, bnds = get_param_and_mapd(str_mol, at_list)
+
+    matplotlib.rc("font", family="sans-serif")
+    matplotlib.rc("font", serif="Arial")
+
+    NM_TO_ANGSTROM = 10
+    K_B = 0.008314 # J/MOL K
+    KJMOL_TO_K = 1.0 / K_B
+
+    def set_ticks_for_axis(ax, param_bounds, nticks):
+        """Set the tick positions and labels on y axis for each plot
+
+        Tick positions based on normalised data
+        Tick labels are based on original data
+        """
+        min_val, max_val = param_bounds
+        step = (max_val - min_val) / float(nticks-1)
+        tick_labels = [round(min_val + step * i, 2) for i in range(nticks)]
+        ticks = np.linspace(0, 1.0, nticks)
+        ax.yaxis.set_ticks(ticks)
+        ax.set_yticklabels(tick_labels, fontsize=16)
+        ax.yaxis.set_minor_locator(ticker.AutoMinorLocator(2))
+        ax.tick_params("y", direction="inout", which="both", length=7)
+        ax.tick_params("y", which="major", length=14)
+        ax.tick_params("x", pad=15) 
+
+    seaborn.set_palette('bright', n_colors=len(df))
+    data = df.to_numpy()
+    result_bounds = np.array([[0, 35], [0, 35]])
+    param_bounds = bnds.T #data_class.param_bounds
+    indx_mid = int(len(data_class.param_names) / 2)
+    param_bounds[:indx_mid] = param_bounds[:indx_mid] * NM_TO_ANGSTROM
+    param_bounds[indx_mid:] = param_bounds[indx_mid:] * KJMOL_TO_K
+
+    # data = np.hstack((data, results))
+    bounds = np.vstack((param_bounds, result_bounds))
+    print(bounds)
+
+    col_names = []
+    for name in data_class.param_names:
+        latex_name = lambda s: fr"$\{s.split('_',1)[0]}_{{{s.split('_',1)[1]}}}$" if '_' in s else fr"${s}$"
+        col_names.append(latex_name(name))
+    col_names += ["MAPD\n" + r"$\rho_{l}$", "MAPD\n" + r"$H_{vap}$"]
+    col_names = [name.replace("1", "") for name in col_names]
+    print("Column names: ", col_names)
+    n_axis = len(col_names)
+    assert data.shape[1] == n_axis
+    x_vals = [i for i in range(n_axis)]
+
+    # Create (N-1) subplots along x axis
+    fig, axes = plt.subplots(1, n_axis-1, sharey=False, figsize=(14,6))
+
+    # Plot each row
+    labels = ["GAFF", "AT4", "AT6a"]
+    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    df_colors = ['gray'] + [cmap(i) for i in np.linspace(0, 1, 4)]
+    markers = ["s", "o", "o"]
+    for i, ax in enumerate(axes):
+        for j, line in enumerate(data):
+            if j == 0:
+                zorder = 1
+            else:
+                zorder = 0
+            if i ==0:
+                ax.plot(x_vals, line, alpha = 0.45, label = labels[j], color = df_colors[j], markersize = 15, marker = markers[j], zorder = zorder)
+            else:
+                ax.plot(x_vals, line, alpha = 0.45, color = df_colors[j], markersize = 15, marker = markers[j], zorder = zorder)
+        ax.set_xlim([x_vals[i], x_vals[i+1]])
+
+    for dim, ax in enumerate(axes):
+        ax.xaxis.set_major_locator(ticker.FixedLocator([dim]))
+        set_ticks_for_axis(ax, bounds[dim], nticks=6)
+        if dim < 10:
+            ax.set_xticklabels([col_names[dim]], fontsize=24)
+        else:
+            ax.set_xticklabels([col_names[dim]], fontsize=20)
+        ax.set_ylim(-0.05,1.05)
+        # Add white background behind labels
+        for label_y in ax.get_yticklabels():
+            label_y.set_bbox(
+                dict(
+                    facecolor='white',
+                    edgecolor='none',
+                    alpha=0.45,
+                    boxstyle=mpatch.BoxStyle("round4")
+                )
+            )
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.spines['left'].set_linewidth(2.0)
+
+    ax = axes[-1]
+    ax.xaxis.set_major_locator(ticker.FixedLocator([n_axis-2, n_axis-1]))
+    ax.set_xticklabels([col_names[-2], col_names[-1]], fontsize=20)
+
+    ax = plt.twinx(axes[-1])
+    ax.set_ylim(-0.05, 1.05)
+    set_ticks_for_axis(ax, bounds[-1], nticks=6)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['right'].set_linewidth(2.0)
+
+    # Remove space between subplots
+    plt.subplots_adjust(wspace=0, bottom=0.3)
+    handles, labels = axes[0].get_legend_handles_labels()
+    # Add legend to the figure (not to a single axis), position top right outside the plot area
+    fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.02, 1), borderaxespad=0, fontsize=16)
+    plt.tight_layout()
+    # fig.subplots_adjust(left=0, right=50, bottom=0, top=25)
+
+    fig.savefig("Results_MS/" + str_mol + "-param-comp.png",dpi=360)
+
+    return None
