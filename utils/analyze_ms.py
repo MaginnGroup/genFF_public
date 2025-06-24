@@ -920,11 +920,8 @@ def get_param_and_mapd(str_mol, at_list = ["gaff", "AT-4", "AT-6a"]):
             # Convert errs to a dictionary keyed by molecule
             mapd_liq = values_real_to_scaled(errs.loc[errs["molecule"] == str_mol, "mapd_liq_density"].values[0], result_bounds)
             mapd_hvap = values_real_to_scaled(errs.loc[errs["molecule"] == str_mol, "mapd_Hvap"].values[0], result_bounds)
-
             # Concatenate the MAPD values to `param_best`
             param_best_with_mapd = np.append(param_best, [mapd_liq, mapd_hvap])
-            print(param_best_with_mapd)
-
         else:
             at_num = 1
             analyzer = Vis_Results(molec_names, at_num, 1, "ExpVal")
@@ -934,7 +931,6 @@ def get_param_and_mapd(str_mol, at_list = ["gaff", "AT-4", "AT-6a"]):
             molec_gaff = np.array(
                 list(data_class.gaff_param_set.values())
             )
-
             bnds =  analyzer.at_class.at_bounds_nm_kjmol.T@param_matrix
             param_best = values_real_to_scaled(analyzer.values_pref_to_real(molec_gaff).reshape(1,-1), bnds.T)
 
@@ -992,7 +988,6 @@ def plot_param_comp(str_mol, at_list = ["gaff", "AT-4", "AT-6a"]):
 
     # data = np.hstack((data, results))
     bounds = np.vstack((param_bounds, result_bounds))
-    print(bounds)
 
     col_names = []
     for name in data_class.param_names:
@@ -1000,7 +995,6 @@ def plot_param_comp(str_mol, at_list = ["gaff", "AT-4", "AT-6a"]):
         col_names.append(latex_name(name))
     col_names += ["MAPD\n" + r"$\rho_{l}$", "MAPD\n" + r"$H_{vap}$"]
     col_names = [name.replace("1", "") for name in col_names]
-    print("Column names: ", col_names)
     n_axis = len(col_names)
     assert data.shape[1] == n_axis
     x_vals = [i for i in range(n_axis)]
