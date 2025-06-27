@@ -433,7 +433,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
 
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
-        show_df = df_label in ["GAFF", "AT-4", "AT-6a"]
+        show_df = True #df_label in ["GAFF", "AT-4", "AT-6a"]
         
         if df_ff is not None and show_df:
             all_props = ["sim_liq_density", "sim_vap_density", "sim_Tc", "sim_rhoc"]
@@ -578,7 +578,7 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name = None):
             df_marker = "p"
         
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
-        show_df = df_label in ["GAFF", "AT-4", "AT-6a"]
+        show_df = True #df_label in ["GAFF", "AT-4", "AT-6a"]
 
         if df_ff is not None and show_df: #and ("Potoff" in df_label or "GAFF" in df_label)
             x_props = ["sim_Pvap", "sim_Hvap"]
@@ -1340,7 +1340,8 @@ def plot_mapd_comp(str_mol, w_params = True, at_list = ["gaff", 1, 2], mapd_para
     all_axes[0,0].set_title("Training", fontsize=16)
     all_axes[1,0].set_title("Testing", fontsize=16)
     # Add legend to the figure (not to a single axis), position top right outside the plot area
-    fig.legend(handles, labels, loc='lower right', bbox_to_anchor=(0.85, 0.55), borderaxespad=0, fontsize=16)
+    # fig.legend(handles, labels, loc='lower right', bbox_to_anchor=(0.85, 0.55), borderaxespad=0, fontsize=16)
+    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.90), ncol=3, fontsize=22, handletextpad=0.1, markerscale=0.9, edgecolor="dimgrey")
     # fig.legend(handles, labels, fontsize=16)
     # plt.tight_layout()
     # fig.subplots_adjust(left=0, right=50, bottom=0, top=25)
