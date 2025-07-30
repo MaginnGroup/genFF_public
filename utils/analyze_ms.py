@@ -454,14 +454,33 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name=None):
     df_labels = list(df_keys)
     df_ff_list = list(df_ffs)
 
-    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 5)] + [
+    
+    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
+    df_colors = [colors[i] for i in range(len(df_ffs) - 5)] + [
         "gray",
-        "brown",
-        "orange",
+        "pink",
         "olive",
-        "olive",
+        "cyan",
+        "cyan",
     ]
+
+    all_markers = {
+        "GAFF": "s",
+        "AT-4": "o",
+        "AT-6a": "p",
+        "AT-6b": "D",
+        "AT-8": "*",
+        "Potoff": "^",
+        "TraPPE": "1"}
+    
+    # cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    # df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 5)] + [
+    #     "gray",
+    #     "brown",
+    #     "orange",
+    #     "olive",
+    #     "olive",
+    # ]
     # df_labels, df_ffs = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
     # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
     # df_markers = ['o', 's', '^', '*', 'p', 'd']
@@ -488,19 +507,21 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name=None):
 
         if "AT-" in df_label:
             df_z_order = len(df_ff_list)
-            df_marker = "o"
+            # df_marker = "o"
         elif "GAFF" in df_label:
             df_z_order = 3
-            df_marker = "s"
+            # df_marker = "s"
         elif "Potoff" in df_label:
             df_z_order = 2
-            df_marker = "^"
+            # df_marker = "^"
         elif "TraPPE" in df_label:
             df_z_order = 1
-            df_marker = "*"
+            # df_marker = "*"
         else:
             df_z_order = 4
-            df_marker = "p"
+            # df_marker = "p"
+
+        df_marker = all_markers.get(df_label, "P")  # Default marker if not found
 
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
         show_df = True  # df_label in ["GAFF", "AT-4", "AT-6a"]
@@ -610,7 +631,10 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name=None):
 
     if molec not in ["R14", "R50", "R170", "R116"]:
         # Substitute mole string R w/ HFC
-        molec = molec.replace("R", "HFC")
+        molec = molec.replace("R", "HFC-")
+    else:
+        # Substitute mole string R w/ HC
+        molec = molec.replace("R", "R-")
     # handles, labels = ax2.get_legend_handles_labels()
     # for h in handles: h.set_linestyle("")
     ax2.legend(
@@ -622,7 +646,7 @@ def plot_vle_envelopes(molec_dict, df_ff_dict, save_name=None):
         markerscale=0.9,
         edgecolor="dimgrey",
     )
-    ax2.text(0.60, 0.82, molec, fontsize=30, transform=ax2.transAxes)
+    ax2.text(0.55, 0.82, molec, fontsize=30, transform=ax2.transAxes)
     fig.subplots_adjust(bottom=0.2, top=0.75, left=0.15, right=0.95, wspace=0.55)
 
     return fig
@@ -641,15 +665,32 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name=None):
     df_labels = list(df_keys)
     df_ff_list = list(df_ffs)
 
-    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 5)] + [
+    # cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    # df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 5)] + [
+    #     "gray",
+    #     "brown",
+    #     "orange",
+    #     "olive",
+    #     "olive",
+    # ]
+
+    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
+    df_colors = [colors[i] for i in range(len(df_ffs) - 5)] + [
         "gray",
-        "brown",
-        "orange",
+        "pink",
         "olive",
-        "olive",
+        "cyan",
+        "cyan",
     ]
 
+    all_markers = {
+        "GAFF": "s",
+        "AT-4": "o",
+        "AT-6a": "p",
+        "AT-6b": "D",
+        "AT-8": "*",
+        "Potoff": "^",
+        "TraPPE": "1"}
     # df_labels = ["This Work", "GAFF", "Potoff et al.", "TraPPE", "Wang et al.", "Befort et al." ]
     # df_colors = ['blue', 'gray', '#0989d9', 'red', 'green','purple']
     # df_markers = ['o', 's', '^', '*', 'p', 'd']
@@ -695,19 +736,21 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name=None):
 
         if "AT-" in df_label:
             df_z_order = len(df_ff_list)
-            df_marker = "o"
+            # df_marker = "o"
         elif "GAFF" in df_label:
             df_z_order = 3
-            df_marker = "s"
+            # df_marker = "s"
         elif "Potoff" in df_label:
             df_z_order = 2
-            df_marker = "^"
+            # df_marker = "^"
         elif "TraPPE" in df_label:
             df_z_order = 1
-            df_marker = "*"
+            # df_marker = "*"
         else:
             df_z_order = 4
-            df_marker = "p"
+            # df_marker = "p"
+
+        df_marker = all_markers.get(df_label, "P")  # Default marker if not found
 
         df_label = df_labels[i] if df_labels[i] != "" else "Previous Work"
         show_df = True  # df_label in ["GAFF", "AT-4", "AT-6a"]
@@ -856,7 +899,10 @@ def plot_pvap_hvap(molec_dict, df_ff_dict, save_name=None):
 
     if molec not in ["R14", "R50", "R170", "R116"]:
         # Substitute mole string R w/ HFC
-        molec = molec.replace("R", "HFC")
+        molec = molec.replace("R", "HFC-")
+    else:
+        # Substitute mole string R w/ HC
+        molec = molec.replace("R", "R-")
     axs[0].text(0.08, 0.3, molec, fontsize=20, transform=axs[0].transAxes)
     axs[0].legend(
         loc="lower left",
@@ -902,11 +948,18 @@ def plot_err_each_prop(molec_names, err_path_dict, obj="mapd", save_name=None):
     df_labels = list(df_keys)
     df_mse_list = list(df_ffs)
 
-    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 3)] + [
+    # cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    # df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 3)] + [
+    #     "gray",
+    #     "olive",
+    #     "olive",
+    # ]
+
+    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
+    df_colors = [colors[i] for i in range(len(df_ffs) - 3)] + [
         "gray",
-        "olive",
-        "olive",
+        "cyan",
+        "cyan",
     ]
 
     train_molecs = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"]
@@ -915,7 +968,7 @@ def plot_err_each_prop(molec_names, err_path_dict, obj="mapd", save_name=None):
     left_indices = np.arange(len_train)
     right_indices = np.arange(len_train, len(molec_names))
 
-    fig, axs = plt.subplots(4, 2, figsize=(24, 16), sharex=False)
+    fig, axs = plt.subplots(4, 2, figsize=(30, 15), sharex=False)
     # Plot each column in a subplot
     for i, (ax, column, name) in enumerate(zip(axs.flatten(), cols, names)):
         bar_width = 0.1
@@ -949,9 +1002,9 @@ def plot_err_each_prop(molec_names, err_path_dict, obj="mapd", save_name=None):
         for molec in mol_names:
             if molec not in ["R14", "R50", "R170", "R116"]:
                 # Substitute mole string R w/ HFC
-                molec_names_use.append(molec.replace("R", "HFC"))
+                molec_names_use.append(molec.replace("R", "HFC-"))
             else:
-                molec_names_use.append(molec)
+                molec_names_use.append(molec.replace("R", "R-"))
 
         ax.set_xticklabels(molec_names_use, fontsize=20)
 
@@ -980,7 +1033,7 @@ def plot_err_each_prop(molec_names, err_path_dict, obj="mapd", save_name=None):
     # Explain missing HFC-143 data
     fig.text(
         0.85,
-        0.1,  # Adjust these coordinates based on the image placement
+        0.15,  # Adjust these coordinates based on the image placement
         "Experimental\n Data\n Unavailable",
         fontsize=20,
         color="black",
@@ -1023,11 +1076,18 @@ def plot_err_avg_props(molec_names, err_path_dict, obj="mapd", save_name=None):
     df_labels = list(df_keys)
     df_mse_list = list(df_ffs)
 
-    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 3)] + [
+    # cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    # df_colors = [cmap(i) for i in np.linspace(0, 1, len(df_ffs) - 3)] + [
+    #     "gray",
+    #     "olive",
+    #     "olive",
+    # ]
+
+    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
+    df_colors = [colors[i] for i in range(len(df_ffs) - 3)] + [
         "gray",
-        "olive",
-        "olive",
+        "cyan",
+        "cyan",
     ]
 
     train_molecs = ["R14", "R32", "R50", "R170", "R125", "R134a", "R143a", "R41"]
@@ -1264,8 +1324,9 @@ def plot_param_comp(
         8: "AT-8",
     }
     labels = [label_dict[at] for at in at_list]
-    cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    all_colors = ["gray"] + [cmap(i) for i in np.linspace(0, 1, 4)]
+    # cmap = plt.get_cmap("cool")  # Get the rainbow colormap
+    # all_colors = ["gray"] + [cmap(i) for i in np.linspace(0, 1, 4)]
+    all_colors = ["gray", "tab:blue", "tab:orange", "tab:green", "tab:red"]
     colors = {
         "gaff": "gray",
         1: all_colors[1],
@@ -1277,9 +1338,9 @@ def plot_param_comp(
     all_markers = {
         "gaff": "s",
         1: "o",
-        2: "o",
-        6: "o",
-        8: "o",
+        2: "p",
+        6: "D",
+        8: "*",
     }
     markers = [all_markers[at] for at in at_list]
 
@@ -1575,7 +1636,8 @@ def plot_mapd_comp(
     }
     labels = [label_dict[at] for at in at_list]
     cmap = plt.get_cmap("cool")  # Get the rainbow colormap
-    all_colors = ["gray"] + [cmap(i) for i in np.linspace(0, 1, 4)]
+    # all_colors = ["gray"] + [cmap(i) for i in np.linspace(0, 1, 4)]
+    all_colors = ["gray", "tab:blue", "tab:orange", "tab:green", "tab:red"]
     colors = {
         "gaff": "gray",
         1: all_colors[1],
@@ -1587,9 +1649,9 @@ def plot_mapd_comp(
     all_markers = {
         "gaff": "s",
         1: "o",
-        2: "o",
-        6: "o",
-        8: "o",
+        2: "p",
+        6: "D",
+        8: "*",
     }
     markers = [all_markers[at] for at in at_list]
 
@@ -1740,7 +1802,7 @@ def plot_mapd_comp(
         labels,
         loc="lower center",
         bbox_to_anchor=(0.5, 0.90),
-        ncol=3,
+        ncol=4,
         fontsize=22,
         handletextpad=0.1,
         markerscale=0.9,
