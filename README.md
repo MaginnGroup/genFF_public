@@ -1,5 +1,40 @@
-# generalizedFF
-Generalized force field for one- and two-carbon single-bonded refrigerants with elements of C, F, and H
+# Machine Learning to Optimize Transferable Hydrofluorocarbon Refrigerant Force Fields
+Authors: Montana N. Carlozo, Ke Wang, and Alexander W. Dowling
+<!-- Introduction: Provide a brief introduction to the project, including its purpose, goals, and any key features or benefits. -->
+## Introduction
+**genFF_public** is a repository used to calibrate a transferable FF for one- and two-carbon single-bonded refrigerants with elements of C, F, and H given experimental data. The key feature of this work is using machine learning (ML) tools in the form of Gaussian processes (GPs) and estimability analysis techniques to smartly design atom type schemes for tranferable FFs and optimize their LJ parameters. This work features the comparison of four atom typing schemes designed and optimized with ML and GAFF.
+
+## Citation
+Please cite as:
+
+Montana N. Carlozo, Ning Wang, Alexander W. Dowling, Edward J. Maginn “Machine Learning to Optimize Transferable Hydrofluorocarbon Refrigerant Force Fields”, 2025
+
+## Available Data
+
+### Repository Organization
+The repository is organized as follows: <br />
+genFF_public/ is the top level directory. It contains: <br />
+1. .gitignore prevents large files from the signac workflow and plots from being tracked by git and prevents tracking of other unimportant files. <br />
+2. hfcs-fffit.yaml is the conda environment for use with this work. <br />
+3. gen-gp-vle.py is the code used to create the GP models in this work from the data in our previous study. <br />
+4. AT-results.xlsx is an excel file of results containing the numerical results of the eigen-decomposition of the FIM and estimability analysis as well as the final LJ parameters for each atom type scheme. <br />
+5. init_gaff_ms.py is the initialization file for molecular simulations for the gaff LJ parameters. <br />
+6. init_opt_at.py is the initialization file for atom type optimization. <br />
+7. init_optff_ms.py is the initialization file for molecular simulations for the validation of LJ parameters for atom type schemes. <br />
+8. molecule_exp_unc_data.csv is a csv of the weights and uncertainties used in atom type (AT) optimization. <br />
+9. param-comp.xlsx is an excel file comparing the different LJ parameters used for each AT scheme for each molecule. <br />
+10. post_analysis_ms.py is the script used to gather validation including the data for Table 4. Also generates Figures 3, 4, 5, and 6 and the files h-p-vap.pdf and vle.pdf. <br />
+11. post_analysis_opt.py is the script used to optimize the transferable FF parameters. Generates the data for Table 7. <br />
+12. rcc_opt_at_analysis.py is the script used to perform the estimability analysis and eigen-decomposition of the FIM. Generates the data for Table 6. <br />
+
+Directories gaff_ff_ms/, opt_at_params/, and opt_ff_ms/ are initially created via init_gaff_ms.py, init_opt_at.py, and init_optff_ms.py in the top directory through signac. <br /> 
+Each contains the following files/subdirectories: <br />:
+1. project_gaff_ms.py, project_opt_at.py, or project_optff_ms.py; The script for running the workflow using signac. <br />
+1. templates/ are the templates required to run this workflow in signac on the crc. <br />
+2. workspace/ will appear to save all raw results generated during the workflow after running init_gpbo*.py. This file is not tracked by git due to its size. the workspace/ folder for this study can be downloaded on Google Drive (see section 'Workflow Files and Results') <br />
+3. signac_project_document.json will also appear to track the status of jobs in the signac workflow <br />
+
+Directo
 
 ### LJ Parameter Optimization (OptAT)
 To run LJ parameter optimization, follow the following steps:
@@ -10,7 +45,6 @@ To run LJ parameter optimization, follow the following steps:
      python init_opt_at.py
    ```  
 3. Do the following in opt_at_params directory:
-   ```  
 4. Generate pareto sets for 1st repeats
    ```
      python project_opt_at.py submit -o gen_pareto_sets -f obj_choice [val] atom_type [val]
