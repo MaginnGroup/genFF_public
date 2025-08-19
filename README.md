@@ -28,13 +28,41 @@ genFF_public/ is the top level directory. It contains: <br />
 12. rcc_opt_at_analysis.py is the script used to perform the estimability analysis and eigen-decomposition of the FIM. Generates the data for Table 6. <br />
 
 Directories gaff_ff_ms/, opt_at_params/, and opt_ff_ms/ are initially created via init_gaff_ms.py, init_opt_at.py, and init_optff_ms.py in the top directory through signac. <br /> 
-Each contains the following files/subdirectories: <br />:
+Each contains the following files/subdirectories: <br />
 1. project_gaff_ms.py, project_opt_at.py, or project_optff_ms.py; The script for running the workflow using signac. <br />
 1. templates/ are the templates required to run this workflow in signac on the crc. <br />
 2. workspace/ will appear to save all raw results generated during the workflow after running init_gpbo*.py. This file is not tracked by git due to its size. the workspace/ folder for this study can be downloaded on Google Drive (see section 'Workflow Files and Results') <br />
 3. signac_project_document.json will also appear to track the status of jobs in the signac workflow <br />
 
-Directo
+Directory csv/ contains data used to train the GP models
+It contains the following files: <br />
+1. rXX-density.csv; The MD density data. <br />
+2. rXX-vle.csv; The GEMC data which is used to train the GP models. <br />
+
+Directory example_mcf_files/ contains sample .mcf files for all models and HFCs evaluated in this work
+It contains the following files/subdirectories: <br />
+1. AT-Y/RXX-species1.mcf are the sample .mcf files for each FF model and HFC
+
+Directory fffit/fffit is a package which contains some critical functions for running the workflow <br />
+It contains the following files/subdirectories: <br />
+1. tests/ contains the tests for the functions in fffit/fffit
+2. __init__.py intializes the package. <br />
+3. models.py contains functions related to building GP models. <br />
+4. pareto.py contains functions related to locating pareto-optimal parameter sets. <br />
+5. plot.py contains some functions for plotting. <br />
+6. signac.py contains functions related to parsing data from signac workspaces. <br />
+7. utils.py contains utility functions necessary for this package. <br />
+
+Directory molec_gp_data/ contains the GPs and training/testing data for each HFC <br />
+It contains the following files/subdirectories: <br />
+1. RXX-vlegp are the subdirectories for each HFC. <br />
+2. RXX-vlegp/sim_PROP_y_train.csv are the output training data for each property. <br />
+3. RXX-vlegp/sim_PROP_y_test.csv are the output testing data for each property. <br />
+4. RXX-vlegp/x_train.csv are the input training data for all properties. <br />
+5. RXX-vlegp/x_test.csv are the input testing data for all properties. <br />
+6. RXX-vlegp/vle-gps.pkl are the pickled GP models for each property. <br />
+
+The pymser directory is a clone of the pymser repository. Refer to their [GitHub Page](https://github.com/IBM/pymser) for more information.
 
 ### LJ Parameter Optimization (OptAT)
 To run LJ parameter optimization, follow the following steps:
