@@ -4,7 +4,7 @@ Authors: Montana N. Carlozo, Ke Wang, and Alexander W. Dowling
 ## Introduction
 **genFF_public** is a repository used to calibrate a transferable FF for one- and two-carbon single-bonded refrigerants with elements of C, F, and H given experimental data. The key feature of this work is using machine learning (ML) tools in the form of Gaussian processes (GPs) and estimability analysis techniques to smartly design atom type schemes for tranferable FFs and optimize their LJ parameters. This work features the comparison of four atom typing schemes designed and optimized with ML and GAFF.
 
-Note: For all files in this repository, AT-4 (main text) corresponds to AT-1 (repository files). Similarly, AT-6a corresponds to AT-2, AT-6b corresponds to AT-6, and AT-8 corresponds to AT-8.
+**Note**: For all files in this repository, AT-4 (main text) corresponds to AT-1 (repository files). Similarly, AT-6a corresponds to AT-2, AT-6b corresponds to AT-6, and AT-8 corresponds to AT-8.
 
 ## Citation
 Please cite as:
@@ -15,7 +15,8 @@ Montana N. Carlozo, Ning Wang, Alexander W. Dowling, Edward J. Maginn “Machine
 
 ### Repository Organization
 The repository is organized as follows: <br />
-genFF_public/ is the top level directory. It contains: <br />
+genFF_public/ is the top level directory. <br />
+It contains the following: <br />
 1. .gitignore prevents large files from the signac workflow and plots from being tracked by git and prevents tracking of other unimportant files. <br />
 2. hfcs-fffit.yaml is the conda environment for use with this work. <br />
 3. gen-gp-vle.py is the code used to create the GP models in this work from the data in our previous study. <br />
@@ -36,18 +37,18 @@ Each contains the following files/subdirectories: <br />
 2. workspace/ will appear to save all raw results generated during the workflow after running init_gpbo*.py. This file is not tracked by git due to its size. the workspace/ folder for this study can be downloaded on Google Drive (see section 'Workflow Files and Results') <br />
 3. signac_project_document.json will also appear to track the status of jobs in the signac workflow <br />
 
-Directory csv/ contains data used to train the GP models
+Directory csv/ contains data used to train the GP models. <br />
 It contains the following files: <br />
 1. rXX-density.csv; The MD density data. <br />
 2. rXX-vle.csv; The GEMC data which is used to train the GP models. <br />
 
-Directory example_mcf_files/ contains sample .mcf files for all models and HFCs evaluated in this work
+Directory example_mcf_files/ contains sample .mcf files for all models and HFCs evaluated in this work. <br />
 It contains the following files/subdirectories: <br />
-1. AT-Y/RXX-species1.mcf are the sample .mcf files for each FF model and HFC. <br />
+1. AT-Y/RXX-species1.mcf are the sample .mcf files for each FF model and refrigerant. <br />
 
-Directory fffit/fffit is a package which contains some critical functions for running the workflow <br />
+Directory fffit/fffit is a package which contains some critical functions for running the workflow. <br />
 It contains the following files/subdirectories: <br />
-1. tests/ contains the tests for the functions in fffit/fffit
+1. tests/ contains the tests for the functions in fffit/fffit. <br />
 2. __init__.py intializes the package. <br />
 3. models.py contains functions related to building GP models. <br />
 4. pareto.py contains functions related to locating pareto-optimal parameter sets. <br />
@@ -55,9 +56,9 @@ It contains the following files/subdirectories: <br />
 6. signac.py contains functions related to parsing data from signac workspaces. <br />
 7. utils.py contains utility functions necessary for this package. <br />
 
-Directory molec_gp_data/ contains the GPs and training/testing data for each HFC <br />
+Directory molec_gp_data/ contains the GPs and training/testing data for each refrigerant. <br />
 It contains the following files/subdirectories: <br />
-1. RXX-vlegp are the subdirectories for each HFC. <br />
+1. RXX-vlegp are the subdirectories for each refrigerant. <br />
 2. RXX-vlegp/sim_PROP_y_train.csv are the output training data for each property. <br />
 3. RXX-vlegp/sim_PROP_y_test.csv are the output testing data for each property. <br />
 4. RXX-vlegp/x_train.csv are the input training data for all properties. <br />
@@ -66,7 +67,7 @@ It contains the following files/subdirectories: <br />
 
 The pymser/ directory is a clone of the pymser repository. Refer to their [GitHub Page](https://github.com/IBM/pymser) for more information. <br />
 
-The utils/ directory consists of the functions and files required for generalized FF optimization <br />
+The utils/ directory consists of the functions and files required for generalized FF optimization. <br />
 It contains the following files/subdirectories: <br />
 1. molec_class_files/rXX.py are files containing class objects with the experimental data and relevant information for each refrigerant.  <br />
 2. __init__.py intializes the package. <br />
@@ -91,7 +92,7 @@ All of the scripts for running the workflow are provided in this repository. pos
 
 ### Figures
 All scripts required to generate the primary figures in the
-manuscript and SI are reported under ``genFF_public/post_analysis_ms.py``. When running analysis scripts, these figures are saved under ``Results_MS_/at_y/RXX``
+manuscript and SI are reported under ``genFF_public/post_analysis_ms.py``. When running analysis scripts, these figures are saved under ``Results_MS_/at_yy/RXX``
 
 ## Installation
 To run this software, you must have access to all packages in the hfcs-fffit environment (hfcs-fffit.yaml) which can be installed using the instructions in the next section.
@@ -123,22 +124,21 @@ instructions assume a working knowledge of that software. <br />
 
 ### LJ Parameter Optimization (OptAT)
 To run LJ parameter optimization, follow the following steps:
-1. Make weight dictionary in Results/at_zz/Rxx/weight_sclrs.json. Use form {"Rxx": wt1, "Ryy": wt2}
-2. Use init_optff_ms.py to initialize files for simulation use. Change init_opt_at.py as necessary
+1. Use init_optff_ms.py to initialize files for simulation use. Change init_opt_at.py as necessary
    ```
      cd genFF_public
      python init_opt_at.py
    ```  
-3. Do the following in opt_at_params directory:
-4. Generate pareto sets for 1st repeats
+2. Do the following in opt_at_params directory:
+3. Generate pareto sets for 1st repeats
    ```
      python project_opt_at.py submit -o gen_pareto_sets -f obj_choice [val] atom_type [val]
    ```   
-5. Run the optimization algorithm with repeats
+4. Run the optimization algorithm with repeats
    ```
      python project_opt_at.py submit -o run_obj_alg -f obj_choice [val] atom_type [val]
    ```
-6. Run the post analysis algorithm
+5. Run the post analysis algorithm
    ```
      cd genFF_public
      python post_analysis_opt.py
