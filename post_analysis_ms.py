@@ -9,7 +9,7 @@ import copy
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import scipy 
-from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes,plot_pvap_hvap, plot_err_each_prop, plot_err_avg_props
+from utils.analyze_ms import prepare_df_vle, prepare_df_vle_errors, plot_vle_envelopes,plot_pvap_hvap, plot_err_each_prop, plot_err_avg_props, plot_param_comp, plot_mapd_comp
 
 #After jobs are finished
 #save signac results for each atom for a given atom typing scheme and number of training parameters
@@ -194,3 +194,15 @@ for error_obj in error_objs:
     plt.close()
     # #Close figures 
     pdf_MAPD.close() 
+
+str_mol = "R50"
+at_list = ["gaff", 1, 2]
+w_params = True
+mapd_params = ["rho_l", "H_vap"]
+plot_param_comp(str_mol, w_params, at_list, mapd_params)
+
+str_mol = "R23"
+at_list = ["gaff", 1, 2, 6, 8]
+w_params = False
+mapd_params = ["rho_l", "rho_v", "P_vap", "H_vap"]
+plot_mapd_comp(str_mol, w_params, at_list, mapd_params)
