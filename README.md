@@ -245,8 +245,8 @@ matplotlib==3.10.1 <br />
 mosdef_cassandra==0.4.0 <br />
 numdifftools==0.9.41 <br />
 numpy==1.26.4 <br />
-packmol==20.16.1 <br />             
-pandas==2.2.3 <br />          
+packmol==20.16.1 <br />            
+pandas==2.2.3 <br />       
 panedr==0.8.0 <br />
 pymser==1.0.21 <br />
 python==3.12.10 <br /> 
