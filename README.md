@@ -4,7 +4,7 @@ Authors: Montana N. Carlozo, Ning Wang, Alexander W. Dowling, and Edward J. Magi
 ## Introduction
 **genFF_public** is a repository used to calibrate a transferable FF for one- and two-carbon single-bonded refrigerants with elements of C, F, and H given experimental data. The key feature of this work is using machine learning (ML) tools in the form of Gaussian processes (GPs) and estimability analysis techniques to smartly design atom type schemes for tranferable FFs and optimize their LJ parameters. This work features the comparison of four atom typing schemes designed and optimized with ML and GAFF.
 
-**Note**: For all files in this repository, AT-4 (main text) corresponds to AT-1 (repository files). Similarly, AT-6a corresponds to AT-2, AT-6b corresponds to AT-6, and AT-8 corresponds to AT-8.
+**Note: For all files in this repository, AT-4 (main text) corresponds to AT-1 (repository files). Similarly, AT-6a corresponds to AT-2, AT-6b corresponds to AT-6, and AT-8 corresponds to AT-8.**
 
 ## Citation
 Please cite as:
