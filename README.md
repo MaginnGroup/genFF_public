@@ -1,5 +1,5 @@
 # Machine Learning to Optimize Transferable Hydrofluorocarbon Refrigerant Force Fields
-Authors: Montana N. Carlozo, Ke Wang, and Alexander W. Dowling
+Authors: Montana N. Carlozo, Ning Wang, Alexander W. Dowling, and Edward J. Maginn
 <!-- Introduction: Provide a brief introduction to the project, including its purpose, goals, and any key features or benefits. -->
 ## Introduction
 **genFF_public** is a repository used to calibrate a transferable FF for one- and two-carbon single-bonded refrigerants with elements of C, F, and H given experimental data. The key feature of this work is using machine learning (ML) tools in the form of Gaussian processes (GPs) and estimability analysis techniques to smartly design atom type schemes for tranferable FFs and optimize their LJ parameters. This work features the comparison of four atom typing schemes designed and optimized with ML and GAFF.
