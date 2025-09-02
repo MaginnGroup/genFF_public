@@ -82,8 +82,8 @@ def get_gp_data_from_pkl(key_list):
     ), "all key in key_list must be valid keys"
     # Make a dict of the gp dictionaries for each molecule
     all_gp_dict = {}
-    # Ensure we are working out of generalizedFF
-    if Path(os.getcwd()).parent.name == "generalizedFF":
+    # Ensure we are working out of genFF_public
+    if Path(os.getcwd()).parent.name == "genFF_public":
         path_use = Path(Path(os.getcwd()).parent)
     else:
         path_use = Path(os.getcwd())
@@ -243,8 +243,8 @@ class Problem_Setup:
         self.at_class = make_atom_type_class(at_number)
         self.seed = 1
 
-        # Ensure we are working out of generalizedFF
-        if Path(os.getcwd()).parent.name == "generalizedFF":
+        # Ensure we are working out of genFF_public
+        if Path(os.getcwd()).parent.name == "genFF_public":
             self.use_root = Path(Path(os.getcwd()).parent)
         else:
             self.use_root = Path(os.getcwd())
@@ -391,7 +391,7 @@ class Problem_Setup:
         ), "molecules must be a string or list/np.ndarray of strings"
         molecule_str = self.molec_names_to_str(molecules)
 
-        if Path(os.getcwd()).parent.name == "generalizedFF":
+        if Path(os.getcwd()).parent.name == "genFF_public":
             use_dir_name = Path(Path(os.getcwd()).parent)
         else:
             use_dir_name = Path(os.getcwd())
