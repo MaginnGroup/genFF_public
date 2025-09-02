@@ -49,7 +49,7 @@ It contains the following files/subdirectories: <br />
 Directory fffit/fffit is a package which contains some critical functions for running the workflow. <br />
 It contains the following files/subdirectories: <br />
 1. tests/ contains the tests for the functions in fffit/fffit. <br />
-2. __init__.py intializes the package. <br />
+2. `__init__`.py intializes the package. <br />
 3. models.py contains functions related to building GP models. <br />
 4. pareto.py contains functions related to locating pareto-optimal parameter sets. <br />
 5. plot.py contains some functions for plotting. <br />
@@ -70,7 +70,7 @@ The pymser/ directory is a clone of the pymser repository. Refer to their [GitHu
 The utils/ directory consists of the functions and files required for generalized FF optimization. <br />
 It contains the following files/subdirectories: <br />
 1. molec_class_files/rXX.py are files containing class objects with the experimental data and relevant information for each refrigerant.  <br />
-2. __init__.py intializes the package. <br />
+2. `__init__`.py intializes the package. <br />
 3. analyze_ms.py contains all functions necessary to analyze the molecular simulation data. <br />
 4. atom_type.py contains classes for each data-informed atom type studied in this work. <br />
 5. opt_atom_types.py contains classes and functions relevant for optimizing transferable FF parameters. <br />
@@ -92,7 +92,11 @@ All of the scripts for running the workflow are provided in this repository. pos
 
 ### Figures
 All scripts required to generate the primary figures in the
-manuscript and SI are reported under ``genFF_public/post_analysis_ms.py``. When running analysis scripts, these figures are saved under ``Results_MS_/at_yy/RXX``
+manuscript and SI are reported under ``genFF_public/post_analysis_ms.py``. When running analysis scripts, these figures are saved under ``Results_MS_/AT-1268/RXX``. <br />
+It contains the following files/subdirectories: <br />
+1. mapd_props.png is SI Figure S5.   <br />
+2. h_p_vap.pdf has property predictions for enthalpy of vaporization and vapor pressure for all FFs and moelcules. <br />
+3. vle.pdf has property predictions for the VLE curve for all FFs and moelcules. <br />
 
 ## Installation
 To run this software, you must have access to all packages in the hfcs-fffit environment (hfcs-fffit.yaml) which can be installed using the instructions in the next section.
