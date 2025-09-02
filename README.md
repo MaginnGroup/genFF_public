@@ -44,7 +44,7 @@ It contains the following files: <br />
 
 Directory example_mcf_files/ contains sample .mcf files for all models and HFCs evaluated in this work. <br />
 It contains the following files/subdirectories: <br />
-1. AT-Y/RXX-species1.mcf are the sample .mcf files for each FF model and refrigerant. The files list FF parameters used for each molecule and AT scheme. <br />
+1. AT-Y/RXX-species1.mcf are the sample .mcf files for each FF model and refrigerant. The files list parameters for the intramolecular and partial charges for each molecule and AT scheme. <br />
 
 Directory fffit/fffit is a package which contains some critical functions for running the workflow. <br />
 It contains the following files/subdirectories: <br />
