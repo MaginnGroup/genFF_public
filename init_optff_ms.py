@@ -67,7 +67,7 @@ molec_dict = {
 project = signac.init_project("opt_ff_ms")
 
 
-def unpack_molec_values(molec_name, at_class, sample, state_point):
+def unpack_molec_values(molec_name, molec_data, at_class, sample, state_point):
     """
     Unpacks sckaled sample values given the molecule under study
     """
@@ -159,7 +159,7 @@ for molec_name, molec_data in molec_dict.items():
                             "param_set": i + 1,
                         }
                         state_point = unpack_molec_values(
-                            molec_name, setup.at_class, sample, state_point
+                            molec_name, molec_data, setup.at_class, sample, state_point
                         )                
 
                         # print(state_point)
